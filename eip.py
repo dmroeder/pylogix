@@ -252,69 +252,6 @@ def _buildEIPHeader():
                         EIPItem2ID,EIPItem2Length,EIPSequence)
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
-  
-def _buildCIPTagReadRequest():
-    #given self.tagname, build up various tagname info
-    #Lot of redundant steps
-    #self.SequenceCounter+=1                         #Bump Sequence counter
-    BaseTagNameLength=len(self.TagName)
-    TagNamePadded=self.TagName
-    if (BaseTagNameLength%2):
-        TagNamePadded+=pack('B',0x00)               #add null to put on word boundry
-
-    TagNamePath=TagNamePadded
-    if self.Offset != None :
-        #first figure out if this is a list(touple) or an int
-        if not hasattr(self.Offset,'__len__'):     #if this does not have len it is an int er something
-            TagNamePath=TagNamePath+pack('<HH',
-                                         0x0029,        #Indicate type of data to follow
-                                         self.Offset)   #Add offset
-        else:   #This has len so we will make it muli dim
-            Depth=len(self.Offset)
-            if Depth>3: Depth=3
-            for Dim in xrange(Depth):
-                TagNamePath=TagNamePath+pack('<HH',
-                                         0x0029,        #Indicate type of data to follow
-                                         self.Offset[Dim])   #Add offset
-                
-
-
-
-    TagNamePathLengthBytes=len(TagNamePath)
-    TagNamePathLengthWords=int(TagNamePathLengthBytes/2)+1
-    
-    RequestNumberOfElements=self.NumberOfElements
-
-    #Start building the request
-
-    #RequestSequence=self.SequenceCounter
-    RequestService=0x4C                             #CIP Read_TAG_Service (PM020 Page 17)
-    RequestPathSize=TagNamePathLengthWords         #Lenght of path in words
- 
-    
-    RequestElements=self.NumberOfElements
-
-    CIPReadRequestPart1=pack('<BBBB',
-                             RequestService,
-                             RequestPathSize,
-                             0x91,
-                             len(self.TagName)
-                             )
-    CIPReadRequestPart2=TagNamePath                 #Fully formed path to tag
-                             
-
-
-    #CIPReadRequestPart3=pack('<BBH',
-    #                         0x29,
-    #                         0x00,
-    #                         RequestElements)
-    CIPReadRequestPart3=pack('<H',
-                              RequestElements)
-    
-    self.CIPRequest=CIPReadRequestPart1+CIPReadRequestPart2+CIPReadRequestPart3
-    return 
-
-
 
 def _buildCIPTagReadRequestStuffs():
     #given self.tagname, build up various tagname info
@@ -642,8 +579,3 @@ def PackFormat(DataType):
 	return '<f'
     elif DataType==672:
 	return '<L'
-      
-def isStupid(tag):
-    if tag.lower().endswith(".pre"): return True
-    if tag.lower().endswith(".acc"): return True
-    return False
