@@ -3,14 +3,6 @@ from random import randrange
 import socket
 import sys
 import ctypes
-#import Bit
-#import Globals
-
-
-#todo  	REAL displays more information than is in the PLC.  
-#	Timers, counters and other data types
-#	Understand how this even works!
-#	Make the read any accept just tagname or tagname and length
 
 self=None
 PLC=self
@@ -169,15 +161,16 @@ def _buildCIPForwardOpen():
     CIPConnectionPathSize=0x04                       #(B)                                   (3-5.5.1.9)
     CIPConnectionPath=(0x01,0x00,0x20,0x02,0x24,0x01,0x2c,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
 
-        #Port Identifier [BackPlane]
-        #Link adress 0x00
-        #Logical Segment ->Class ID ->8-bit
-        #ClassID 0x02
-        #Logical Segment ->Instance ID -> 8-bit
-        #Instance 0x01
-        #Logical Segment -> connection point ->8 bit
-        #Connection Point 0x01
-    
+    """
+    Port Identifier [BackPlane]
+    Link adress 0x00
+    Logical Segment ->Class ID ->8-bit
+    ClassID 0x02
+    Logical Segment ->Instance ID -> 8-bit
+    Instance 0x01
+    Logical Segment -> connection point ->8 bit
+    Connection Point 0x01
+    """
     self.CIPForwardOpenFrame=pack('<BBBBBBBBIIHHIB3BIhIhBB8B',
                                   CIPService,
                                   CIPPathSize,
@@ -254,115 +247,108 @@ def _buildEIPHeader():
     return
 
 def _buildCIPTagReadRequestStuffs():
-    #given self.tagname, build up various tagname info
-    #Lot of redundant steps
-    #self.SequenceCounter+=1                    # Bump Sequence counter
-    TagSplit=self.TagName.lower().split(".")	# try splitting in case we're reading a UDT
-    BaseTagNameLength=len(self.TagName)		# get the base tag length
-    TagNamePadded=self.TagName
-    if (BaseTagNameLength%2):
-        TagNamePadded+=pack('B',0x00)           #add null to put on word boundry
-
-    TagNamePath=TagNamePadded
-    ##if self.Offset != None :
-        ###first figure out if this is a list(touple) or an int
-        ##if not hasattr(self.Offset,'__len__'):     #if this does not have len it is an int er something
-            ##TagNamePath=TagNamePath+pack('<HH',
-                                         ##0x0029,        #Indicate type of data to follow
-                                         ##self.Offset)   #Add offset
-        ##else:   #This has len so we will make it muli dim
-            ##Depth=len(self.Offset)
-            ##if Depth>3: Depth=3
-            ##for Dim in xrange(Depth):
-                ##TagNamePath=TagNamePath+pack('<HH',
-                                         ##0x0029,        #Indicate type of data to follow
-                                         ##self.Offset[Dim])   #Add offset
-
-    TagNamePathLengthBytes=len(TagNamePath)     
-    TagNamePathLengthWords=int(TagNamePathLengthBytes/2)+len(TagSplit)
-    RequestNumberOfElements=self.NumberOfElements+1
+    '''
+    What I have here is what we call a cluster fuck.  Might be necessary but a cluster 
+    fuck none the less.  The packet needs to be assembled different ways depending on if
+    you are reading a normal tag, array or UDT (SuperDuper, SuperDuper[x], Super.Duper)
     
-    #Start building the request
-    #RequestSequence=self.SequenceCounter
+    First off by using the split, we can determine if it's a UDT becaues they contain "."
+    
+    Also, if we look for a ] at the end, then we are working with an array.  Arrays are silly
+    because we have to pass the tag without the [x] on it.  We also have to pass it the index
+    in [x] (we pass it x).  So because of this, I have to figure the length different
+    
+    There's probably a cleaner way to do this but I just barely got it working.
+    
+    So the following block of code really just figures out the RequestPathSize
+    '''
+    TagSplit=self.TagName.lower().split(".")	# try splitting in case we're reading a UDT
+    
+    if self.TagName.endswith("]"):	
+	plctag=self.TagName
+	# we are after an array, let's pretend SuperDuper[x]
+	ElementPosition=(len(plctag)-plctag.index("["))	# find position of [
+	basetag=plctag[:-ElementPosition]		# remove [x]: result=SuperDuper
+	temp=plctag[-ElementPosition:]			# remove tag: result=[x]
+	index=int(temp[1:-1])				# strip the []: result=x
+	TagNamePathLengthBytes=len(basetag)		# get number of bytes
+	
+	# if it's odd number, add another word
+	if TagNamePathLengthBytes%2==1: TagNamePathLengthBytes+=1
+
+	TagNamePathLengthWords=1 			# start with 1 word for 0x91 and tag len
+	TagNamePathLengthWords+=int(TagNamePathLengthBytes/2)	# add words for tag name
+	
+	if index < 256:			# if index < 256, we need 1 word to store the index	
+	    TagNamePathLengthWords+=1	# add additional word for index
+	else:				# if index > 256 we need 2 words to store index
+	    TagNamePathLengthWords+=2	# add 2 words for index
+    else:
+	BaseTagNameLength=len(self.TagName)	# get the base tag length
+	TagNamePadded=self.TagName
+	 # add null to put on word boundry
+	if (BaseTagNameLength%2): TagNamePadded+=pack('B',0x00)          
+
+	TagNamePath=TagNamePadded
+	TagNamePathLengthBytes=len(TagNamePath)
+	TagNamePathLengthWords=int(TagNamePathLengthBytes/2)
+	TagNamePathLengthWords+=len(TagSplit)
+
+    """
+    Now that we figured out the RequestPathSize in probably the most complicated way possible,
+    we need to assemble the packet.  Of course it gets assembled in multiple ways
+    """
     RequestService=0x4C                             #CIP Read_TAG_Service (PM020 Page 17)
     RequestPathSize=TagNamePathLengthWords          #Lenght of path in words
     RequestElements=self.NumberOfElements
+    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)
     
-    CIPReadRequest=pack('<BB',
-			RequestService,
-			RequestPathSize
-			)
-    # UDT's contain a "." in the tag name.  TagSplit stores the tag name split by "."
-    # So if TagSplit length is greater than 1, then we're working with a UDT.
-    # I had to do some silly shit to handle tags with a single "." vs tags with multiple
-    # we're basically doing a loop for each piece of the tag name to build the packet.
-    if len(TagSplit) > 1:
+    """
+    Here's where we actually assemble the packet for reading the tag.  Again, we have
+    different ways of doing this depending on if we are reading SuperDuper, Super.Duper or
+    SuperDuper[x].
+    
+    There are a few if/else statments where we are using %, this is to figure out if something
+    is an odd/even number of bytes.  If odd, we need to ad a byte to make sure they are "word friendly"
+    """
+    if len(TagSplit) > 1:	# assemble tag for UDT
 	for i in xrange(len(TagSplit)):
-	    CIPReadRequest+=pack('<BB',
-				  0x91,
-				  len(TagSplit[i])
-				)
-	    
-	    if len(TagSplit[i])%2==0:
-		CIPReadRequest+=TagSplit[i]
-	    else:
-		CIPReadRequest+=(TagSplit[i]+pack('<B', 0x00))
-		
-    elif self.TagName.endswith("]"):
-	plctag=self.TagName
-	# we are after an array
-	# find the position of the [
-	ElementPosition=(len(plctag)-plctag.index("["))
-	# give us the base tag (remove the [x])
-	basetag=plctag[:-ElementPosition]
-	# give us just the [x]
-	temp=plctag[-ElementPosition:]
-	# remove the braces and just leave the index
-	index=int(temp[1:-1])
-	CIPReadRequest+=pack('<BB',
-			      0x91,
-			      len(basetag)
-			     )
-	if len(basetag)%2==0:
-	    CIPReadRequest+=basetag
-	else:
-	    CIPReadRequest+=(basetag+pack('<B', 0x00))
-		      
-	CIPReadRequest+=pack('<BB',
-			     0x28,
-			     index
-			    )
+	    # add the service code and name length
+	    CIPReadRequest+=pack('<BB', 0x91, len(TagSplit[i]))
+	    CIPReadRequest+=TagSplit[i]
+	    if len(TagSplit[i])%2==1: CIPReadRequest+=pack('<B', 0x00)	
+    elif self.TagName.endswith("]"):	# Assemble differently for array
+	# again, add the service code and tag length
+	CIPReadRequest+=pack('<BB', 0x91, len(basetag))
+	CIPReadRequest+=basetag
+	if len(basetag)%2==1: CIPReadRequest+=pack('<B', 0x00)
+
+	# add the index, occupies one word
+	if index < 256:	CIPReadRequest+=pack('<BB', 0x28, index)
+	# add the index, occupies two words
+	if index > 255: CIPReadRequest+=pack('<BBH', 0x29, 0x00, index)
 	
-    else:
-	# this is for non-UDT's
-	CIPReadRequest+=pack('<BB',
-			      0x91,
-			      len(TagSplit[0])
-			    )
-	##CIPReadRequest+=TagNamePath
-	if len(TagSplit[0])%2==0: 
-	    CIPReadRequest+=TagSplit[0]
-	else:
-	    CIPReadRequest+=TagSplit[0]+pack('<B', 0x00)
+    else:	# and for regular o'l tag
+	CIPReadRequest+=pack('<BB', 0x91, len(TagSplit[0]))
+	CIPReadRequest+=TagSplit[0]
+	if len(TagSplit[0])%2==1: CIPReadRequest+=pack('<B', 0x00)
 
-    
     # the final part of the packet, common for any tag read
-    CIPReadRequest+=pack('<H',
-			  RequestElements)
-
+    CIPReadRequest+=pack('<H', RequestElements)
     self.CIPRequest=CIPReadRequest
     return
 
 
 def _buildCIPTagWriteRequest():
-    #given self.tagname, build up various tagname info
-    #Lot of redundant steps
-    #When sending a struct, it is up to you to form it correctly
-    #writing to a struct is speacial case
-    #The format becomes:
-    #Tagname,0xA0,0X02,'H' Sturct identifier,number of structs,[struct data]
-    #the The struc identifier screws things up
-
+    """
+    given self.tagname, build up various tagname info
+    Lot of redundant steps
+    When sending a struct, it is up to you to form it correctly
+    writing to a struct is speacial case
+    The format becomes:
+    Tagname,0xA0,0X02,'H' Sturct identifier,number of structs,[struct data]
+    the The struc identifier screws things up
+    """
 
     self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
     self.NumberOfElements=len(self.WriteData)            #list of elements to write
@@ -465,11 +451,13 @@ def OpenConnection(IPAddress):
         self.OpenForwardSessionDone=True
         
 def ReadStuffs(*args):
-    # Reads any data type.  We use the args so that the user can either send just a
-    #	tag name or a tag name and length (for reading arrays)
+    """
+     Reads any data type.  We use the args so that the user can either send just a
+    	tag name or a tag name and length (for reading arrays)
     
-    #args[0] = tag name
-    #args[1] = Number of Elements
+    args[0] = tag name
+    args[1] = Number of Elements
+    """
     name=args[0]
     PLC.TagName=name
     if len(args) == 2:	# array read
@@ -519,7 +507,6 @@ def ReadStuffs(*args):
 	print Status, ExtendedStatus
 	print "Did not nail it, read fail", name
       
-#def WriteStuffs(TagName, Value, DataType):
 def WriteStuffs(*args):
     TagName=args[0]
     Value=args[1]
