@@ -246,6 +246,74 @@ def _buildEIPHeader():
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
 
+def _buildCIPTagReadRequestSuper():
+    """
+    Wish me luck!
+    So here's what happens here.  Tags can be super simple like mytag or pretty complex
+    like My.Tag[7].Value.  In the example, the tag needs to be split up by the '.' and
+    assembled different depending on if the portion is an array or not.  The other thing
+    we have to consider is if the tag segment is an even number of bytes or not.  If it's
+    not, then we have to add a byte.
+    
+    So throughout this function we have to figure out the number of words necessary
+    for this packet as well assemblying the tag portion of the packet.  It might be more
+    complicated than it should be but that's all I could come up with.
+    """
+    RequestPathSize=0	# define path size
+    RequestTagData=""		# define tag data
+    RequestElements=self.NumberOfElements
+    
+    TagSplit = self.TagName.lower().split(".")
+    
+    # this loop figures out the packet length and builds our packet
+    for i  in xrange(len(TagSplit)):
+    
+	if TagSplit[i].endswith("]"):
+	    RequestPathSize+=1					# add a word for 0x91 and len
+	    ElementPosition=(len(TagSplit[i])-TagSplit[i].index("["))	# find position of [
+	    basetag=TagSplit[i][:-ElementPosition]		# remove [x]: result=SuperDuper
+	    temp=TagSplit[i][-ElementPosition:]			# remove tag: result=[x]
+	    index=int(temp[1:-1])				# strip the []: result=x
+	    BaseTagLenBytes=len(basetag)			# get number of bytes
+	
+	    # Assemble the packet
+	    RequestTagData+=pack('<BB', 0x91, len(basetag))	# add the req type and tag len to packet
+	    RequestTagData+=basetag				# add the tag name
+	    if BaseTagLenBytes%2==1:				# check for odd bytes
+		BaseTagLenBytes+=1				# add another byte to make it even
+		RequestTagData+=pack('<B', 0x00)		# add the byte to our packet
+	    
+	    BaseTagLenWords=BaseTagLenBytes/2			# figure out the words for this segment
+
+	    RequestPathSize+=BaseTagLenWords			# add it to our request size
+	    if index < 256:					# if index is 1 byte...
+		RequestPathSize+=1				# add word for array index
+		RequestTagData+=pack('<BB', 0x28, index)	# add one word to packet
+	    if index > 255:					# if index is more than 1 byte...
+		RequestPathSize+=2				# add 2 words for array for index
+		RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
+	    #print ""
+	
+	else:
+	    # for non-array segment of tag
+	    RequestPathSize+=1					# add a word for 0x91 and len
+	    BaseTagLenBytes=len(TagSplit[i])			# store len of tag
+	    RequestTagData+=pack('<BB', 0x91, len(TagSplit[i]))	# add to packet
+	    RequestTagData+=TagSplit[i]				# add tag req type and len to packet
+	    if BaseTagLenBytes%2==1:				# if odd number of bytes
+		BaseTagLenBytes+=1				# add byte to make it even
+		RequestTagData+=pack('<B', 0x00)		# also add to packet
+	    RequestPathSize+=BaseTagLenBytes/2			# add words to our path size
+
+    #print "Total Words:", TotalWords
+    # start assembling the results!
+    RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
+    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    CIPReadRequest+=RequestTagData				# Tag portion of packet
+    CIPReadRequest+=pack('<H', RequestElements)			# end of packet
+    self.CIPRequest=CIPReadRequest	
+    return
+    
 def _buildCIPTagReadRequestStuffs():
     '''
     What I have here is what we call a cluster fuck.  Might be necessary but a cluster 
@@ -468,7 +536,8 @@ def ReadStuffs(*args):
 	
     PLC.NumberOfElements=NumberOfElements
     PLC.Offset=None
-    _buildCIPTagReadRequestStuffs()
+    #_buildCIPTagReadRequestStuffs()
+    _buildCIPTagReadRequestSuper()
     _buildEIPHeader()
     
     PLC.Socket.send(PLC.EIPFrame)
