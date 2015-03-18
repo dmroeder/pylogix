@@ -4,6 +4,16 @@ import socket
 import sys
 import ctypes
 
+"""
+I think I can update the CIPTagRequest to be combined process both read and write. 
+I'll probably just have to add a parameter to specify whether read or write called it.
+There will be a few specific things to writes that have to be added to the packet.
+
+One idea for writing would be to read the tag first to determine the data type, then
+the user wouldn't have to enter it.  You could just enter the tag and value
+"""
+
+
 self=None
 PLC=self
 class Self():
@@ -17,11 +27,11 @@ def __init__():
     PLC=self
     self.IPAddress=""
     self.Port=44818
-    self.Context='Rad'
+    self.Context='RadWagon'
     self.CIPDataTypes={"STRUCT":(0,0x02A0,'B'),"BOOL":(1,0x00C1,'?'),"SINT":(1,0x00C2,'b'),"INT":(2,0x00C3,'h'),"DINT":(4,0x00C4,'i'),"REAL":(4,0x00CA,'f'),"DWORD":(4,0x00D3,'I'),"LINT":(8,0x00C5,'Q')}
     self.CIPDataType=None
     self.CIPData=None
-    self.VendorID=0x1234
+    self.VendorID=0x1337
     self.SerialNumber=randrange(65000)
     self.OriginatorSerialNumber=42
     self.Socket=socket.socket()
@@ -245,6 +255,7 @@ def _buildEIPHeader():
                         EIPItem2ID,EIPItem2Length,EIPSequence)
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
+   
 
 def _buildCIPTagReadRequest():
     """
@@ -310,7 +321,79 @@ def _buildCIPTagReadRequest():
     CIPReadRequest+=pack('<H', RequestElements)			# end of packet
     self.CIPRequest=CIPReadRequest	
     return
+
+def _buildCIPTagRequest():
+  
+    self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
+    self.NumberOfElements=len(self.WriteData)            #list of elements to write
+    self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
     
+    RequestPathSize=0	# define path size
+    RequestTagData=""		# define tag data
+    RequestElements=self.NumberOfElements
+    
+    TagSplit = self.TagName.lower().split(".")
+    
+    # this loop figures out the packet length and builds our packet
+    for i  in xrange(len(TagSplit)):
+    
+	if TagSplit[i].endswith("]"):
+	    RequestPathSize+=1					# add a word for 0x91 and len
+	    ElementPosition=(len(TagSplit[i])-TagSplit[i].index("["))	# find position of [
+	    basetag=TagSplit[i][:-ElementPosition]		# remove [x]: result=SuperDuper
+	    temp=TagSplit[i][-ElementPosition:]			# remove tag: result=[x]
+	    index=int(temp[1:-1])				# strip the []: result=x
+	    BaseTagLenBytes=len(basetag)			# get number of bytes
+	
+	    # Assemble the packet
+	    RequestTagData+=pack('<BB', 0x91, len(basetag))	# add the req type and tag len to packet
+	    RequestTagData+=basetag				# add the tag name
+	    if BaseTagLenBytes%2==1:				# check for odd bytes
+		BaseTagLenBytes+=1				# add another byte to make it even
+		RequestTagData+=pack('<B', 0x00)		# add the byte to our packet
+	    
+	    BaseTagLenWords=BaseTagLenBytes/2			# figure out the words for this segment
+
+	    RequestPathSize+=BaseTagLenWords			# add it to our request size
+	    if index < 256:					# if index is 1 byte...
+		RequestPathSize+=1				# add word for array index
+		RequestTagData+=pack('<BB', 0x28, index)	# add one word to packet
+	    if index > 255:					# if index is more than 1 byte...
+		RequestPathSize+=2				# add 2 words for array for index
+		RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
+	
+	else:
+	    # for non-array segment of tag
+	    RequestPathSize+=1					# add a word for 0x91 and len
+	    BaseTagLenBytes=len(TagSplit[i])			# store len of tag
+	    RequestTagData+=pack('<BB', 0x91, len(TagSplit[i]))	# add to packet
+	    RequestTagData+=TagSplit[i]				# add tag req type and len to packet
+	    if BaseTagLenBytes%2==1:				# if odd number of bytes
+		BaseTagLenBytes+=1				# add byte to make it even
+		RequestTagData+=pack('<B', 0x00)		# also add to packet
+	    RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
+    
+    
+    
+    RequestNumberOfElements=self.NumberOfElements
+    if self.CIPDataType.upper()=="STRUCT":  #Structs are special
+        RequestNumberOfElements=self.StructIdentifier    
+    
+    RequestService=0x4D                             #CIP Write_TAG_Service (PM020 Page 17)
+    RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
+    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    CIPReadRequest+=RequestTagData				# Tag portion of packet    
+    CIPReadRequest+=pack('<HH', RequestElementType, RequestNumberOfElements)
+    self.CIPRequest=CIPReadRequest
+    
+    
+    for i in xrange(len(self.WriteData)):
+        el=self.WriteData[i]
+        self.CIPRequest+=pack('<'+self.CIPDataTypes[self.CIPDataType.upper()][2],el)
+        
+    return
+  
+  
 def _buildCIPTagWriteRequest():
     """
     given self.tagname, build up various tagname info
@@ -325,12 +408,11 @@ def _buildCIPTagWriteRequest():
     self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
     self.NumberOfElements=len(self.WriteData)            #list of elements to write
     self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
-    
 
     BaseTagNameLength=len(self.TagName)
     TagNamePadded=self.TagName
     if (BaseTagNameLength%2):
-        TagNamePadded+=pack('B',0x00)               #add null to put on word boundry
+        TagNamePadCIPReadRequestPart1ded+=pack('B',0x00)               #add null to put on word boundry
 
     TagNamePath=TagNamePadded
     if self.Offset != None :
@@ -480,6 +562,11 @@ def ReadStuffs(*args):
 	print "Did not nail it, read fail", name
       
 def WriteStuffs(*args):
+    """
+    Typical write arguments: Tag, Value, DataType
+    Typical array write arguments: Tag, Value, DataType, Length
+    """
+    
     TagName=args[0]
     Value=args[1]
     DataType=args[2]
@@ -505,7 +592,7 @@ def WriteStuffs(*args):
     else:
 	print "fix this"
 	
-    _buildCIPTagWriteRequest()
+    _buildCIPTagWriteRequestStuffs()
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
