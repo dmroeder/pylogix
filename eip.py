@@ -322,13 +322,19 @@ def _buildCIPTagReadRequest():
     self.CIPRequest=CIPReadRequest	
     return
 
-def _buildCIPTagRequest():
-  
-    self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
-    self.NumberOfElements=len(self.WriteData)            #list of elements to write
-    self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
+def _buildCIPTagRequest(reqType):
+    """
+    So here's what happens here.  Tags can be super simple like mytag or pretty complex
+    like My.Tag[7].Value.  In the example, the tag needs to be split up by the '.' and
+    assembled different depending on if the portion is an array or not.  The other thing
+    we have to consider is if the tag segment is an even number of bytes or not.  If it's
+    not, then we have to add a byte.
     
-    RequestPathSize=0	# define path size
+    So throughout this function we have to figure out the number of words necessary
+    for this packet as well assemblying the tag portion of the packet.  It might be more
+    complicated than it should be but that's all I could come up with.
+    """
+    RequestPathSize=0		# define path size
     RequestTagData=""		# define tag data
     RequestElements=self.NumberOfElements
     
@@ -374,25 +380,32 @@ def _buildCIPTagRequest():
 	    RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
     
     
-    
-    RequestNumberOfElements=self.NumberOfElements
-    if self.CIPDataType.upper()=="STRUCT":  #Structs are special
-        RequestNumberOfElements=self.StructIdentifier    
-    
-    RequestService=0x4D                             #CIP Write_TAG_Service (PM020 Page 17)
-    RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
-    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
-    CIPReadRequest+=RequestTagData				# Tag portion of packet    
-    CIPReadRequest+=pack('<HH', RequestElementType, RequestNumberOfElements)
-    self.CIPRequest=CIPReadRequest
-    
-    
-    for i in xrange(len(self.WriteData)):
-        el=self.WriteData[i]
-        self.CIPRequest+=pack('<'+self.CIPDataTypes[self.CIPDataType.upper()][2],el)
-        
+    if reqType=="Write":
+	# do the write related stuff if we're writing a tag
+      	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
+	self.NumberOfElements=len(self.WriteData)            #list of elements to write
+	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
+	RequestNumberOfElements=self.NumberOfElements
+	if self.CIPDataType.upper()=="STRUCT":  #Structs are special
+	    RequestNumberOfElements=self.StructIdentifier    
+    	RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
+	RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
+        CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+	CIPReadRequest+=RequestTagData					# Tag portion of packet 
+	CIPReadRequest+=pack('<HH', RequestElementType, RequestNumberOfElements)
+	self.CIPRequest=CIPReadRequest
+	for i in xrange(len(self.WriteData)):
+	    el=self.WriteData[i]
+	    self.CIPRequest+=pack('<'+self.CIPDataTypes[self.CIPDataType.upper()][2],el)
+    if reqType=="Read":
+	# do the read related stuff if we are reading
+	RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
+	CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+	CIPReadRequest+=RequestTagData					# Tag portion of packet
+	CIPReadRequest+=pack('<H', RequestElements)			# end of packet
+	self.CIPRequest=CIPReadRequest
+
     return
-  
   
 def _buildCIPTagWriteRequest():
     """
@@ -522,7 +535,8 @@ def ReadStuffs(*args):
 	
     PLC.NumberOfElements=NumberOfElements
     PLC.Offset=None
-    _buildCIPTagReadRequest()
+    #_buildCIPTagReadRequest()
+    _buildCIPTagRequest("Read")
     _buildEIPHeader()
     
     PLC.Socket.send(PLC.EIPFrame)
@@ -592,7 +606,8 @@ def WriteStuffs(*args):
     else:
 	print "fix this"
 	
-    _buildCIPTagWriteRequestStuffs()
+    #_buildCIPTagWriteRequestStuffs()
+    _buildCIPTagRequest("Write")
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
