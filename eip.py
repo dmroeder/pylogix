@@ -246,9 +246,8 @@ def _buildEIPHeader():
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
 
-def _buildCIPTagReadRequestSuper():
+def _buildCIPTagReadRequest():
     """
-    Wish me luck!
     So here's what happens here.  Tags can be super simple like mytag or pretty complex
     like My.Tag[7].Value.  In the example, the tag needs to be split up by the '.' and
     assembled different depending on if the portion is an array or not.  The other thing
@@ -292,7 +291,6 @@ def _buildCIPTagReadRequestSuper():
 	    if index > 255:					# if index is more than 1 byte...
 		RequestPathSize+=2				# add 2 words for array for index
 		RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
-	    #print ""
 	
 	else:
 	    # for non-array segment of tag
@@ -305,7 +303,6 @@ def _buildCIPTagReadRequestSuper():
 		RequestTagData+=pack('<B', 0x00)		# also add to packet
 	    RequestPathSize+=BaseTagLenBytes/2			# add words to our path size
 
-    #print "Total Words:", TotalWords
     # start assembling the results!
     RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
     CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
@@ -314,99 +311,6 @@ def _buildCIPTagReadRequestSuper():
     self.CIPRequest=CIPReadRequest	
     return
     
-def _buildCIPTagReadRequestStuffs():
-    '''
-    What I have here is what we call a cluster fuck.  Might be necessary but a cluster 
-    fuck none the less.  The packet needs to be assembled different ways depending on if
-    you are reading a normal tag, array or UDT (SuperDuper, SuperDuper[x], Super.Duper)
-    
-    First off by using the split, we can determine if it's a UDT becaues they contain "."
-    
-    Also, if we look for a ] at the end, then we are working with an array.  Arrays are silly
-    because we have to pass the tag without the [x] on it.  We also have to pass it the index
-    in [x] (we pass it x).  So because of this, I have to figure the length different
-    
-    There's probably a cleaner way to do this but I just barely got it working.
-    
-    So the following block of code really just figures out the RequestPathSize
-    '''
-    TagSplit=self.TagName.lower().split(".")	# try splitting in case we're reading a UDT
-    
-    if self.TagName.endswith("]"):	
-	plctag=self.TagName
-	# we are after an array, let's pretend SuperDuper[x]
-	ElementPosition=(len(plctag)-plctag.index("["))	# find position of [
-	basetag=plctag[:-ElementPosition]		# remove [x]: result=SuperDuper
-	temp=plctag[-ElementPosition:]			# remove tag: result=[x]
-	index=int(temp[1:-1])				# strip the []: result=x
-	TagNamePathLengthBytes=len(basetag)		# get number of bytes
-	
-	# if it's odd number, add another word
-	if TagNamePathLengthBytes%2==1: TagNamePathLengthBytes+=1
-
-	TagNamePathLengthWords=1 			# start with 1 word for 0x91 and tag len
-	TagNamePathLengthWords+=int(TagNamePathLengthBytes/2)	# add words for tag name
-	
-	if index < 256:			# if index < 256, we need 1 word to store the index	
-	    TagNamePathLengthWords+=1	# add additional word for index
-	else:				# if index > 256 we need 2 words to store index
-	    TagNamePathLengthWords+=2	# add 2 words for index
-    else:
-	BaseTagNameLength=len(self.TagName)	# get the base tag length
-	TagNamePadded=self.TagName
-	 # add null to put on word boundry
-	if (BaseTagNameLength%2): TagNamePadded+=pack('B',0x00)          
-
-	TagNamePath=TagNamePadded
-	TagNamePathLengthBytes=len(TagNamePath)
-	TagNamePathLengthWords=int(TagNamePathLengthBytes/2)
-	TagNamePathLengthWords+=len(TagSplit)
-
-    """
-    Now that we figured out the RequestPathSize in probably the most complicated way possible,
-    we need to assemble the packet.  Of course it gets assembled in multiple ways
-    """
-    RequestService=0x4C                             #CIP Read_TAG_Service (PM020 Page 17)
-    RequestPathSize=TagNamePathLengthWords          #Lenght of path in words
-    RequestElements=self.NumberOfElements
-    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)
-    
-    """
-    Here's where we actually assemble the packet for reading the tag.  Again, we have
-    different ways of doing this depending on if we are reading SuperDuper, Super.Duper or
-    SuperDuper[x].
-    
-    There are a few if/else statments where we are using %, this is to figure out if something
-    is an odd/even number of bytes.  If odd, we need to ad a byte to make sure they are "word friendly"
-    """
-    if len(TagSplit) > 1:	# assemble tag for UDT
-	for i in xrange(len(TagSplit)):
-	    # add the service code and name length
-	    CIPReadRequest+=pack('<BB', 0x91, len(TagSplit[i]))
-	    CIPReadRequest+=TagSplit[i]
-	    if len(TagSplit[i])%2==1: CIPReadRequest+=pack('<B', 0x00)	
-    elif self.TagName.endswith("]"):	# Assemble differently for array
-	# again, add the service code and tag length
-	CIPReadRequest+=pack('<BB', 0x91, len(basetag))
-	CIPReadRequest+=basetag
-	if len(basetag)%2==1: CIPReadRequest+=pack('<B', 0x00)
-
-	# add the index, occupies one word
-	if index < 256:	CIPReadRequest+=pack('<BB', 0x28, index)
-	# add the index, occupies two words
-	if index > 255: CIPReadRequest+=pack('<BBH', 0x29, 0x00, index)
-	
-    else:	# and for regular o'l tag
-	CIPReadRequest+=pack('<BB', 0x91, len(TagSplit[0]))
-	CIPReadRequest+=TagSplit[0]
-	if len(TagSplit[0])%2==1: CIPReadRequest+=pack('<B', 0x00)
-
-    # the final part of the packet, common for any tag read
-    CIPReadRequest+=pack('<H', RequestElements)
-    self.CIPRequest=CIPReadRequest
-    return
-
-
 def _buildCIPTagWriteRequest():
     """
     given self.tagname, build up various tagname info
@@ -536,8 +440,7 @@ def ReadStuffs(*args):
 	
     PLC.NumberOfElements=NumberOfElements
     PLC.Offset=None
-    #_buildCIPTagReadRequestStuffs()
-    _buildCIPTagReadRequestSuper()
+    _buildCIPTagReadRequest()
     _buildEIPHeader()
     
     PLC.Socket.send(PLC.EIPFrame)
