@@ -255,72 +255,6 @@ def _buildEIPHeader():
                         EIPItem2ID,EIPItem2Length,EIPSequence)
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
-   
-
-def _buildCIPTagReadRequest():
-    """
-    So here's what happens here.  Tags can be super simple like mytag or pretty complex
-    like My.Tag[7].Value.  In the example, the tag needs to be split up by the '.' and
-    assembled different depending on if the portion is an array or not.  The other thing
-    we have to consider is if the tag segment is an even number of bytes or not.  If it's
-    not, then we have to add a byte.
-    
-    So throughout this function we have to figure out the number of words necessary
-    for this packet as well assemblying the tag portion of the packet.  It might be more
-    complicated than it should be but that's all I could come up with.
-    """
-    RequestPathSize=0	# define path size
-    RequestTagData=""		# define tag data
-    RequestElements=self.NumberOfElements
-    
-    TagSplit = self.TagName.lower().split(".")
-    
-    # this loop figures out the packet length and builds our packet
-    for i  in xrange(len(TagSplit)):
-    
-	if TagSplit[i].endswith("]"):
-	    RequestPathSize+=1					# add a word for 0x91 and len
-	    ElementPosition=(len(TagSplit[i])-TagSplit[i].index("["))	# find position of [
-	    basetag=TagSplit[i][:-ElementPosition]		# remove [x]: result=SuperDuper
-	    temp=TagSplit[i][-ElementPosition:]			# remove tag: result=[x]
-	    index=int(temp[1:-1])				# strip the []: result=x
-	    BaseTagLenBytes=len(basetag)			# get number of bytes
-	
-	    # Assemble the packet
-	    RequestTagData+=pack('<BB', 0x91, len(basetag))	# add the req type and tag len to packet
-	    RequestTagData+=basetag				# add the tag name
-	    if BaseTagLenBytes%2==1:				# check for odd bytes
-		BaseTagLenBytes+=1				# add another byte to make it even
-		RequestTagData+=pack('<B', 0x00)		# add the byte to our packet
-	    
-	    BaseTagLenWords=BaseTagLenBytes/2			# figure out the words for this segment
-
-	    RequestPathSize+=BaseTagLenWords			# add it to our request size
-	    if index < 256:					# if index is 1 byte...
-		RequestPathSize+=1				# add word for array index
-		RequestTagData+=pack('<BB', 0x28, index)	# add one word to packet
-	    if index > 255:					# if index is more than 1 byte...
-		RequestPathSize+=2				# add 2 words for array for index
-		RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
-	
-	else:
-	    # for non-array segment of tag
-	    RequestPathSize+=1					# add a word for 0x91 and len
-	    BaseTagLenBytes=len(TagSplit[i])			# store len of tag
-	    RequestTagData+=pack('<BB', 0x91, len(TagSplit[i]))	# add to packet
-	    RequestTagData+=TagSplit[i]				# add tag req type and len to packet
-	    if BaseTagLenBytes%2==1:				# if odd number of bytes
-		BaseTagLenBytes+=1				# add byte to make it even
-		RequestTagData+=pack('<B', 0x00)		# also add to packet
-	    RequestPathSize+=BaseTagLenBytes/2			# add words to our path size
-
-    # start assembling the results!
-    RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
-    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
-    CIPReadRequest+=RequestTagData				# Tag portion of packet
-    CIPReadRequest+=pack('<H', RequestElements)			# end of packet
-    self.CIPRequest=CIPReadRequest	
-    return
 
 def _buildCIPTagRequest(reqType):
     """
@@ -407,75 +341,6 @@ def _buildCIPTagRequest(reqType):
 
     return
   
-def _buildCIPTagWriteRequest():
-    """
-    given self.tagname, build up various tagname info
-    Lot of redundant steps
-    When sending a struct, it is up to you to form it correctly
-    writing to a struct is speacial case
-    The format becomes:
-    Tagname,0xA0,0X02,'H' Sturct identifier,number of structs,[struct data]
-    the The struc identifier screws things up
-    """
-
-    self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
-    self.NumberOfElements=len(self.WriteData)            #list of elements to write
-    self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
-
-    BaseTagNameLength=len(self.TagName)
-    TagNamePadded=self.TagName
-    if (BaseTagNameLength%2):
-        TagNamePadCIPReadRequestPart1ded+=pack('B',0x00)               #add null to put on word boundry
-
-    TagNamePath=TagNamePadded
-    if self.Offset != None :
-        #first figure out if this is a list(touple) or an int
-        if not hasattr(self.Offset,'__len__'):     #if this does not have len it is an int er something
-            TagNamePath=TagNamePath+pack('<HH',
-                                         0x0029,        #Indicate type of data to follow
-                                         self.Offset)   #Add offset
-        else:   #This has len so we will make it muli dim
-            Depth=len(self.Offset)
-            if Depth>3: Depth=3
-            for Dim in xrange(Depth):
-                TagNamePath=TagNamePath+pack('<HH',
-                                         0x0029,        #Indicate type of data to follow
-                                         self.Offset[Dim])   #Add offset
-    TagNamePathLengthBytes=len(TagNamePath)
-    TagNamePathLengthWords=int(TagNamePathLengthBytes/2)+1
-    
-    RequestNumberOfElements=self.NumberOfElements
-    if self.CIPDataType.upper()=="STRUCT":  #Structs are special
-        RequestNumberOfElements=self.StructIdentifier
-        
-    #Start building the request
-
-    RequestService=0x4D                             #CIP Write_TAG_Service (PM020 Page 17)
-    RequestPathSize=TagNamePathLengthWords          #Lenght of path in words
- 
-    
-    RequestElements=self.NumberOfElements
-    RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
-    
-    CIPReadRequestPart1=pack('<BBBB',
-                             RequestService,
-                             RequestPathSize,
-                             0x91,
-                             len(self.TagName))
-    CIPReadRequestPart2=TagNamePath                 #Fully formed path to tag
-                             
-
-
-    CIPReadRequestPart3=pack('<HH',
-                             RequestElementType,
-                             RequestNumberOfElements)
-                                 
-    self.CIPRequest=CIPReadRequestPart1+CIPReadRequestPart2+CIPReadRequestPart3
-    for i in xrange(len(self.WriteData)):
-        el=self.WriteData[i]
-        self.CIPRequest+=pack('<'+self.CIPDataTypes[self.CIPDataType.upper()][2],el)
-        
-    return
   
 def MakeString(string):
     work=[]
@@ -535,7 +400,6 @@ def ReadStuffs(*args):
 	
     PLC.NumberOfElements=NumberOfElements
     PLC.Offset=None
-    #_buildCIPTagReadRequest()
     _buildCIPTagRequest("Read")
     _buildEIPHeader()
     
@@ -606,7 +470,6 @@ def WriteStuffs(*args):
     else:
 	print "fix this"
 	
-    #_buildCIPTagWriteRequestStuffs()
     _buildCIPTagRequest("Write")
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
