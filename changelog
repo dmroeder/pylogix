@@ -1,0 +1,15 @@
+03/18/2015
+  -Removed buildCIPTagRead and Write requests (now one funtion)
+  
+03/17/2015
+  -Merged buildTagRead and Write Request into one common function called buildTagRequest
+  -Cleaned up some code
+  
+03/16/2015
+  -Reworked CIPRequest to read complex data types (specific array elements and UDT's)
+  -Added ability to read a single simple array element
+  
+03/14/2015
+  -Removed duplicate CIPTagReadRequest function (from testing)
+  -Initial commit
+  

@@ -390,6 +390,12 @@ def ReadStuffs(*args):
     args[0] = tag name
     args[1] = Number of Elements
     """
+    
+    # If not connected to PLC, abandon ship!
+    if self.SocketConnected==False:
+	print "Failed to connect to", self.IPAddress, ". Abandoning ship!"
+	sys.exit(0)
+	
     name=args[0]
     PLC.TagName=name
     if len(args) == 2:	# array read
@@ -445,6 +451,11 @@ def WriteStuffs(*args):
     Typical array write arguments: Tag, Value, DataType, Length
     """
     
+    # If not connected to PLC, abandon ship!
+    if self.SocketConnected==False:
+	print "Failed to connect to", self.IPAddress, ". Abandoning ship!"
+	sys.exit(0)
+	
     TagName=args[0]
     Value=args[1]
     DataType=args[2]
@@ -503,3 +514,4 @@ def PackFormat(DataType):
 	return '<f'
     elif DataType==672:
 	return '<L'
+      
