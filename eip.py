@@ -49,6 +49,7 @@ def __init__():
     self.ForwardOpenDone=False
     self.RegisterSesionDone=False
     self.SocketConnected=False
+    self.ProcessorSlot=0x00
     PLC=self
 
   
@@ -169,11 +170,11 @@ def _buildCIPForwardOpen():
                                                      # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
     CIPTransportTrigger=0xA3                         #(B)                                   (3-5.5.1.12)
     CIPConnectionPathSize=0x04                       #(B)                                   (3-5.5.1.9)
-    CIPConnectionPath=(0x01,0x00,0x20,0x02,0x24,0x01,0x2c,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
+    CIPConnectionPath=(0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01,0x2c,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
 
     """
     Port Identifier [BackPlane]
-    Link adress 0x00
+    Link adress .SetProcessorSlot (default=0x00)
     Logical Segment ->Class ID ->8-bit
     ClassID 0x02
     Logical Segment ->Instance ID -> 8-bit
@@ -355,8 +356,16 @@ def MakeString(string):
         work.append(0x00)
     return work
   
+def SetProcessorSlot(slot):
+    if isinstance(slot, int) and (slot>=0 and slot<17):
+	# set the processor slot
+	self.ProcessorSlot=0x00+slot
+    else:
+	print "Processor slot must be an integer between 0 and 16, defaulting to 0"
+	self.SocketConnected=False
+	self.ProcessorSlot=0x00
+  
 def OpenConnection(IPAddress):
-    self.SocketConnected=False
     self.IPAddress=IPAddress
     try:
         _openconnection()
@@ -488,17 +497,17 @@ def WriteStuffs(*args):
 
 
 def BytesPerElement(DataType):
-    if DataType==193:
+    if DataType==193:	#BOOL
 	return 1
-    elif DataType==194:
+    elif DataType==194:	#SINT
 	return 1
-    elif DataType==195:
+    elif DataType==195:	#INT
 	return 2
-    elif DataType==196:
+    elif DataType==196:	#DINT
 	return 4
-    elif DataType==202:
+    elif DataType==202:	#REAL
 	return 4
-    elif DataType==672:
+    elif DataType==672:	#STRING
 	return 4
 
 def PackFormat(DataType):

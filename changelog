@@ -1,3 +1,10 @@
+03/23/2015
+  -Added ProcessorSlot.  If not in slot 0, use .SetProcessorSlot(n)
+
+03/22/2015
+  -Added check for connection in read/write functions, no longer crashes
+  -Added change log
+
 03/18/2015
   -Removed buildCIPTagRead and Write requests (now one funtion)
   
