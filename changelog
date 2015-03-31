@@ -1,3 +1,7 @@
+03/XX/2015
+  -Removed "PackFormat" function, put the code back in the read function
+  -Added ability to read a bit from a word
+
 03/23/2015
   -Added ProcessorSlot.  If not in slot 0, use .SetProcessorSlot(n)
 

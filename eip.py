@@ -95,7 +95,7 @@ def _buildUnregisterSession():
     EIPContext=self.Context
     EIPOptions=0x00
 
-    self.unregistersession=pack('<HHII8sI',
+    self.UnregisterSession=pack('<HHII8sI',
                                 EIPCommand,
                                 EIPLength,
                                 EIPSessionHandle,
@@ -239,6 +239,7 @@ def _buildEIPHeader():
     EIPSequence=self.SequenceCounter        #(H)
     self.SequenceCounter+=1
     self.SequenceCounter=self.SequenceCounter%0x10000
+    #print EIPItem2ID, EIPItem2Length, EIPSequence
     
     self.EIPHeaderFrame=pack('<HHII8sIIHHHHIHHH',
                         EIPCommand,
@@ -305,14 +306,24 @@ def _buildCIPTagRequest(reqType):
 	
 	else:
 	    # for non-array segment of tag
-	    RequestPathSize+=1					# add a word for 0x91 and len
-	    BaseTagLenBytes=len(TagSplit[i])			# store len of tag
-	    RequestTagData+=pack('<BB', 0x91, len(TagSplit[i]))	# add to packet
-	    RequestTagData+=TagSplit[i]				# add tag req type and len to packet
-	    if BaseTagLenBytes%2==1:				# if odd number of bytes
-		BaseTagLenBytes+=1				# add byte to make it even
-		RequestTagData+=pack('<B', 0x00)		# also add to packet
-	    RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
+	    # the try might be a stupid way of doing this.  If the portion of the tag
+	    # 	can be converted to an integer successfully then we must be just looking
+	    #	for a bit from a word rather than a UDT.  So we then don't want to assemble
+	    #	the read request as a UDT, just read the value of the DINT.  We'll figure out
+	    #	the individual bit in the read function.
+	    try:
+		if int(TagSplit[i])<=31:
+		    #do nothing
+		    test="test"
+	    except:
+		RequestPathSize+=1					# add a word for 0x91 and len
+		BaseTagLenBytes=len(TagSplit[i])				# store len of tag
+		RequestTagData+=pack('<BB', 0x91, len(TagSplit[i]))	# add to packet
+		RequestTagData+=TagSplit[i]				# add tag req type and len to packet
+		if BaseTagLenBytes%2==1:					# if odd number of bytes
+		    BaseTagLenBytes+=1					# add byte to make it even
+		    RequestTagData+=pack('<B', 0x00)			# also add to packet
+		RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
     
     
     if reqType=="Write":
@@ -431,17 +442,29 @@ def ReadStuffs(*args):
     if Status==204 and ExtendedStatus==0: # nailed it!
 	if len(args) == 1:	# user passed 1 argument (non array read)
 	    # Do different stuff based on the returned data type
-	    if DataType==0:
-		# 0 means something wrong with the datatype
-		print "Invalid DataTpe", DataType
+	    if DataType==0:	
+		print "I'm not sure what happened, data type returned:", DataType
 	    elif DataType==672:
 		# gotta handle strings a little different
-		NameLength=unpack_from(PackFormat(DataType) ,PLC.ReceiveData, 54)[0]
+		NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
 		returnvalue=PLC.ReceiveData[-84:(-84+NameLength)]
 	    else:
 		# this handles SINT, INT, DINT, REAL
 		returnvalue=unpack_from(PackFormat(DataType), PLC.ReceiveData, 52)[0]
-	      
+		
+	    
+	    # if we were just reading a bit of a word, convert it to a true/false
+	    SplitTest=name.lower().split(".")
+	    if len(SplitTest) > 1:
+		BitPos=SplitTest[len(SplitTest)-1]
+		try:
+		    if int(BitPos)<=31:
+			returnvalue=BitValue(BitPos, returnvalue)
+		except:
+		    #print "Failed to convert bit"
+		    do="nothing"
+		
+		
 	    return returnvalue
 
 	else:	# user passed more than one argument (array read)
@@ -495,6 +518,68 @@ def WriteStuffs(*args):
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
 
+def GetTagList():
+  
+    # I honestly don't know what this stuff is, I got it
+    # from sniffing AHMI packets.
+    RequestService=0x55
+    ReqNoOfWords=0x02
+    PathSegment1=0x20
+    ConnectionManager=0x06
+    PathSegment2=0x24
+    SegmentInstance=0x01
+    
+    self.CIPRequest=pack('<BBBBBB',
+			 RequestService,
+			 ReqNoOfWords,
+			 PathSegment1,
+			 ConnectionManager,
+			 PathSegment2,
+			 SegmentInstance
+			 )
+			  
+			  
+    #_openconnection()
+    #_buildRegisterSession()
+    #self.Socket.send(self.registersession)
+    #self.ReceiveData=self.Socket.recv(1024)
+    #self.SessionHandle=unpack_from('<I', self.ReceiveData,4)[0]
+    #print self.SessionHandle
+    
+    _buildCIPForwardOpen
+    #self.ForwardOpenFrame=self.EIPSendRRFrame+self.UnregisterSession
+    _buildForwardOpenPacket()
+    _buildEIPHeader()
+    #PLC.Socket.send(PLC.EIPFrame)
+    #PLC.Receive=PLC.Socket.recv(1024)
+    
+    
+    
+def BitValue (BitNumber, Value):
+    BitNumber=int(BitNumber)	# convert to int just in case
+    Value=int(Value)		# convert to int just in case
+    if Value==0: return False	# must be false if our value is 0
+    dectobin=list(bin(Value)[2:])	# convert value to bit array
+    listlen=len(dectobin)-1		# get the length of the array
+    bit=dectobin[listlen-BitNumber]	# get the specific bit that we were after
+    bit=int(bit)		# convert to int
+    if bit==0: return False	# convert to false
+    if bit==1: return True	# convert to true
+
+
+def PackFormat(DataType):
+    if DataType==193:	#BOOL
+	return '<?'
+    elif DataType==194:	#SINT
+	return '<b'
+    elif DataType==195:	#INT
+	return '<h'
+    elif DataType==196:	#DINT
+	return '<i'
+    elif DataType==202:	#REAL
+	return '<f'
+    elif DataType==672:	#STRING
+	return '<L'
 
 def BytesPerElement(DataType):
     if DataType==193:	#BOOL
@@ -509,18 +594,4 @@ def BytesPerElement(DataType):
 	return 4
     elif DataType==672:	#STRING
 	return 4
-
-def PackFormat(DataType):
-    if DataType==193:
-	return '<?'
-    elif DataType==194:
-	return '<b'
-    elif DataType==195:
-	return '<h'
-    elif DataType==196:
-	return '<i'
-    elif DataType==202:
-	return '<f'
-    elif DataType==672:
-	return '<L'
       
