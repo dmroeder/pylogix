@@ -1,3 +1,6 @@
+06/12/2015
+  -OpenConnection now happens in the read/write functions.  Now need to use .SetIPAddress()
+  
 03/XX/2015
   -Removed "PackFormat" function, put the code back in the read function
   -Added ability to read a bit from a word
