@@ -61,10 +61,43 @@ def _openconnection():
         self.Socket.connect((self.IPAddress,self.Port))
         self.SocketConnected=True
     except:
-        #print "open except ",sys.exc_info()
         self.SocketConnected=False
+	print "Failed to connect to", self.IPAddress, ". Abandoning ship!"
+	sys.exit(0)
+        
+    self.SerialNumber=self.SerialNumber+1
+    if self.SocketConnected==True:
+        _buildRegisterSession()
+        self.Socket.send(self.registersession)
+        self.ReceiveData=self.Socket.recv(1024)
+        self.SessionHandle=unpack_from('<I',self.ReceiveData,4)[0]
+        self.RegisterSessionDone=True
+        
+        #try a forward open
+        _buildCIPForwardOpen
+        _buildForwardOpenPacket()
+        self.Socket.send(self.ForwardOpenFrame)
+        self.ReceiveData=self.Socket.recv(1024)
+        TempID=unpack_from('<I', self.ReceiveData, 44)
+        self.OTNetworkConnectionID=TempID[0]
+        self.OpenForwardSessionDone=True
+        
     return
-  
+
+def SetIPAddress(address):
+    self.IPAddress=address
+    return
+
+def SetProcessorSlot(slot):
+    if isinstance(slot, int) and (slot>=0 and slot<17):
+	# set the processor slot
+	self.ProcessorSlot=0x00+slot
+    else:
+	print "Processor slot must be an integer between 0 and 16, defaulting to 0"
+	self.SocketConnected=False
+	self.ProcessorSlot=0x00
+	
+	
 def _buildRegisterSession():
     EIPCommand=0x0065                       #(H)Register Session Command   (Vol 2 2-3.2)
     EIPLength=0x0004                        #(H)Lenght of Payload          (2-3.3)
@@ -367,40 +400,33 @@ def MakeString(string):
         work.append(0x00)
     return work
   
-def SetProcessorSlot(slot):
-    if isinstance(slot, int) and (slot>=0 and slot<17):
-	# set the processor slot
-	self.ProcessorSlot=0x00+slot
-    else:
-	print "Processor slot must be an integer between 0 and 16, defaulting to 0"
-	self.SocketConnected=False
-	self.ProcessorSlot=0x00
+
   
-def OpenConnection(IPAddress):
-    self.IPAddress=IPAddress
-    try:
-        _openconnection()
-    except:
-        print "Failed to open socket"
-        print "Fail need something else to do"
-        print "Unexpected error:", sys.exc_info()
-        return
-    self.SerialNumber=self.SerialNumber+1
-    if self.SocketConnected==True:
-        _buildRegisterSession()
-        self.Socket.send(self.registersession)
-        self.ReceiveData=self.Socket.recv(1024)
-        self.SessionHandle=unpack_from('<I',self.ReceiveData,4)[0]
-        self.RegisterSessionDone=True
+#def OpenConnection(IPAddress):
+    #self.IPAddress=IPAddress
+    #try:
+        #_openconnection()
+    #except:
+        #print "Failed to open socket"
+        #print "Fail need something else to do"
+        #print "Unexpected error:", sys.exc_info()
+        #return
+    #self.SerialNumber=self.SerialNumber+1
+    #if self.SocketConnected==True:
+        #_buildRegisterSession()
+        #self.Socket.send(self.registersession)
+        #self.ReceiveData=self.Socket.recv(1024)
+        #self.SessionHandle=unpack_from('<I',self.ReceiveData,4)[0]
+        #self.RegisterSessionDone=True
         
-        #try a forward open
-        _buildCIPForwardOpen
-        _buildForwardOpenPacket()
-        self.Socket.send(self.ForwardOpenFrame)
-        self.ReceiveData=self.Socket.recv(1024)
-        TempID=unpack_from('<I', self.ReceiveData, 44)
-        self.OTNetworkConnectionID=TempID[0]
-        self.OpenForwardSessionDone=True
+        ##try a forward open
+        #_buildCIPForwardOpen
+        #_buildForwardOpenPacket()
+        #self.Socket.send(self.ForwardOpenFrame)
+        #self.ReceiveData=self.Socket.recv(1024)
+        #TempID=unpack_from('<I', self.ReceiveData, 44)
+        #self.OTNetworkConnectionID=TempID[0]
+        #self.OpenForwardSessionDone=True
         
 def ReadStuffs(*args):
     """
@@ -413,8 +439,7 @@ def ReadStuffs(*args):
     
     # If not connected to PLC, abandon ship!
     if self.SocketConnected==False:
-	print "Failed to connect to", self.IPAddress, ". Abandoning ship!"
-	sys.exit(0)
+	_openconnection()
 	
     name=args[0]
     PLC.TagName=name
@@ -485,8 +510,7 @@ def WriteStuffs(*args):
     
     # If not connected to PLC, abandon ship!
     if self.SocketConnected==False:
-	print "Failed to connect to", self.IPAddress, ". Abandoning ship!"
-	sys.exit(0)
+	_openconnection()
 	
     TagName=args[0]
     Value=args[1]
