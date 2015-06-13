@@ -142,6 +142,19 @@ def _buildForwardOpenPacket():
     _buildEIPSendRRDatHeader()
     self.ForwardOpenFrame=self.EIPSendRRFrame+self.CIPForwardOpenFrame
     return
+
+def _buildForwardOpenPacketToo(partial):
+    if partial==False: _buildMessageRequest()
+    if partial==True: _buildPartialMessageRequest()
+    if partial==False: _buildCIPForwardOpenToo(0x0010)
+    if partial==True: _buildCIPForwardOpenToo(0x0012)
+    self.CIPForwardOpenFrame=self.CIPForwardOpenFrame+self.StupidMessage
+    _buildEIPSendRRDatHeaderToo()
+
+
+    self.ForwardOpenFrame=self.EIPSendRRFrame+self.CIPForwardOpenFrame
+    #self.ForwardOpenFrame=self.CIPForwardOpenFrame
+    return
   
 def _buildEIPSendRRDatHeader():
     EIPCommand=0x6F                                 #(H)EIP SendRRData         (Vol2 2-4.7)
@@ -243,6 +256,133 @@ def _buildCIPForwardOpen():
                                    
     
     
+    return
+
+def _buildCIPForwardOpenToo(toots):
+    CIPService=0x52                                  #(B) CIP OpenForward        Vol 3 (3-5.5.2)(3-5.5)
+    CIPPathSize=0x02               		     #(B) Request Path zize              (2-4.1)
+    CIPClassType=0x20                                #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
+                                                            #[Logical Segment][Class ID][8 bit addressing]
+    CIPClass=0x06                                    #(B) Connection Manager Object      (3-5)
+    CIPInstanceType=0x24                             #(B) Instance type                  (C-1.1)
+                                                            #[Logical Segment][Instance ID][8 bit addressing]
+    CIPInstance=0x01                                 #(B) Instance
+    CIPPriority=0x0A                                 #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
+    CIPTimeoutTicks=0x0e                             #(B) Timeout Info                   (3-5.5.1.3)
+    CIPOTConnectionID=toots        	             #(I) O->T connection ID             (3-5.16)
+    # the above value needs to be replaced by the message request length or something like that
+    """
+    Port Identifier [BackPlane]
+    Link adress .SetProcessorSlot (default=0x00)
+    Logical Segment ->Class ID ->8-bit
+    ClassID 0x02
+    Logical Segment ->Instance ID -> 8-bit
+    Instance 0x01
+    Logical Segment -> connection point ->8 bit
+    Connection Point 0x01
+    """
+    
+    self.CIPForwardOpenFrame=pack('<BBBBBBBBH',
+                                  CIPService,
+                                  CIPPathSize,
+                                  CIPClassType,
+                                  CIPClass,
+                                  CIPInstanceType,
+                                  CIPInstance,
+                                  CIPPriority,
+                                  CIPTimeoutTicks,
+                                  CIPOTConnectionID)
+    
+    #print "CIPForwardOpenFrame:", len(self.CIPForwardOpenFrame)
+    return
+
+def _buildEIPSendRRDatHeaderToo():
+    EIPCommand=0x6F                                 #(H)EIP SendRRData         (Vol2 2-4.7)
+    EIPLength=16+len(self.CIPForwardOpenFrame)      #(H)
+    EIPSessionHandle=self.SessionHandle             #(I)
+    EIPStatus=0x00                                  #(I)
+    EIPContext=self.Context                         #(8s)
+    EIPOptions=0x00                                 #(I)
+                                                    #Begin Command Specific Data
+    EIPInterfaceHandle=0x00                         #(I) Interface Handel       (2-4.7.2)
+    EIPTimeout=0x00                                 #(H) Always 0x00
+    EIPItemCount=0x02                               #(H) Always 0x02 for our purposes
+    EIPItem1Type=0x00                               #(H) Null Item Type
+    EIPItem1Length=0x00                             #(H) No data for Null Item
+    EIPItem2Type=0xB2                               #(H) Uconnected CIP message to follow
+    EIPItem2Length=0x00+len(self.CIPForwardOpenFrame)    #(H)
+  
+    self.EIPSendRRFrame=pack('<HHII8sIIHHHHHH',
+                             EIPCommand,
+                             EIPLength,
+                             EIPSessionHandle,
+                             EIPStatus,
+                             EIPContext,
+                             EIPOptions,
+                             EIPInterfaceHandle,
+                             EIPTimeout,
+                             EIPItemCount,
+                             EIPItem1Type,
+                             EIPItem1Length,
+                             EIPItem2Type,
+                             EIPItem2Length)
+    return
+
+def _buildMessageRequest():
+    StupidService=0x55
+    StupidServiceSize=0x02
+    StupidSegment1=0x6B20
+    StupidSegment2=0x0024
+    StupidStuff1=0x0004
+    StupidStuff2=0x0002
+    StupidStuff3=0x0007
+    StupidStuff4=0x0008
+    StupidStuff5=0x0001
+    StupidPathSize=0x01
+    StupidReserved=0x00
+    StupidPathPort=0x01
+    StupidPathSegment=0x00
+    
+    self.StupidMessage=pack('<BBHHHHHHHBBBB',
+			    StupidService,
+			    StupidServiceSize,
+			    StupidSegment1,
+			    StupidSegment2,
+			    StupidStuff1,
+			    StupidStuff2,
+			    StupidStuff3,
+			    StupidStuff4,
+			    StupidStuff5,
+			    StupidPathSize,
+			    StupidReserved,
+			    StupidPathPort,
+			    StupidPathSegment)
+    return
+    
+def _buildPartialMessageRequest():
+    StupidService=0x55
+    StupidServiceSize=0x03
+    StupidSegment1=0x6B20
+    StupidSegment2=0x8A980025
+    StupidStuff=(0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
+    StupidPathSize=0x01
+    StupidReserved=0x00
+    StupidPathPort=0x0001
+    #StupidPathSegment=0x00
+    
+    self.StupidMessage=pack('<BBHI10BBBH',
+			    StupidService,
+			    StupidServiceSize,
+			    StupidSegment1,
+			    StupidSegment2,
+			    StupidStuff[0], StupidStuff[1], StupidStuff[2],
+			    StupidStuff[3], StupidStuff[4], StupidStuff[5],
+			    StupidStuff[6], StupidStuff[7], StupidStuff[8],
+			    StupidStuff[9],
+			    StupidPathSize,
+			    StupidReserved,
+			    StupidPathPort)
+			    #StupidPathSegment)
     return
   
 def _buildEIPHeader():
@@ -544,39 +684,58 @@ def WriteStuffs(*args):
 
 def GetTagList():
   
-    # I honestly don't know what this stuff is, I got it
-    # from sniffing AHMI packets.
-    RequestService=0x55
-    ReqNoOfWords=0x02
-    PathSegment1=0x20
-    ConnectionManager=0x06
-    PathSegment2=0x24
-    SegmentInstance=0x01
+    self.SocketConnected=False
+    try:    
+        self.Socket=socket.socket()
+        self.Socket.settimeout(0.5)
+        self.Socket.connect((self.IPAddress,self.Port))
+        self.SocketConnected=True
+    except:
+        self.SocketConnected=False
+	print "Failed to connect to", self.IPAddress, ". Abandoning ship!!"
+	sys.exit(0)
+	
+    self.SerialNumber=self.SerialNumber+1
+    if self.SocketConnected==True:
+        _buildRegisterSession()
+        self.Socket.send(self.registersession)
+        self.ReceiveData=self.Socket.recv(1024)
+        self.SessionHandle=unpack_from('<I',self.ReceiveData,4)[0]
+        self.RegisterSessionDone=True
+
+    _buildForwardOpenPacketToo(False)
+    PLC.Socket.send(self.ForwardOpenFrame)
+    PLC.Receive=PLC.Socket.recv(1024)
+    status = unpack_from('<h', PLC.Receive, 42)[0]
+    print "	Printing our first packet"
+    # Parse the first packet
+    TagHaxxorz(PLC.Receive)
+    count = 2
+    while status == 6: # 6=partial transfer, more packets to follow
+      print "	Printing packet number", count
+      _buildForwardOpenPacketToo(True)
+      PLC.Socket.send(self.ForwardOpenFrame)
+      PLC.Receive=PLC.Socket.recv(1024)
+      TagHaxxorz(PLC.Receive)
+      status = unpack_from('<h', PLC.Receive, 42)[0]
+      count+=1
     
-    self.CIPRequest=pack('<BBBBBB',
-			 RequestService,
-			 ReqNoOfWords,
-			 PathSegment1,
-			 ConnectionManager,
-			 PathSegment2,
-			 SegmentInstance
-			 )
-			  
-			  
-    #_openconnection()
-    #_buildRegisterSession()
-    #self.Socket.send(self.registersession)
-    #self.ReceiveData=self.Socket.recv(1024)
-    #self.SessionHandle=unpack_from('<I', self.ReceiveData,4)[0]
-    #print self.SessionHandle
-    
-    _buildCIPForwardOpen
-    #self.ForwardOpenFrame=self.EIPSendRRFrame+self.UnregisterSession
-    _buildForwardOpenPacket()
-    _buildEIPHeader()
-    #PLC.Socket.send(PLC.EIPFrame)
-    #PLC.Receive=PLC.Socket.recv(1024)
-    
+def TagHaxxorz(data):
+  # First point to find the first tag length
+  lengthPointer = 64
+  # since length is 2 bytes, we need to move ahead 2 bytes to get
+  #	to the start of the tag
+  tagPointer = lengthPointer + 2
+  #print "data length: ", len(data)
+  
+  # now we're going to loop through the packet to pull out all the tags
+  while (lengthPointer-20) < len(data):
+    tagLen = unpack_from('<b', data, lengthPointer)[0]
+    # print the tag name [some slicing going on)
+    print data[tagPointer:tagPointer + tagLen]
+    # shift  to the next tag in our packet
+    lengthPointer = lengthPointer + tagLen + 22
+    tagPointer = lengthPointer + 2    
     
     
 def BitValue (BitNumber, Value):

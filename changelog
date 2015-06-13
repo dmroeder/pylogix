@@ -1,3 +1,6 @@
+06/13/2015
+  -Added GetTagList function, needs some serious work though
+  
 06/12/2015
   -OpenConnection now happens in the read/write functions.  Now need to use .SetIPAddress()
   
