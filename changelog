@@ -1,3 +1,6 @@
+06/14/2015
+  -Rename some TagList functions, combined TagListMessage functions
+  
 06/13/2015
   -Added GetTagList function, needs some serious work though
   

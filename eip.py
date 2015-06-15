@@ -5,9 +5,9 @@ import sys
 import ctypes
 
 """
-I think I can update the CIPTagRequest to be combined process both read and write. 
-I'll probably just have to add a parameter to specify whether read or write called it.
-There will be a few specific things to writes that have to be added to the packet.
+Polish up GetTagList()
+
+Investigate RSLinx GetAttribute
 
 One idea for writing would be to read the tag first to determine the data type, then
 the user wouldn't have to enter it.  You could just enter the tag and value
@@ -143,17 +143,20 @@ def _buildForwardOpenPacket():
     self.ForwardOpenFrame=self.EIPSendRRFrame+self.CIPForwardOpenFrame
     return
 
-def _buildForwardOpenPacketToo(partial):
-    if partial==False: _buildMessageRequest()
-    if partial==True: _buildPartialMessageRequest()
-    if partial==False: _buildCIPForwardOpenToo(0x0010)
-    if partial==True: _buildCIPForwardOpenToo(0x0012)
-    self.CIPForwardOpenFrame=self.CIPForwardOpenFrame+self.StupidMessage
+def _buildTagListPacket(partial):
+    # The packet has to be assembled a little different in the event
+    # that all of the tags don't fit in a single packet
+    if partial==False:
+      _buildTagListRequest(partial)
+      _buildCIPForwardOpenToo(0x0010)
+    else:
+      _buildTagListRequest(partial)
+      _buildCIPForwardOpenToo(0x0012)
+      
+    self.CIPForwardOpenFrame=self.CIPForwardOpenFrame+self.TagListRequest
     _buildEIPSendRRDatHeaderToo()
 
-
     self.ForwardOpenFrame=self.EIPSendRRFrame+self.CIPForwardOpenFrame
-    #self.ForwardOpenFrame=self.CIPForwardOpenFrame
     return
   
 def _buildEIPSendRRDatHeader():
@@ -293,7 +296,6 @@ def _buildCIPForwardOpenToo(toots):
                                   CIPTimeoutTicks,
                                   CIPOTConnectionID)
     
-    #print "CIPForwardOpenFrame:", len(self.CIPForwardOpenFrame)
     return
 
 def _buildEIPSendRRDatHeaderToo():
@@ -328,62 +330,84 @@ def _buildEIPSendRRDatHeaderToo():
                              EIPItem2Length)
     return
 
-def _buildMessageRequest():
-    StupidService=0x55
-    StupidServiceSize=0x02
-    StupidSegment1=0x6B20
-    StupidSegment2=0x0024
-    StupidStuff1=0x0004
-    StupidStuff2=0x0002
-    StupidStuff3=0x0007
-    StupidStuff4=0x0008
-    StupidStuff5=0x0001
-    StupidPathSize=0x01
-    StupidReserved=0x00
-    StupidPathPort=0x01
-    StupidPathSegment=0x00
+def _buildTagListRequest(partial):
+    TLService=0x55
+    if partial==False: TLServiceSize=0x02
+    if partial==True: TLServiceSize=0x03
+    TLSegment=0x6B20
     
-    self.StupidMessage=pack('<BBHHHHHHHBBBB',
-			    StupidService,
-			    StupidServiceSize,
-			    StupidSegment1,
-			    StupidSegment2,
-			    StupidStuff1,
-			    StupidStuff2,
-			    StupidStuff3,
-			    StupidStuff4,
-			    StupidStuff5,
-			    StupidPathSize,
-			    StupidReserved,
-			    StupidPathPort,
-			    StupidPathSegment)
-    return
+    TLRequest=pack('<BBH', TLService, TLServiceSize, TLSegment)
     
-def _buildPartialMessageRequest():
-    StupidService=0x55
-    StupidServiceSize=0x03
-    StupidSegment1=0x6B20
-    StupidSegment2=0x8A980025
-    StupidStuff=(0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
-    StupidPathSize=0x01
-    StupidReserved=0x00
-    StupidPathPort=0x0001
+    if partial==False: TLRequest=TLRequest + pack('<H', 0x0024)
+    if partial==True: TLRequest=TLRequest + pack('<I', 0x8A980025)
+    
+    TLStuff=(0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
+    TLPathSize=0x01
+    TLReserved=0x00
+    TLPort=0x0001
+    
+    self.TagListRequest=TLRequest + pack('<10BBBH',
+					 TLStuff[0], TLStuff[1], TLStuff[2], TLStuff[3], TLStuff[4],
+					 TLStuff[5], TLStuff[6], TLStuff[7], TLStuff[8], TLStuff[9],
+					 TLPathSize,
+					 TLReserved,
+					 TLPort)
+
+#def _buildTagListRequest():
+    #StupidService=0x55
+    #StupidServiceSize=0x02
+    #StupidSegment1=0x6B20
+    #StupidSegment2=0x0024
+    #StupidStuff1=0x0004
+    #StupidStuff2=0x0002
+    #StupidStuff3=0x0007
+    #StupidStuff4=0x0008
+    #StupidStuff5=0x0001
+    #StupidPathSize=0x01
+    #StupidReserved=0x00
+    #StupidPathPort=0x01
     #StupidPathSegment=0x00
     
-    self.StupidMessage=pack('<BBHI10BBBH',
-			    StupidService,
-			    StupidServiceSize,
-			    StupidSegment1,
-			    StupidSegment2,
-			    StupidStuff[0], StupidStuff[1], StupidStuff[2],
-			    StupidStuff[3], StupidStuff[4], StupidStuff[5],
-			    StupidStuff[6], StupidStuff[7], StupidStuff[8],
-			    StupidStuff[9],
-			    StupidPathSize,
-			    StupidReserved,
-			    StupidPathPort)
+    #self.TagListRequest=pack('<BBHHHHHHHBBBB',
+			    #StupidService,
+			    #StupidServiceSize,
+			    #StupidSegment1,
+			    #StupidSegment2,
+			    #StupidStuff1,
+			    #StupidStuff2,
+			    #StupidStuff3,
+			    #StupidStuff4,
+			    #StupidStuff5,
+			    #StupidPathSize,
+			    #StupidReserved,
+			    #StupidPathPort,
 			    #StupidPathSegment)
-    return
+    #return
+    
+#def _buildPartialTagListRequest():
+    #StupidService=0x55
+    #StupidServiceSize=0x03
+    #StupidSegment1=0x6B20
+    #StupidSegment2=0x8A980025
+    #StupidStuff=(0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
+    #StupidPathSize=0x01
+    #StupidReserved=0x00
+    #StupidPathPort=0x0001
+    
+    #self.TagListRequest=pack('<BBHI10BBBH',
+			    #StupidService,
+			    #StupidServiceSize,
+			    #StupidSegment1,
+			    #StupidSegment2,
+			    #StupidStuff[0], StupidStuff[1], StupidStuff[2],
+			    #StupidStuff[3], StupidStuff[4], StupidStuff[5],
+			    #StupidStuff[6], StupidStuff[7], StupidStuff[8],
+			    #StupidStuff[9],
+			    #StupidPathSize,
+			    #StupidReserved,
+			    #StupidPathPort)
+			    ##StupidPathSegment)
+    #return
   
 def _buildEIPHeader():
 
@@ -539,34 +563,7 @@ def MakeString(string):
     for x in xrange(len(string),84):
         work.append(0x00)
     return work
-  
 
-  
-#def OpenConnection(IPAddress):
-    #self.IPAddress=IPAddress
-    #try:
-        #_openconnection()
-    #except:
-        #print "Failed to open socket"
-        #print "Fail need something else to do"
-        #print "Unexpected error:", sys.exc_info()
-        #return
-    #self.SerialNumber=self.SerialNumber+1
-    #if self.SocketConnected==True:
-        #_buildRegisterSession()
-        #self.Socket.send(self.registersession)
-        #self.ReceiveData=self.Socket.recv(1024)
-        #self.SessionHandle=unpack_from('<I',self.ReceiveData,4)[0]
-        #self.RegisterSessionDone=True
-        
-        ##try a forward open
-        #_buildCIPForwardOpen
-        #_buildForwardOpenPacket()
-        #self.Socket.send(self.ForwardOpenFrame)
-        #self.ReceiveData=self.Socket.recv(1024)
-        #TempID=unpack_from('<I', self.ReceiveData, 44)
-        #self.OTNetworkConnectionID=TempID[0]
-        #self.OpenForwardSessionDone=True
         
 def ReadStuffs(*args):
     """
@@ -703,7 +700,7 @@ def GetTagList():
         self.SessionHandle=unpack_from('<I',self.ReceiveData,4)[0]
         self.RegisterSessionDone=True
 
-    _buildForwardOpenPacketToo(False)
+    _buildTagListPacket(False)
     PLC.Socket.send(self.ForwardOpenFrame)
     PLC.Receive=PLC.Socket.recv(1024)
     status = unpack_from('<h', PLC.Receive, 42)[0]
@@ -713,7 +710,7 @@ def GetTagList():
     count = 2
     while status == 6: # 6=partial transfer, more packets to follow
       print "	Printing packet number", count
-      _buildForwardOpenPacketToo(True)
+      _buildTagListPacket(True)
       PLC.Socket.send(self.ForwardOpenFrame)
       PLC.Receive=PLC.Socket.recv(1024)
       TagHaxxorz(PLC.Receive)
