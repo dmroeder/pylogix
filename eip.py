@@ -38,13 +38,11 @@ def __init__():
     self.SessionHandle=0x0000
     self.OTNetworkConnectionID=None
     self.TagName=None
-    self.Offset=None
     self.NumberOfElements=1
     self.SequenceCounter=0
     self.CIPRequest=None
     self.Socket.settimeout(0.5)
     self.Offset=None
-    self.Offset2=None
     self.ReceiveData=None
     self.ForwardOpenDone=False
     self.RegisterSesionDone=False
@@ -262,7 +260,7 @@ def _buildCIPForwardOpen():
     return
 
 def _buildCIPForwardOpenToo(toots):
-    CIPService=0x52                                  #(B) CIP OpenForward        Vol 3 (3-5.5.2)(3-5.5)
+    CIPService=0x52                                  #(B) CIP OpenForward          Vol 3 (3-5.5.2)(3-5.5)
     CIPPathSize=0x02               		     #(B) Request Path zize              (2-4.1)
     CIPClassType=0x20                                #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
                                                             #[Logical Segment][Class ID][8 bit addressing]
@@ -338,8 +336,8 @@ def _buildTagListRequest(partial):
     
     TLRequest=pack('<BBH', TLService, TLServiceSize, TLSegment)
     
-    if partial==False: TLRequest=TLRequest + pack('<H', 0x0024)
-    if partial==True: TLRequest=TLRequest + pack('<I', 0x8A980025)
+    if partial==False: TLRequest=TLRequest + pack('<BB', 0x24, self.Offset)
+    if partial==True: TLRequest=TLRequest + pack('<HH', 0x0025, self.Offset+1)
     
     TLStuff=(0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
     TLPathSize=0x01
@@ -352,62 +350,8 @@ def _buildTagListRequest(partial):
 					 TLPathSize,
 					 TLReserved,
 					 TLPort)
+    return
 
-#def _buildTagListRequest():
-    #StupidService=0x55
-    #StupidServiceSize=0x02
-    #StupidSegment1=0x6B20
-    #StupidSegment2=0x0024
-    #StupidStuff1=0x0004
-    #StupidStuff2=0x0002
-    #StupidStuff3=0x0007
-    #StupidStuff4=0x0008
-    #StupidStuff5=0x0001
-    #StupidPathSize=0x01
-    #StupidReserved=0x00
-    #StupidPathPort=0x01
-    #StupidPathSegment=0x00
-    
-    #self.TagListRequest=pack('<BBHHHHHHHBBBB',
-			    #StupidService,
-			    #StupidServiceSize,
-			    #StupidSegment1,
-			    #StupidSegment2,
-			    #StupidStuff1,
-			    #StupidStuff2,
-			    #StupidStuff3,
-			    #StupidStuff4,
-			    #StupidStuff5,
-			    #StupidPathSize,
-			    #StupidReserved,
-			    #StupidPathPort,
-			    #StupidPathSegment)
-    #return
-    
-#def _buildPartialTagListRequest():
-    #StupidService=0x55
-    #StupidServiceSize=0x03
-    #StupidSegment1=0x6B20
-    #StupidSegment2=0x8A980025
-    #StupidStuff=(0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
-    #StupidPathSize=0x01
-    #StupidReserved=0x00
-    #StupidPathPort=0x0001
-    
-    #self.TagListRequest=pack('<BBHI10BBBH',
-			    #StupidService,
-			    #StupidServiceSize,
-			    #StupidSegment1,
-			    #StupidSegment2,
-			    #StupidStuff[0], StupidStuff[1], StupidStuff[2],
-			    #StupidStuff[3], StupidStuff[4], StupidStuff[5],
-			    #StupidStuff[6], StupidStuff[7], StupidStuff[8],
-			    #StupidStuff[9],
-			    #StupidPathSize,
-			    #StupidReserved,
-			    #StupidPathPort)
-			    ##StupidPathSegment)
-    #return
   
 def _buildEIPHeader():
 
@@ -436,7 +380,6 @@ def _buildEIPHeader():
     EIPSequence=self.SequenceCounter        #(H)
     self.SequenceCounter+=1
     self.SequenceCounter=self.SequenceCounter%0x10000
-    #print EIPItem2ID, EIPItem2Length, EIPSequence
     
     self.EIPHeaderFrame=pack('<HHII8sIIHHHHIHHH',
                         EIPCommand,
@@ -680,7 +623,6 @@ def WriteStuffs(*args):
     PLC.ReceiveData=PLC.Socket.recv(1024)
 
 def GetTagList():
-  
     self.SocketConnected=False
     try:    
         self.Socket=socket.socket()
@@ -699,7 +641,8 @@ def GetTagList():
         self.ReceiveData=self.Socket.recv(1024)
         self.SessionHandle=unpack_from('<I',self.ReceiveData,4)[0]
         self.RegisterSessionDone=True
-
+        
+    self.Offset = 0
     _buildTagListPacket(False)
     PLC.Socket.send(self.ForwardOpenFrame)
     PLC.Receive=PLC.Socket.recv(1024)
@@ -723,18 +666,20 @@ def TagHaxxorz(data):
   # since length is 2 bytes, we need to move ahead 2 bytes to get
   #	to the start of the tag
   tagPointer = lengthPointer + 2
-  #print "data length: ", len(data)
   
   # now we're going to loop through the packet to pull out all the tags
   while (lengthPointer-20) < len(data):
-    tagLen = unpack_from('<b', data, lengthPointer)[0]
-    # print the tag name [some slicing going on)
+    tagLen = unpack_from('<B', data, lengthPointer)[0]
     print data[tagPointer:tagPointer + tagLen]
+    offset_location = lengthPointer + 2 + tagLen
+    if offset_location < len(data):
+      # get the offset value so that we can pass it to the next read
+      self.Offset = unpack_from('<H', data, offset_location)[0]
+      
     # shift  to the next tag in our packet
     lengthPointer = lengthPointer + tagLen + 22
-    tagPointer = lengthPointer + 2    
-    
-    
+    tagPointer = lengthPointer + 2
+
 def BitValue (BitNumber, Value):
     BitNumber=int(BitNumber)	# convert to int just in case
     Value=int(Value)		# convert to int just in case

@@ -1,15 +1,12 @@
 06/14/2015
-  -Rename some TagList functions, combined TagListMessage functions
-  
-06/13/2015
-  -Added GetTagList function, needs some serious work though
+  -Rename some TagList functions, combined TagListMessage functions, still needs work
   
 06/12/2015
-  -OpenConnection now happens in the read/write functions.  Now need to use .SetIPAddress()
+  -Added GetTagList function, needs some serious work though
   
-03/XX/2015
-  -Removed "PackFormat" function, put the code back in the read function
-  -Added ability to read a bit from a word
+04/07/2015
+  -Removed some old code (open connection)
+  -OpenConnection is handled in Read/Write functions, must use .SetIPAddress("192.168.1.10")
 
 03/23/2015
   -Added ProcessorSlot.  If not in slot 0, use .SetProcessorSlot(n)
