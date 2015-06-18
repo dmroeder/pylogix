@@ -1,0 +1,31 @@
+USAGE:
+
+1) import the EIP file: import eip as PLC
+
+2) init:  PLC.__init__()
+
+3) Set the IP Address property: PLC.SetIPAddress("192.168.1.10")
+
+4) If your processor is in a slot other than 0, set that: PLC.SetProcessorSlot(n)
+
+5) Do one of the following:
+
+    Read a value:  value = PLC.ReadStuffs("tagname")
+	ex: value = PLC.ReadStuffs("MyTimer.ACC")
+	
+    Read an array: value = PLC.ReadStuffs("tagname", length)
+	ex: value = PLC.ReadStuffs("MyDINT", 10)
+		    print value(3)
+		    
+    Write a value: PLC.WriteStuffs("tagname", value, "datatype")
+	ex: PLC.WriteStuffs("MyTimer.PRE", 100, "DINT")
+	
+    Get a list of the controller tags:  taglist = PLC.GetTagList()
+	taglist will be an object with the following properties:
+	    .TagName
+	    .Offset
+	    .DataType
+	if you want to know how many tags: print len(taglist)
+	access one:  print taglist[4].TagName
+
+

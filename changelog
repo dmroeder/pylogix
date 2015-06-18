@@ -1,3 +1,10 @@
+06/17/15
+  -Created LGXTag object, GetTagList() now returns list of LGXTag
+  -Modified read for string to accomodate custom string size data types
+
+06/15/2015
+  -GetTagList() is now working.  Still could use some work though.
+
 06/14/2015
   -Rename some TagList functions, combined TagListMessage functions, still needs work
   

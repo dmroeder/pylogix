@@ -1,8 +1,9 @@
 from struct import *
 from random import randrange
+import ctypes
 import socket
 import sys
-import ctypes
+import time
 
 """
 Polish up GetTagList()
@@ -13,7 +14,7 @@ One idea for writing would be to read the tag first to determine the data type, 
 the user wouldn't have to enter it.  You could just enter the tag and value
 """
 
-
+taglist = []
 self=None
 PLC=self
 class Self():
@@ -42,7 +43,7 @@ def __init__():
     self.SequenceCounter=0
     self.CIPRequest=None
     self.Socket.settimeout(0.5)
-    self.Offset=None
+    self.Offset=0
     self.ReceiveData=None
     self.ForwardOpenDone=False
     self.RegisterSesionDone=False
@@ -50,7 +51,18 @@ def __init__():
     self.ProcessorSlot=0x00
     PLC=self
 
+
+class LGXTag():
   
+  def __init__(self, packet):
+    length = unpack_from('<H', packet, 20)[0]
+    tagname = packet[20:length+22]
+    offset = unpack_from('<H', packet, 0)[0]
+    datatype = unpack_from('<B', packet, 4)[0]
+    self.TagName = tagname
+    self.Offset = offset
+    self.DataType = GetDataType(datatype)
+    
 def _openconnection():
     self.SocketConnected=False
     try:    
@@ -81,19 +93,6 @@ def _openconnection():
         self.OpenForwardSessionDone=True
         
     return
-
-def SetIPAddress(address):
-    self.IPAddress=address
-    return
-
-def SetProcessorSlot(slot):
-    if isinstance(slot, int) and (slot>=0 and slot<17):
-	# set the processor slot
-	self.ProcessorSlot=0x00+slot
-    else:
-	print "Processor slot must be an integer between 0 and 16, defaulting to 0"
-	self.SocketConnected=False
-	self.ProcessorSlot=0x00
 	
 	
 def _buildRegisterSession():
@@ -493,6 +492,18 @@ def _buildCIPTagRequest(reqType):
 
     return
   
+def SetIPAddress(address):
+    self.IPAddress=address
+    return
+
+def SetProcessorSlot(slot):
+    if isinstance(slot, int) and (slot>=0 and slot<17):
+	# set the processor slot
+	self.ProcessorSlot=0x00+slot
+    else:
+	print "Processor slot must be an integer between 0 and 16, defaulting to 0"
+	self.SocketConnected=False
+	self.ProcessorSlot=0x00  
   
 def MakeString(string):
     work=[]
@@ -552,7 +563,9 @@ def ReadStuffs(*args):
 	    elif DataType==672:
 		# gotta handle strings a little different
 		NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
-		returnvalue=PLC.ReceiveData[-84:(-84+NameLength)]
+		stringLen = unpack_from('<H', PLC.ReceiveData, 2)[0]
+		stringLen = stringLen-34
+		returnvalue=PLC.ReceiveData[-stringLen:(-stringLen+NameLength)]
 	    else:
 		# this handles SINT, INT, DINT, REAL
 		returnvalue=unpack_from(PackFormat(DataType), PLC.ReceiveData, 52)[0]
@@ -641,45 +654,40 @@ def GetTagList():
         self.ReceiveData=self.Socket.recv(1024)
         self.SessionHandle=unpack_from('<I',self.ReceiveData,4)[0]
         self.RegisterSessionDone=True
-        
-    self.Offset = 0
+    
     _buildTagListPacket(False)
     PLC.Socket.send(self.ForwardOpenFrame)
     PLC.Receive=PLC.Socket.recv(1024)
     status = unpack_from('<h', PLC.Receive, 42)[0]
-    print "	Printing our first packet"
     # Parse the first packet
-    TagHaxxorz(PLC.Receive)
-    count = 2
+    ffs(PLC.Receive)
     while status == 6: # 6=partial transfer, more packets to follow
-      print "	Printing packet number", count
       _buildTagListPacket(True)
       PLC.Socket.send(self.ForwardOpenFrame)
       PLC.Receive=PLC.Socket.recv(1024)
-      TagHaxxorz(PLC.Receive)
+      ffs(PLC.Receive)
       status = unpack_from('<h', PLC.Receive, 42)[0]
-      count+=1
-    
-def TagHaxxorz(data):
-  # First point to find the first tag length
-  lengthPointer = 64
-  # since length is 2 bytes, we need to move ahead 2 bytes to get
-  #	to the start of the tag
-  tagPointer = lengthPointer + 2
-  
-  # now we're going to loop through the packet to pull out all the tags
-  while (lengthPointer-20) < len(data):
-    tagLen = unpack_from('<B', data, lengthPointer)[0]
-    print data[tagPointer:tagPointer + tagLen]
-    offset_location = lengthPointer + 2 + tagLen
-    if offset_location < len(data):
-      # get the offset value so that we can pass it to the next read
-      self.Offset = unpack_from('<H', data, offset_location)[0]
+      time.sleep(0.5)
       
-    # shift  to the next tag in our packet
-    lengthPointer = lengthPointer + tagLen + 22
-    tagPointer = lengthPointer + 2
+    return taglist
+  
+def ffs(data):
+  # the first tag in a packet starts at byte 44
+  packetStart = 44
+  
+  while packetStart < len(data):
+    # get the length of the tag name
+    tagLen = unpack_from('<H', data, packetStart+20)[0]
+    # get a single tag from the packet
+    packet = data[packetStart:packetStart+tagLen+22]
+    # extract the offset
+    self.Offset = unpack_from('<H', packet, 0)[0]
+    # add the tag to our tag list
+    taglist.append(LGXTag(packet))
+    # increment ot the next tag in the packet
+    packetStart = packetStart+tagLen+22
 
+  
 def BitValue (BitNumber, Value):
     BitNumber=int(BitNumber)	# convert to int just in case
     Value=int(Value)		# convert to int just in case
@@ -719,4 +727,17 @@ def BytesPerElement(DataType):
 	return 4
     elif DataType==672:	#STRING
 	return 4
+      
+def GetDataType(value):
+  if value==130: return "COUNTER"
+  if value==131: return "TIMER"
+  if value==193: return "BOOL"
+  if value==194: return "SINT"
+  if value==195: return "INT"
+  if value==196: return "DINT"
+  if value==202: return "REAL"
+  if value==206: return "STRING"
+  if value==672: return "STRUCT"
+  return "DUNNO"
+
       
