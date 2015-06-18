@@ -10,15 +10,15 @@ USAGE:
 
 5) Do one of the following:
 
-    Read a value:  value = PLC.ReadStuffs("tagname")
-	ex: value = PLC.ReadStuffs("MyTimer.ACC")
+    Read a value:  value = PLC.Read("tagname")
+	ex: value = PLC.Read("MyTimer.ACC")
 	
-    Read an array: value = PLC.ReadStuffs("tagname", length)
-	ex: value = PLC.ReadStuffs("MyDINT", 10)
+    Read an array: value = PLC.Read("tagname", length)
+	ex: value = PLC.Read("MyDINT", 10)
 		    print value(3)
 		    
-    Write a value: PLC.WriteStuffs("tagname", value, "datatype")
-	ex: PLC.WriteStuffs("MyTimer.PRE", 100, "DINT")
+    Write a value: PLC.Write("tagname", value, "datatype")
+	ex: PLC.Write("MyTimer.PRE", 100, "DINT")
 	
     Get a list of the controller tags:  taglist = PLC.GetTagList()
 	taglist will be an object with the following properties:

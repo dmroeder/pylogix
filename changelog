@@ -1,6 +1,7 @@
 06/17/15
   -Created LGXTag object, GetTagList() now returns list of LGXTag
   -Modified read for string to accomodate custom string size data types
+  -Renamed ReadStuffs/WriteStuffs to Read/Write, "STRUCT" data type renamed to "STRING"
 
 06/15/2015
   -GetTagList() is now working.  Still could use some work though.

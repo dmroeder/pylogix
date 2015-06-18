@@ -6,8 +6,6 @@ import sys
 import time
 
 """
-Polish up GetTagList()
-
 Investigate RSLinx GetAttribute
 
 One idea for writing would be to read the tag first to determine the data type, then
@@ -29,7 +27,7 @@ def __init__():
     self.IPAddress=""
     self.Port=44818
     self.Context='RadWagon'
-    self.CIPDataTypes={"STRUCT":(0,0x02A0,'B'),"BOOL":(1,0x00C1,'?'),"SINT":(1,0x00C2,'b'),"INT":(2,0x00C3,'h'),"DINT":(4,0x00C4,'i'),"REAL":(4,0x00CA,'f'),"DWORD":(4,0x00D3,'I'),"LINT":(8,0x00C5,'Q')}
+    self.CIPDataTypes={"STRING":(0,0x02A0,'B'),"BOOL":(1,0x00C1,'?'),"SINT":(1,0x00C2,'b'),"INT":(2,0x00C3,'h'),"DINT":(4,0x00C4,'i'),"REAL":(4,0x00CA,'f'),"DWORD":(4,0x00D3,'I'),"LINT":(8,0x00C5,'Q')}
     self.CIPDataType=None
     self.CIPData=None
     self.VendorID=0x1337
@@ -471,7 +469,7 @@ def _buildCIPTagRequest(reqType):
 	self.NumberOfElements=len(self.WriteData)            #list of elements to write
 	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
 	RequestNumberOfElements=self.NumberOfElements
-	if self.CIPDataType.upper()=="STRUCT":  #Structs are special
+	if self.CIPDataType.upper()=="STRING":  #Strings are special
 	    RequestNumberOfElements=self.StructIdentifier    
     	RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
 	RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
@@ -519,7 +517,7 @@ def MakeString(string):
     return work
 
         
-def ReadStuffs(*args):
+def Read(*args):
     """
      Reads any data type.  We use the args so that the user can either send just a
     	tag name or a tag name and length (for reading arrays)
@@ -595,7 +593,7 @@ def ReadStuffs(*args):
 	print Status, ExtendedStatus
 	print "Did not nail it, read fail", name
       
-def WriteStuffs(*args):
+def Write(*args):
     """
     Typical write arguments: Tag, Value, DataType
     Typical array write arguments: Tag, Value, DataType, Length
@@ -619,7 +617,7 @@ def WriteStuffs(*args):
     if len(args)==3:
 	if DataType=="REAL":
 	    PLC.WriteData.append(float(Value))
-	elif DataType=="STRUCT":
+	elif DataType=="STRING":
 	    PLC.StructIdentifier=0x0fCE
 	    PLC.WriteData=MakeString(Value)
 	else:
