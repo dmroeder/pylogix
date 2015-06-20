@@ -54,7 +54,7 @@ class LGXTag():
   
   def __init__(self, packet):
     length = unpack_from('<H', packet, 20)[0]
-    tagname = packet[20:length+22]
+    tagname = packet[22:length+22]
     offset = unpack_from('<H', packet, 0)[0]
     datatype = unpack_from('<B', packet, 4)[0]
     self.TagName = tagname
@@ -134,27 +134,21 @@ def _buildUnregisterSession():
   
 def _buildForwardOpenPacket():
     _buildCIPForwardOpen()
-    _buildEIPSendRRDatHeader()
+    _buildEIPSendRRDataHeader()
     self.ForwardOpenFrame=self.EIPSendRRFrame+self.CIPForwardOpenFrame
     return
 
 def _buildTagListPacket(partial):
     # The packet has to be assembled a little different in the event
     # that all of the tags don't fit in a single packet
-    if partial==False:
-      _buildTagListRequest(partial)
-      _buildCIPForwardOpenToo(0x0010)
-    else:
-      _buildTagListRequest(partial)
-      _buildCIPForwardOpenToo(0x0012)
-      
+    _buildTagListRequest(partial)
+    _buildCIPUnconnectedSend(partial)
     self.CIPForwardOpenFrame=self.CIPForwardOpenFrame+self.TagListRequest
-    _buildEIPSendRRDatHeaderToo()
-
+    _buildEIPSendRRDataHeader()
     self.ForwardOpenFrame=self.EIPSendRRFrame+self.CIPForwardOpenFrame
     return
   
-def _buildEIPSendRRDatHeader():
+def _buildEIPSendRRDataHeader():
     EIPCommand=0x6F                                 #(H)EIP SendRRData         (Vol2 2-4.7)
     EIPLength= 16+len(self.CIPForwardOpenFrame)     #(H)
     EIPSessionHandle=self.SessionHandle             #(I)
@@ -256,8 +250,8 @@ def _buildCIPForwardOpen():
     
     return
 
-def _buildCIPForwardOpenToo(toots):
-    CIPService=0x52                                  #(B) CIP OpenForward          Vol 3 (3-5.5.2)(3-5.5)
+def _buildCIPUnconnectedSend(partial):
+    CIPService=0x52                                  #(B) CIP Unconnected Send           Vol 3 (3-5.5.2)(3-5.5)
     CIPPathSize=0x02               		     #(B) Request Path zize              (2-4.1)
     CIPClassType=0x20                                #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
                                                             #[Logical Segment][Class ID][8 bit addressing]
@@ -267,7 +261,8 @@ def _buildCIPForwardOpenToo(toots):
     CIPInstance=0x01                                 #(B) Instance
     CIPPriority=0x0A                                 #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
     CIPTimeoutTicks=0x0e                             #(B) Timeout Info                   (3-5.5.1.3)
-    CIPOTConnectionID=toots        	             #(I) O->T connection ID             (3-5.16)
+    if partial == False: MRServiceSize = 0x0010      #(H) Message Request Size
+    if partial == True: MRServiceSize = 0x0012
     # the above value needs to be replaced by the message request length or something like that
     """
     Port Identifier [BackPlane]
@@ -289,40 +284,8 @@ def _buildCIPForwardOpenToo(toots):
                                   CIPInstance,
                                   CIPPriority,
                                   CIPTimeoutTicks,
-                                  CIPOTConnectionID)
+                                  MRServiceSize)
     
-    return
-
-def _buildEIPSendRRDatHeaderToo():
-    EIPCommand=0x6F                                 #(H)EIP SendRRData         (Vol2 2-4.7)
-    EIPLength=16+len(self.CIPForwardOpenFrame)      #(H)
-    EIPSessionHandle=self.SessionHandle             #(I)
-    EIPStatus=0x00                                  #(I)
-    EIPContext=self.Context                         #(8s)
-    EIPOptions=0x00                                 #(I)
-                                                    #Begin Command Specific Data
-    EIPInterfaceHandle=0x00                         #(I) Interface Handel       (2-4.7.2)
-    EIPTimeout=0x00                                 #(H) Always 0x00
-    EIPItemCount=0x02                               #(H) Always 0x02 for our purposes
-    EIPItem1Type=0x00                               #(H) Null Item Type
-    EIPItem1Length=0x00                             #(H) No data for Null Item
-    EIPItem2Type=0xB2                               #(H) Uconnected CIP message to follow
-    EIPItem2Length=0x00+len(self.CIPForwardOpenFrame)    #(H)
-  
-    self.EIPSendRRFrame=pack('<HHII8sIIHHHHHH',
-                             EIPCommand,
-                             EIPLength,
-                             EIPSessionHandle,
-                             EIPStatus,
-                             EIPContext,
-                             EIPOptions,
-                             EIPInterfaceHandle,
-                             EIPTimeout,
-                             EIPItemCount,
-                             EIPItem1Type,
-                             EIPItem1Length,
-                             EIPItem2Type,
-                             EIPItem2Length)
     return
 
 def _buildTagListRequest(partial):
@@ -353,7 +316,6 @@ def _buildTagListRequest(partial):
 def _buildEIPHeader():
 
     EIPPayloadLength=22+len(self.CIPRequest)   #22 bytes of command specific data + the size of the CIP Payload
-    
     EIPConnectedDataLength=len(self.CIPRequest)+2 #Size of CIP packet plus the sequence counter
 
     EIPCommand=0x70                         #(H) Send_unit_Data (vol 2 section 2-4.8)
@@ -454,10 +416,10 @@ def _buildCIPTagRequest(reqType):
 		    test="test"
 	    except:
 		RequestPathSize+=1					# add a word for 0x91 and len
-		BaseTagLenBytes=len(TagSplit[i])				# store len of tag
+		BaseTagLenBytes=len(TagSplit[i])			# store len of tag
 		RequestTagData+=pack('<BB', 0x91, len(TagSplit[i]))	# add to packet
 		RequestTagData+=TagSplit[i]				# add tag req type and len to packet
-		if BaseTagLenBytes%2==1:					# if odd number of bytes
+		if BaseTagLenBytes%2==1:				# if odd number of bytes
 		    BaseTagLenBytes+=1					# add byte to make it even
 		    RequestTagData+=pack('<B', 0x00)			# also add to packet
 		RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
@@ -590,7 +552,7 @@ def Read(*args):
 		    
 	    return Array
     else: # didn't nail it
-	print Status, ExtendedStatus
+	#print Status, ExtendedStatus
 	print "Did not nail it, read fail", name
       
 def Write(*args):
@@ -632,7 +594,12 @@ def Write(*args):
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
-
+    Status=unpack_from('<h',PLC.ReceiveData,46)[0]
+    
+    # check for success, let the user know of failure
+    if Status!=204 or ExtendedStatus!=0: # fail
+      print "Failed to write to", TagName
+      
 def GetTagList():
     self.SocketConnected=False
     try:    
@@ -736,6 +703,6 @@ def GetDataType(value):
   if value==202: return "REAL"
   if value==206: return "STRING"
   if value==672: return "STRUCT"
-  return "DUNNO"
+  return value
 
       

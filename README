@@ -12,6 +12,7 @@ USAGE:
 
     Read a value:  value = PLC.Read("tagname")
 	ex: value = PLC.Read("MyTimer.ACC")
+		    print value
 	
     Read an array: value = PLC.Read("tagname", length)
 	ex: value = PLC.Read("MyDINT", 10)
@@ -27,5 +28,12 @@ USAGE:
 	    .DataType
 	if you want to know how many tags: print len(taglist)
 	access one:  print taglist[4].TagName
+	
+	
+So a complete script to read a tag would look like this:
 
-
+import eip as PLC
+PLC.__init__()
+PLC.SetIPAddress("192.168.1.10")
+value = PLC.Read("MyTimer.ACC")
+print value
