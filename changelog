@@ -1,5 +1,6 @@
 08/26/2015
   -Added LINT read support
+  -Added functino .GetPLCTime()
 
 06/20/2015
   -Removed duplicate _buildEIPSendRRDatHeader, renamed some stuff

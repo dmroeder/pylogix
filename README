@@ -29,6 +29,10 @@ USAGE:
 	if you want to know how many tags: print len(taglist)
 	access one:  print taglist[4].TagName
 	
+    Get the PLC Clock time: time=PLC.GetPLCTime()
+	ex: time=PLC.GetPLCTime()
+	    print time
+	
 	
 So a complete script to read a tag would look like this:
 

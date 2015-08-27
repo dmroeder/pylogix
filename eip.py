@@ -604,7 +604,54 @@ def Write(*args):
     # check for success, let the user know of failure
     if Status!=204 or ExtendedStatus!=0: # fail
       print "Failed to write to", TagName
-      
+ 
+def GetPLCTime():
+    # If not connected to PLC, abandon ship!
+    if self.SocketConnected==False:
+	_openconnection()
+		
+    AttributeService=0x03
+    AttributeSize=0x02
+    AttributeClassType=0x20
+    AttributeClass=0x8B
+    AttributeInstanceType=0x24
+    AttributeInstance=0x01
+    AttributeCount=0x04
+    Attributes=(0x06, 0x08, 0x09, 0x0A)
+    
+    AttributePacket=pack('<BBBBBBH4H',
+			 AttributeService,
+			 AttributeSize,
+			 AttributeClassType,
+			 AttributeClass,
+			 AttributeInstanceType,
+			 AttributeInstance,
+			 AttributeCount,
+			 Attributes[0],
+			 Attributes[1],
+			 Attributes[2],
+			 Attributes[3])
+    
+    self.CIPRequest = AttributePacket
+    _buildEIPHeader()
+    
+    PLC.Socket.send(self.EIPFrame)
+    PLC.Receive=PLC.Socket.recv(1024)
+    #status = unpack_from('<h', PLC.Receive, 48)[0]
+    # get the time from the packet
+    plcTime=unpack_from('<Q', PLC.Receive, 56)[0]
+    # get the timezone offset from the packet (this will include sign)
+    timezoneOffset=int(PLC.Receive[75:78])
+    # get daylight savings setting from packet (at the end)
+    dst=unpack_from('<B', PLC.Receive, len(PLC.Receive)-1)[0]
+    # factor in daylight savings time
+    timezoneOffset+=dst
+    # offset our by the timezone (big number=1 hour in microseconds)
+    timezoneOffset=timezoneOffset*3600000000
+    # convert it to human readable format
+    humanTime=datetime(1970, 1, 1)+timedelta(microseconds=plcTime+timezoneOffset)
+    return humanTime 
+ 
 def GetTagList():
     self.SocketConnected=False
     try:    
