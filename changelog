@@ -2,6 +2,7 @@
   -Added LINT read support
   -Added functino .GetPLCTime()
   -Fixed write reporting error when successful
+  -Removed some white space
 
 06/20/2015
   -Removed duplicate _buildEIPSendRRDatHeader, renamed some stuff

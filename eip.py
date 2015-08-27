@@ -54,13 +54,13 @@ def __init__():
 class LGXTag():
   
   def __init__(self, packet):
-    length = unpack_from('<H', packet, 20)[0]
-    tagname = packet[22:length+22]
-    offset = unpack_from('<H', packet, 0)[0]
-    datatype = unpack_from('<B', packet, 4)[0]
-    self.TagName = tagname
-    self.Offset = offset
-    self.DataType = GetDataType(datatype)
+    length=unpack_from('<H', packet, 20)[0]
+    tagname=packet[22:length+22]
+    offset=unpack_from('<H', packet, 0)[0]
+    datatype=unpack_from('<B', packet, 4)[0]
+    self.TagName=tagname
+    self.Offset=offset
+    self.DataType=GetDataType(datatype)
     
 def _openconnection():
     self.SocketConnected=False
@@ -151,7 +151,7 @@ def _buildTagListPacket(partial):
   
 def _buildEIPSendRRDataHeader():
     EIPCommand=0x6F                                 #(H)EIP SendRRData         (Vol2 2-4.7)
-    EIPLength= 16+len(self.CIPForwardOpenFrame)     #(H)
+    EIPLength=16+len(self.CIPForwardOpenFrame)     #(H)
     EIPSessionHandle=self.SessionHandle             #(I)
     EIPStatus=0x00                                  #(I)
     EIPContext=self.Context                         #(8s)
@@ -262,8 +262,8 @@ def _buildCIPUnconnectedSend(partial):
     CIPInstance=0x01                                 #(B) Instance
     CIPPriority=0x0A                                 #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
     CIPTimeoutTicks=0x0e                             #(B) Timeout Info                   (3-5.5.1.3)
-    if partial == False: MRServiceSize = 0x0010      #(H) Message Request Size
-    if partial == True: MRServiceSize = 0x0012
+    if partial==False: MRServiceSize=0x0010        #(H) Message Request Size
+    if partial==True: MRServiceSize=0x0012
     # the above value needs to be replaced by the message request length or something like that
     """
     Port Identifier [BackPlane]
@@ -297,15 +297,15 @@ def _buildTagListRequest(partial):
     
     TLRequest=pack('<BBH', TLService, TLServiceSize, TLSegment)
     
-    if partial==False: TLRequest=TLRequest + pack('<BB', 0x24, self.Offset)
-    if partial==True: TLRequest=TLRequest + pack('<HH', 0x0025, self.Offset+1)
+    if partial==False: TLRequest=TLRequest+pack('<BB', 0x24, self.Offset)
+    if partial==True: TLRequest=TLRequest+pack('<HH', 0x0025, self.Offset+1)
     
     TLStuff=(0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
     TLPathSize=0x01
     TLReserved=0x00
     TLPort=0x0001
     
-    self.TagListRequest=TLRequest + pack('<10BBBH',
+    self.TagListRequest=TLRequest+pack('<10BBBH',
 					 TLStuff[0], TLStuff[1], TLStuff[2], TLStuff[3], TLStuff[4],
 					 TLStuff[5], TLStuff[6], TLStuff[7], TLStuff[8], TLStuff[9],
 					 TLPathSize,
@@ -374,10 +374,10 @@ def _buildCIPTagRequest(reqType):
     RequestTagData=""		# define tag data
     RequestElements=self.NumberOfElements
     
-    TagSplit = self.TagName.lower().split(".")
+    TagSplit=self.TagName.lower().split(".")
     
     # this loop figures out the packet length and builds our packet
-    for i  in xrange(len(TagSplit)):
+    for i in xrange(len(TagSplit)):
     
 	if TagSplit[i].endswith("]"):
 	    RequestPathSize+=1					# add a word for 0x91 and len
@@ -397,10 +397,10 @@ def _buildCIPTagRequest(reqType):
 	    BaseTagLenWords=BaseTagLenBytes/2			# figure out the words for this segment
 
 	    RequestPathSize+=BaseTagLenWords			# add it to our request size
-	    if index < 256:					# if index is 1 byte...
+	    if index<256:					# if index is 1 byte...
 		RequestPathSize+=1				# add word for array index
 		RequestTagData+=pack('<BB', 0x28, index)	# add one word to packet
-	    if index > 255:					# if index is more than 1 byte...
+	    if index>255:					# if index is more than 1 byte...
 		RequestPathSize+=2				# add 2 words for array for index
 		RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
 	
@@ -495,7 +495,7 @@ def Read(*args):
 	
     name=args[0]
     PLC.TagName=name
-    if len(args) == 2:	# array read
+    if len(args)==2:	# array read
 	NumberOfElements=args[1]
 	Array=[0 for i in range(NumberOfElements)]   #create array
     else:
@@ -517,7 +517,7 @@ def Read(*args):
     
     # if we successfully read from the PLC...
     if Status==204 and ExtendedStatus==0: # nailed it!
-	if len(args) == 1:	# user passed 1 argument (non array read)
+	if len(args)==1:	# user passed 1 argument (non array read)
 	    # Do different stuff based on the returned data type
 	    if DataType==0:	
 		print "I'm not sure what happened, data type returned:", DataType
@@ -528,8 +528,8 @@ def Read(*args):
 	    elif DataType==672:
 		# gotta handle strings a little different
 		NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
-		stringLen = unpack_from('<H', PLC.ReceiveData, 2)[0]
-		stringLen = stringLen-34
+		stringLen=unpack_from('<H', PLC.ReceiveData, 2)[0]
+		stringLen=stringLen-34
 		returnvalue=PLC.ReceiveData[-stringLen:(-stringLen+NameLength)]
 	    else:
 		# this handles SINT, INT, DINT, REAL
@@ -538,7 +538,7 @@ def Read(*args):
 	    
 	    # if we were just reading a bit of a word, convert it to a true/false
 	    SplitTest=name.lower().split(".")
-	    if len(SplitTest) > 1:
+	    if len(SplitTest)>1:
 		BitPos=SplitTest[len(SplitTest)-1]
 		try:
 		    if int(BitPos)<=31:
@@ -678,34 +678,34 @@ def GetTagList():
     status = unpack_from('<h', PLC.Receive, 42)[0]
     # Parse the first packet
     ffs(PLC.Receive)
-    while status == 6: # 6=partial transfer, more packets to follow
+    while status==6: # 6=partial transfer, more packets to follow
       _buildTagListPacket(True)
       PLC.Socket.send(self.ForwardOpenFrame)
       PLC.Receive=PLC.Socket.recv(1024)
       ffs(PLC.Receive)
-      status = unpack_from('<h', PLC.Receive, 42)[0]
+      status=unpack_from('<h', PLC.Receive, 42)[0]
       time.sleep(0.5)
       
     return taglist
   
 def ffs(data):
   # the first tag in a packet starts at byte 44
-  packetStart = 44
+  packetStart=44
   
-  while packetStart < len(data):
+  while packetStart<len(data):
     # get the length of the tag name
-    tagLen = unpack_from('<H', data, packetStart+20)[0]
+    tagLen=unpack_from('<H', data, packetStart+20)[0]
     # get a single tag from the packet
-    packet = data[packetStart:packetStart+tagLen+22]
+    packet=data[packetStart:packetStart+tagLen+22]
     # extract the offset
-    self.Offset = unpack_from('<H', packet, 0)[0]
+    self.Offset=unpack_from('<H', packet, 0)[0]
     # add the tag to our tag list
     taglist.append(LGXTag(packet))
     # increment ot the next tag in the packet
-    packetStart = packetStart+tagLen+22
+    packetStart=packetStart+tagLen+22
 
   
-def BitValue (BitNumber, Value):
+def BitValue(BitNumber, Value):
     BitNumber=int(BitNumber)	# convert to int just in case
     Value=int(Value)		# convert to int just in case
     if Value==0: return False	# must be false if our value is 0
@@ -756,5 +756,3 @@ def GetDataType(value):
   if value==206: return "STRING"
   if value==672: return "STRUCT"
   return value
-
-      
