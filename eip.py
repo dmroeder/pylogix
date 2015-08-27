@@ -552,9 +552,8 @@ def Read(*args):
 		except:
 		    #print "Failed to convert bit"
 		    do="nothing"
-	    test=LGXTag().Tag(PLC.TagName, GetDataType(DataType), returnvalue)
-	    return test
-	    #return returnvalue
+	    returntag=LGXTag().Tag(PLC.TagName, GetDataType(DataType), returnvalue)
+	    return returntag
 
 	else:	# user passed more than one argument (array read)
 	    for i in xrange(NumberOfElements):
@@ -564,16 +563,13 @@ def Read(*args):
 		bt=PLC.TagName[:-pos]				# remove [x]: result=SuperDuper
 		temp=PLC.TagName[-pos:]				# remove tag: result=[x]
 		ind=int(temp[1:-1])				# strip the []: result=x
-		#print ElementPosition, basetag, temp, index
 		newTagName=bt+'['+str(ind+i)+']'
 		
-		#Array[i]=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
 		returnvalue=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
 	        Array[i]=LGXTag().Tag(newTagName, GetDataType(DataType), returnvalue)
 	      
 	    return Array
     else: # didn't nail it
-	#print Status, ExtendedStatus
 	print "Did not nail it, read fail", name
       
 def Write(*args):
