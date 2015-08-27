@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from struct import *
 from random import randrange
 import ctypes
@@ -520,6 +521,10 @@ def Read(*args):
 	    # Do different stuff based on the returned data type
 	    if DataType==0:	
 		print "I'm not sure what happened, data type returned:", DataType
+	    elif DataType==197:
+	        rawTime=unpack_from('<Q', PLC.ReceiveData, 52)[0]
+	        #print datetime(1970, 1, 1) + timedelta(microseconds=rawTime)
+	        returnvalue=rawTime
 	    elif DataType==672:
 		# gotta handle strings a little different
 		NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
