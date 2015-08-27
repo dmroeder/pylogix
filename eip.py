@@ -54,13 +54,10 @@ def __init__():
 class LGXTag():
   
   def __init__(self):
-    #length=unpack_from('<H', packet, 20)[0]
-    #tagname=packet[22:length+22]
-    #offset=unpack_from('<H', packet, 0)[0]
-    #datatype=unpack_from('<B', packet, 4)[0]
     self.TagName=""
     self.Offset=0
     self.DataType=""
+    self.Value=None
   
   def ParsePacket(self, packet):
     length=unpack_from('<H', packet, 20)[0]
@@ -68,7 +65,12 @@ class LGXTag():
     self.Offset=unpack_from('<H', packet, 0)[0]
     datatype=unpack_from('<B', packet, 4)[0]
     self.DataType=GetDataType(datatype)
-    
+    return self
+  
+  def Tag(self, tagname, datatype, value):
+    self.TagName=tagname
+    self.DataType=datatype
+    self.Value=value
     return self
     
 def _openconnection():
@@ -544,7 +546,6 @@ def Read(*args):
 		# this handles SINT, INT, DINT, REAL
 		returnvalue=unpack_from(PackFormat(DataType), PLC.ReceiveData, 52)[0]
 		
-	    
 	    # if we were just reading a bit of a word, convert it to a true/false
 	    SplitTest=name.lower().split(".")
 	    if len(SplitTest)>1:
@@ -555,15 +556,25 @@ def Read(*args):
 		except:
 		    #print "Failed to convert bit"
 		    do="nothing"
-		
-		
-	    return returnvalue
+	    test=LGXTag().Tag(PLC.TagName, GetDataType(DataType), returnvalue)
+	    return test
+	    #return returnvalue
 
 	else:	# user passed more than one argument (array read)
 	    for i in xrange(NumberOfElements):
 		index=52+(i*BytesPerElement(DataType))
-		Array[i]=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
-		    
+		
+		pos=(len(PLC.TagName)-PLC.TagName.index("["))	# find position of [
+		bt=PLC.TagName[:-pos]				# remove [x]: result=SuperDuper
+		temp=PLC.TagName[-pos:]				# remove tag: result=[x]
+		ind=int(temp[1:-1])				# strip the []: result=x
+		#print ElementPosition, basetag, temp, index
+		newTagName=bt+'['+str(ind+i)+']'
+		
+		#Array[i]=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
+		returnvalue=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
+	        Array[i]=LGXTag().Tag(newTagName, GetDataType(DataType), returnvalue)
+	      
 	    return Array
     else: # didn't nail it
 	#print Status, ExtendedStatus
@@ -578,7 +589,7 @@ def Write(*args):
     # If not connected to PLC, abandon ship!
     if self.SocketConnected==False:
 	_openconnection()
-	
+
     TagName=args[0]
     Value=args[1]
     DataType=args[2]
@@ -641,7 +652,7 @@ def GetPLCTime():
 			 Attributes[2],
 			 Attributes[3])
     
-    self.CIPRequest = AttributePacket
+    self.CIPRequest=AttributePacket
     _buildEIPHeader()
     
     PLC.Socket.send(self.EIPFrame)
@@ -762,6 +773,7 @@ def GetDataType(value):
   if value==194: return "SINT"
   if value==195: return "INT"
   if value==196: return "DINT"
+  if value==197: return "LINT"
   if value==202: return "REAL"
   if value==206: return "STRING"
   if value==672: return "STRUCT"
