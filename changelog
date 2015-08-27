@@ -1,3 +1,6 @@
+08/27/2015
+  -Added ParsePacket to LGXTag which GetTagList uses
+
 08/26/2015
   -Added LINT read support
   -Added functino .GetPLCTime()

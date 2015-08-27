@@ -53,14 +53,23 @@ def __init__():
 
 class LGXTag():
   
-  def __init__(self, packet):
+  def __init__(self):
+    #length=unpack_from('<H', packet, 20)[0]
+    #tagname=packet[22:length+22]
+    #offset=unpack_from('<H', packet, 0)[0]
+    #datatype=unpack_from('<B', packet, 4)[0]
+    self.TagName=""
+    self.Offset=0
+    self.DataType=""
+  
+  def ParsePacket(self, packet):
     length=unpack_from('<H', packet, 20)[0]
-    tagname=packet[22:length+22]
-    offset=unpack_from('<H', packet, 0)[0]
+    self.TagName=packet[22:length+22]
+    self.Offset=unpack_from('<H', packet, 0)[0]
     datatype=unpack_from('<B', packet, 4)[0]
-    self.TagName=tagname
-    self.Offset=offset
     self.DataType=GetDataType(datatype)
+    
+    return self
     
 def _openconnection():
     self.SocketConnected=False
@@ -700,7 +709,8 @@ def ffs(data):
     # extract the offset
     self.Offset=unpack_from('<H', packet, 0)[0]
     # add the tag to our tag list
-    taglist.append(LGXTag(packet))
+    #taglist.append(LGXTag(packet))
+    taglist.append(LGXTag().ParsePacket(packet))
     # increment ot the next tag in the packet
     packetStart=packetStart+tagLen+22
 
