@@ -28,7 +28,7 @@ def __init__():
     self.IPAddress=""
     self.Port=44818
     self.Context='RadWagon'
-    self.CIPDataTypes={"STRING":(0,0x02A0,'B'),"BOOL":(1,0x00C1,'?'),"SINT":(1,0x00C2,'b'),"INT":(2,0x00C3,'h'),"DINT":(4,0x00C4,'i'),"REAL":(4,0x00CA,'f'),"DWORD":(4,0x00D3,'I'),"LINT":(8,0x00C5,'Q')}
+    self.CIPDataTypes={"STRUCT":(0,0x02A0,'B'),"BOOL":(1,0x00C1,'?'),"SINT":(1,0x00C2,'b'),"INT":(2,0x00C3,'h'),"DINT":(4,0x00C4,'i'),"REAL":(4,0x00CA,'f'),"DWORD":(4,0x00D3,'I'),"LINT":(8,0x00C5,'Q')}
     self.CIPDataType=None
     self.CIPData=None
     self.VendorID=0x1337
@@ -443,7 +443,7 @@ def _buildCIPTagRequest(reqType):
 	self.NumberOfElements=len(self.WriteData)            #list of elements to write
 	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
 	RequestNumberOfElements=self.NumberOfElements
-	if self.CIPDataType.upper()=="STRING":  #Strings are special
+	if self.CIPDataType.upper()=="STRUCT":  #Strings are special
 	    RequestNumberOfElements=self.StructIdentifier    
     	RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
 	RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
@@ -594,7 +594,6 @@ def Write(*args):
     
     TagName=args[0]
     Value=args[1]
-    #DataType=args[2]
     DataType=tag.DataType
     
     PLC.TagName=TagName
@@ -607,7 +606,7 @@ def Write(*args):
     if len(args)==2:
 	if DataType=="REAL":
 	    PLC.WriteData.append(float(Value))
-	elif DataType=="STRING":
+	elif DataType=="STRUCT":
 	    PLC.StructIdentifier=0x0fCE
 	    PLC.WriteData=MakeString(Value)
 	else:
