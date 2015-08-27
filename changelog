@@ -2,6 +2,7 @@
   -Added ParsePacket to LGXTag which GetTagList uses
   -Read now returns LGXTag type
   -Write no longer requres providing data type
+  -Fixed GetTagList when processor is not in slot 0
 
 08/26/2015
   -Added LINT read support

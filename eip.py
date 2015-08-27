@@ -6,12 +6,6 @@ import socket
 import sys
 import time
 
-"""
-Investigate RSLinx GetAttribute
-
-One idea for writing would be to read the tag first to determine the data type, then
-the user wouldn't have to enter it.  You could just enter the tag and value
-"""
 
 taglist = []
 self=None
@@ -314,14 +308,16 @@ def _buildTagListRequest(partial):
     TLStuff=(0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
     TLPathSize=0x01
     TLReserved=0x00
-    TLPort=0x0001
+    TLPort=0x01
+    TLSlot=self.ProcessorSlot
     
-    self.TagListRequest=TLRequest+pack('<10BBBH',
+    self.TagListRequest=TLRequest+pack('<10BBBBB',
 					 TLStuff[0], TLStuff[1], TLStuff[2], TLStuff[3], TLStuff[4],
 					 TLStuff[5], TLStuff[6], TLStuff[7], TLStuff[8], TLStuff[9],
 					 TLPathSize,
 					 TLReserved,
-					 TLPort)
+					 TLPort,
+					 TLSlot)
     return
 
   
