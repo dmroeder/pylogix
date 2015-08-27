@@ -602,7 +602,7 @@ def Write(*args):
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     
     # check for success, let the user know of failure
-    if Status!=204 or ExtendedStatus!=0: # fail
+    if Status!=205 or ExtendedStatus!=0: # fail
       print "Failed to write to", TagName
  
 def GetPLCTime():
