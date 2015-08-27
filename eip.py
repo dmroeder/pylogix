@@ -590,18 +590,21 @@ def Write(*args):
     if self.SocketConnected==False:
 	_openconnection()
 
+    tag=Read(args[0])
+    
     TagName=args[0]
     Value=args[1]
-    DataType=args[2]
+    #DataType=args[2]
+    DataType=tag.DataType
     
     PLC.TagName=TagName
-    if len(args)==3: PLC.NumberOfElements=1
-    if len(args)==4: PLC.NumberOfElements=args[3]
+    if len(args)==2: PLC.NumberOfElements=1
+    if len(args)==3: PLC.NumberOfElements=args[2]
 
     PLC.Offset=None
     PLC.CIPDataType=DataType
     PLC.WriteData=[]
-    if len(args)==3:
+    if len(args)==2:
 	if DataType=="REAL":
 	    PLC.WriteData.append(float(Value))
 	elif DataType=="STRING":
@@ -609,7 +612,7 @@ def Write(*args):
 	    PLC.WriteData=MakeString(Value)
 	else:
 	    PLC.WriteData.append(int(Value))
-    elif len(args)==4:
+    elif len(args)==3:
 	for i in xrange(PLC.NumberOfElements):
 	    PLC.WriteData.append(int(Value[i]))		  
     else:
@@ -620,10 +623,11 @@ def Write(*args):
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
-    
+    ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
+        
     # check for success, let the user know of failure
     if Status!=205 or ExtendedStatus!=0: # fail
-      print "Failed to write to", TagName
+      print "Failed to write to", TagName, " Status", Status, " Extended Status", ExtendedStatus
  
 def GetPLCTime():
     # If not connected to PLC, abandon ship!
