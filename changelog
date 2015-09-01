@@ -1,3 +1,6 @@
+08/31/15
+  -Write bit of a word fixed (something wrong with bit 31)
+
 08/27/2015
   -Added ParsePacket to LGXTag which GetTagList uses
   -Read now returns LGXTag type
