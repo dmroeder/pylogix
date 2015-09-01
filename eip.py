@@ -449,7 +449,8 @@ def _buildCIPTagRequest(reqType):
 	self.CIPRequest=CIPReadRequest
 	for i in xrange(len(self.WriteData)):
 	    el=self.WriteData[i]
-	    self.CIPRequest+=pack('<'+self.CIPDataTypes[self.CIPDataType.upper()][2],el)
+	    #print el
+	    self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType.upper()][2],el)
     if reqType=="Read":
 	# do the read related stuff if we are reading
 	RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
@@ -587,6 +588,7 @@ def Write(*args):
     TagName=args[0]
     Value=args[1]
     DataType=tag.DataType
+    readValue=tag.Value
     
     PLC.TagName=TagName
     if len(args)==2: PLC.NumberOfElements=1
@@ -602,7 +604,15 @@ def Write(*args):
 	    PLC.StructIdentifier=0x0fCE
 	    PLC.WriteData=MakeString(Value)
 	else:
-	    PLC.WriteData.append(int(Value))
+	    test=TagName.split(".")
+	    if len(test)==1: # Word
+	        PLC.WriteData.append(int(Value))
+	    else:  #Bit of a word
+		#print Value, test[1]
+	        newValue=readValue | (int(Value)<<int(test[1]))
+	        #print newValue
+	        PLC.WriteData.append(newValue)
+	    
     elif len(args)==3:
 	for i in xrange(PLC.NumberOfElements):
 	    PLC.WriteData.append(int(Value[i]))		  
