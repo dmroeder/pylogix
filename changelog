@@ -1,3 +1,6 @@
+09/20/15
+  -Large array reads now sort of working 
+  
 08/31/15
   -Write bit of a word fixed (something wrong with bit 31)
 

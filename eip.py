@@ -21,7 +21,7 @@ def __init__():
     PLC=self
     self.IPAddress=""
     self.Port=44818
-    self.Context='RadWagon'
+    self.Context='00000000'
     self.CIPDataTypes={"STRUCT":(0,0x02A0,'B'),"BOOL":(1,0x00C1,'?'),"SINT":(1,0x00C2,'b'),"INT":(2,0x00C3,'h'),"DINT":(4,0x00C4,'i'),"REAL":(4,0x00CA,'f'),"DWORD":(4,0x00D3,'I'),"LINT":(8,0x00C5,'Q')}
     self.CIPDataType=None
     self.CIPData=None
@@ -156,7 +156,7 @@ def _buildTagListPacket(partial):
   
 def _buildEIPSendRRDataHeader():
     EIPCommand=0x6F                                 #(H)EIP SendRRData         (Vol2 2-4.7)
-    EIPLength=16+len(self.CIPForwardOpenFrame)     #(H)
+    EIPLength=16+len(self.CIPForwardOpenFrame)      #(H)
     EIPSessionHandle=self.SessionHandle             #(I)
     EIPStatus=0x00                                  #(I)
     EIPContext=self.Context                         #(8s)
@@ -213,9 +213,9 @@ def _buildCIPForwardOpen():
                                                      # Non-Redundant,Point to Point,[reserved],Low Priority,Variable,[500 bytes] 
                                                      # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
     CIPTransportTrigger=0xA3                         #(B)                                   (3-5.5.1.12)
-    CIPConnectionPathSize=0x04                       #(B)                                   (3-5.5.1.9)
-    CIPConnectionPath=(0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01,0x2c,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
-
+    CIPConnectionPathSize=0x03                       #(B)                                   (3-5.5.1.9)
+    #CIPConnectionPath=(0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01,0x2c,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
+    CIPConnectionPath=(0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
     """
     Port Identifier [BackPlane]
     Link adress .SetProcessorSlot (default=0x00)
@@ -226,7 +226,7 @@ def _buildCIPForwardOpen():
     Logical Segment -> connection point ->8 bit
     Connection Point 0x01
     """
-    self.CIPForwardOpenFrame=pack('<BBBBBBBBIIHHIB3BIhIhBB8B',
+    self.CIPForwardOpenFrame=pack('<BBBBBBBBIIHHIB3BIhIhBB6B',
                                   CIPService,
                                   CIPPathSize,
                                   CIPClassType,
@@ -249,7 +249,8 @@ def _buildCIPForwardOpen():
                                   CIPTransportTrigger,
                                   CIPConnectionPathSize,
                                   CIPConnectionPath[0],CIPConnectionPath[1],CIPConnectionPath[2],CIPConnectionPath[3],
-                                  CIPConnectionPath[4],CIPConnectionPath[5],CIPConnectionPath[6],CIPConnectionPath[7])
+                                  #CIPConnectionPath[4],CIPConnectionPath[5],CIPConnectionPath[6],CIPConnectionPath[7])
+                                  CIPConnectionPath[4],CIPConnectionPath[5])
                                   
                                    
     
@@ -260,14 +261,14 @@ def _buildCIPUnconnectedSend(partial):
     CIPService=0x52                                  #(B) CIP Unconnected Send           Vol 3 (3-5.5.2)(3-5.5)
     CIPPathSize=0x02               		     #(B) Request Path zize              (2-4.1)
     CIPClassType=0x20                                #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
-                                                            #[Logical Segment][Class ID][8 bit addressing]
+                                                     #[Logical Segment][Class ID][8 bit addressing]
     CIPClass=0x06                                    #(B) Connection Manager Object      (3-5)
     CIPInstanceType=0x24                             #(B) Instance type                  (C-1.1)
-                                                            #[Logical Segment][Instance ID][8 bit addressing]
+                                                     #[Logical Segment][Instance ID][8 bit addressing]
     CIPInstance=0x01                                 #(B) Instance
     CIPPriority=0x0A                                 #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
     CIPTimeoutTicks=0x0e                             #(B) Timeout Info                   (3-5.5.1.3)
-    if partial==False: MRServiceSize=0x0010        #(H) Message Request Size
+    if partial==False: MRServiceSize=0x0010          #(H) Message Request Size
     if partial==True: MRServiceSize=0x0012
     # the above value needs to be replaced by the message request length or something like that
     """
@@ -365,7 +366,7 @@ def _buildEIPHeader():
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
 
-def _buildCIPTagRequest(reqType):
+def _buildCIPTagRequest(reqType, partial):
     """
     So here's what happens here.  Tags can be super simple like mytag or pretty complex
     like My.Tag[7].Value.  In the example, the tag needs to be split up by the '.' and
@@ -380,7 +381,6 @@ def _buildCIPTagRequest(reqType):
     RequestPathSize=0		# define path size
     RequestTagData=""		# define tag data
     RequestElements=self.NumberOfElements
-    
     TagSplit=self.TagName.lower().split(".")
     
     # this loop figures out the packet length and builds our packet
@@ -453,11 +453,14 @@ def _buildCIPTagRequest(reqType):
 	    self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType.upper()][2],el)
     if reqType=="Read":
 	# do the read related stuff if we are reading
-	RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
+	if partial==False: RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
+	if partial==True: RequestService=0x52
 	CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
 	CIPReadRequest+=RequestTagData					# Tag portion of packet
 	CIPReadRequest+=pack('<H', RequestElements)			# end of packet
+	CIPReadRequest+=pack('<H', self.Offset)
 	self.CIPRequest=CIPReadRequest
+	if partial==True: self.CIPRequest+=pack('<H', 0x0000)
 
     return
   
@@ -510,8 +513,8 @@ def Read(*args):
 	NumberOfElements=1  # if non array, then only 1 element
 	
     PLC.NumberOfElements=NumberOfElements
-    PLC.Offset=None
-    _buildCIPTagRequest("Read")
+    PLC.Offset=0
+    _buildCIPTagRequest("Read", False)
     _buildEIPHeader()
     
     PLC.Socket.send(PLC.EIPFrame)
@@ -524,7 +527,7 @@ def Read(*args):
     returnvalue=0
     
     # if we successfully read from the PLC...
-    if Status==204 and ExtendedStatus==0: # nailed it!
+    if Status==204 and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
 	if len(args)==1:	# user passed 1 argument (non array read)
 	    # Do different stuff based on the returned data type
 	    if DataType==0:	
@@ -557,8 +560,11 @@ def Read(*args):
 	    return returntag
 
 	else:	# user passed more than one argument (array read)
+	    numbytes=unpack_from('<H', PLC.ReceiveData, 42)[0]
+	    counter=0
 	    for i in xrange(NumberOfElements):
-		index=52+(i*BytesPerElement(DataType))
+		index=52+(counter*BytesPerElement(DataType))
+		self.Offset=i*BytesPerElement(DataType)
 		
 		pos=(len(PLC.TagName)-PLC.TagName.index("["))	# find position of [
 		bt=PLC.TagName[:-pos]				# remove [x]: result=SuperDuper
@@ -568,7 +574,21 @@ def Read(*args):
 		
 		returnvalue=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
 	        Array[i]=LGXTag().Tag(newTagName, GetDataType(DataType), returnvalue)
-	      
+		counter+=1
+		# with large arrays, the data takes multiple packets so at the end of
+		# a packet, we need to send a new request
+		if index==numbytes and ExtendedStatus==6: 
+		    index=0
+		    counter=0
+
+		    _buildCIPTagRequest("Read", True)
+		    _buildEIPHeader()
+    
+		    PLC.Socket.send(PLC.EIPFrame)
+		    PLC.ReceiveData=PLC.Socket.recv(1024)
+		    Status=unpack_from('<h',PLC.ReceiveData,46)[0]
+		    ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
+		    numbytes=unpack_from('<H', PLC.ReceiveData, 42)[0] 
 	    return Array
     else: # didn't nail it
 	print "Did not nail it, read fail", name
@@ -619,7 +639,7 @@ def Write(*args):
     else:
 	print "fix this"
 	
-    _buildCIPTagRequest("Write")
+    _buildCIPTagRequest("Write", False)
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
