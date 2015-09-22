@@ -560,12 +560,15 @@ def Read(*args):
 	    return returntag
 
 	else:	# user passed more than one argument (array read)
-	    numbytes=unpack_from('<H', PLC.ReceiveData, 42)[0]
-	    counter=0
-	    for i in xrange(NumberOfElements):
-		index=52+(counter*BytesPerElement(DataType))
-		self.Offset=i*BytesPerElement(DataType)
+	    numbytes=len(PLC.ReceiveData)-4		# total number of bytes in packet
+	    dataSize=BytesPerElement(DataType)		# get number of bytes per datatype
+	    counter=0					# counter for indexing through packet
+	    self.Offset=0				# offset for next packet request
+	    for i in xrange(NumberOfElements):	
+		index=52+(counter*dataSize)		# location of data in packet
+		self.Offset+=dataSize
 		
+		# parse the packet to get the base tag name
 		pos=(len(PLC.TagName)-PLC.TagName.index("["))	# find position of [
 		bt=PLC.TagName[:-pos]				# remove [x]: result=SuperDuper
 		temp=PLC.TagName[-pos:]				# remove tag: result=[x]
@@ -577,7 +580,7 @@ def Read(*args):
 		counter+=1
 		# with large arrays, the data takes multiple packets so at the end of
 		# a packet, we need to send a new request
-		if index==numbytes and ExtendedStatus==6: 
+		if index==numbytes and ExtendedStatus==6:
 		    index=0
 		    counter=0
 
@@ -586,9 +589,8 @@ def Read(*args):
     
 		    PLC.Socket.send(PLC.EIPFrame)
 		    PLC.ReceiveData=PLC.Socket.recv(1024)
-		    Status=unpack_from('<h',PLC.ReceiveData,46)[0]
 		    ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
-		    numbytes=unpack_from('<H', PLC.ReceiveData, 42)[0] 
+		    numbytes=len(PLC.ReceiveData)-4
 	    return Array
     else: # didn't nail it
 	print "Did not nail it, read fail", name

@@ -1,3 +1,6 @@
+09/22/15
+  -Fixed larg array read bug
+
 09/20/15
   -Large array reads now sort of working 
   
