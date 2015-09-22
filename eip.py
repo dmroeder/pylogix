@@ -774,6 +774,8 @@ def PackFormat(DataType):
 	return '<h'
     elif DataType==196:	#DINT
 	return '<i'
+    elif DataType==197: #LINT
+	return '<q'
     elif DataType==202:	#REAL
 	return '<f'
     elif DataType==672:	#STRING
@@ -788,6 +790,8 @@ def BytesPerElement(DataType):
 	return 2
     elif DataType==196:	#DINT
 	return 4
+    elif DataType==197: #LINT
+	return 8
     elif DataType==202:	#REAL
 	return 4
     elif DataType==672:	#STRING

@@ -1,5 +1,6 @@
 09/22/15
-  -Fixed larg array read bug
+  -Fixed large array read bug
+  -Fixed LINT array reads
 
 09/20/15
   -Large array reads now sort of working 
