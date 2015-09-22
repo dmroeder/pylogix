@@ -560,8 +560,8 @@ def Read(*args):
 	    return returntag
 
 	else:	# user passed more than one argument (array read)
-	    numbytes=len(PLC.ReceiveData)-4		# total number of bytes in packet
 	    dataSize=BytesPerElement(DataType)		# get number of bytes per datatype
+	    numbytes=len(PLC.ReceiveData)-dataSize	# total number of bytes in packet
 	    counter=0					# counter for indexing through packet
 	    self.Offset=0				# offset for next packet request
 	    for i in xrange(NumberOfElements):	
@@ -590,7 +590,7 @@ def Read(*args):
 		    PLC.Socket.send(PLC.EIPFrame)
 		    PLC.ReceiveData=PLC.Socket.recv(1024)
 		    ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
-		    numbytes=len(PLC.ReceiveData)-4
+		    numbytes=len(PLC.ReceiveData)-dataSize
 	    return Array
     else: # didn't nail it
 	print "Did not nail it, read fail", name
