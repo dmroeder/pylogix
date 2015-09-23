@@ -1,6 +1,7 @@
 09/22/15
   -Fixed large array read bug
   -Fixed LINT array reads
+  -Added TagNameParser function
 
 09/20/15
   -Large array reads now sort of working 

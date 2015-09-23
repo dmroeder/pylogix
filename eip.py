@@ -545,6 +545,10 @@ def Read(*args):
 	    else:
 		# this handles SINT, INT, DINT, REAL
 		returnvalue=unpack_from(PackFormat(DataType), PLC.ReceiveData, 52)[0]
+		print returnvalue
+	        if DataType==211:  #BOOL Array
+		    ret=TagNameParser(PLC.TagName, 0)		# get array index
+		    returnvalue=BitValue(ret[2], returnvalue)	# get the bit from the returned word
 		
 	    # if we were just reading a bit of a word, convert it to a true/false
 	    SplitTest=name.lower().split(".")
@@ -554,7 +558,6 @@ def Read(*args):
 		    if int(BitPos)<=31:
 			returnvalue=BitValue(BitPos, returnvalue)
 		except:
-		    #print "Failed to convert bit"
 		    do="nothing"
 	    returntag=LGXTag().Tag(PLC.TagName, GetDataType(DataType), returnvalue)
 	    return returntag
@@ -568,15 +571,10 @@ def Read(*args):
 		index=52+(counter*dataSize)		# location of data in packet
 		self.Offset+=dataSize
 		
-		# parse the packet to get the base tag name
-		pos=(len(PLC.TagName)-PLC.TagName.index("["))	# find position of [
-		bt=PLC.TagName[:-pos]				# remove [x]: result=SuperDuper
-		temp=PLC.TagName[-pos:]				# remove tag: result=[x]
-		ind=int(temp[1:-1])				# strip the []: result=x
-		newTagName=bt+'['+str(ind+i)+']'
-		
+		ret=TagNameParser(PLC.TagName, i)
 		returnvalue=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
-	        Array[i]=LGXTag().Tag(newTagName, GetDataType(DataType), returnvalue)
+		#if DataType==211: returnvalue=BitValue(ind, returnvalue)
+	        Array[i]=LGXTag().Tag(ret[0], GetDataType(DataType), returnvalue)
 		counter+=1
 		# with large arrays, the data takes multiple packets so at the end of
 		# a packet, we need to send a new request
@@ -752,6 +750,15 @@ def ffs(data):
     # increment ot the next tag in the packet
     packetStart=packetStart+tagLen+22
 
+def TagNameParser(tag, offset):
+    # parse the packet to get the base tag name
+    # the offset is so that we can increment the array pointer if need be
+    pos=(len(tag)-tag.index("["))	# find position of [
+    bt=tag[:-pos]			# remove [x]: result=SuperDuper
+    temp=tag[-pos:]			# remove tag: result=[x]
+    ind=int(temp[1:-1])			# strip the []: result=x
+    newTagName=bt+'['+str(ind+offset)+']'
+    return newTagName, bt, ind
   
 def BitValue(BitNumber, Value):
     BitNumber=int(BitNumber)	# convert to int just in case
@@ -778,6 +785,8 @@ def PackFormat(DataType):
 	return '<q'
     elif DataType==202:	#REAL
 	return '<f'
+    elif DataType==211: #BOOL Array
+        return '<i'
     elif DataType==672:	#STRING
 	return '<L'
 
@@ -794,6 +803,8 @@ def BytesPerElement(DataType):
 	return 8
     elif DataType==202:	#REAL
 	return 4
+    elif DataType==211: #BOOL Array
+        return 4
     elif DataType==672:	#STRING
 	return 4
       
