@@ -1,3 +1,7 @@
+09/27/15
+  -Each unique tag read gets stored in a dictionary so we won't read it again
+      when we do a write
+
 09/22/15
   -Fixed large array read bug
   -Fixed LINT array reads

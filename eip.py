@@ -6,8 +6,8 @@ import socket
 import sys
 import time
 
-
-taglist = []
+tagsread={}
+taglist=[]
 self=None
 PLC=self
 class Self():
@@ -388,14 +388,16 @@ def _buildCIPTagRequest(reqType, partial):
     
 	if TagSplit[i].endswith("]"):
 	    RequestPathSize+=1					# add a word for 0x91 and len
-	    ElementPosition=(len(TagSplit[i])-TagSplit[i].index("["))	# find position of [
-	    basetag=TagSplit[i][:-ElementPosition]		# remove [x]: result=SuperDuper
-	    temp=TagSplit[i][-ElementPosition:]			# remove tag: result=[x]
-	    index=int(temp[1:-1])				# strip the []: result=x
+	    #ElementPosition=(len(TagSplit[i])-TagSplit[i].index("["))	# find position of [
+	    #basetag=TagSplit[i][:-ElementPosition]		# remove [x]: result=SuperDuper
+	    #temp=TagSplit[i][-ElementPosition:]		# remove tag: result=[x]
+	    #index=int(temp[1:-1])				# strip the []: result=x
+	    #ret=TagNameParser(TagSplit[i], 0)
+	    tag, basetag, index = TagNameParser(TagSplit[i], 0)
 	    BaseTagLenBytes=len(basetag)			# get number of bytes
-	
+
 	    # Assemble the packet
-	    RequestTagData+=pack('<BB', 0x91, len(basetag))	# add the req type and tag len to packet
+	    RequestTagData+=pack('<BB', 0x91, BaseTagLenBytes)	# add the req type and tag len to packet
 	    RequestTagData+=basetag				# add the tag name
 	    if BaseTagLenBytes%2==1:				# check for odd bytes
 		BaseTagLenBytes+=1				# add another byte to make it even
@@ -508,15 +510,18 @@ def Read(*args):
     PLC.TagName=name
     if len(args)==2:	# array read
 	NumberOfElements=args[1]
-	Array=[0 for i in range(NumberOfElements)]   #create array
+	Array=[0 for i in xrange(NumberOfElements)]   #create array
     else:
 	NumberOfElements=1  # if non array, then only 1 element
 	
     PLC.NumberOfElements=NumberOfElements
     PLC.Offset=0
+    
+    # build our tag
     _buildCIPTagRequest("Read", False)
     _buildEIPHeader()
     
+    # send our tag read request
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
     
@@ -524,7 +529,10 @@ def Read(*args):
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
     DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
-    returnvalue=0
+
+    # if we have not read the tag previously, store it in our dictionary
+    if not args[0] in tagsread:
+	tagsread[PLC.TagName]=DataType
     
     # if we successfully read from the PLC...
     if Status==204 and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
@@ -545,7 +553,7 @@ def Read(*args):
 	    else:
 		# this handles SINT, INT, DINT, REAL
 		returnvalue=unpack_from(PackFormat(DataType), PLC.ReceiveData, 52)[0]
-		print returnvalue
+		#print returnvalue
 	        if DataType==211:  #BOOL Array
 		    ret=TagNameParser(PLC.TagName, 0)		# get array index
 		    returnvalue=BitValue(ret[2], returnvalue)	# get the bit from the returned word
@@ -560,6 +568,8 @@ def Read(*args):
 		except:
 		    do="nothing"
 	    returntag=LGXTag().Tag(PLC.TagName, GetDataType(DataType), returnvalue)
+	    tagsread[returntag.TagName]=returntag.DataType
+	    #print tagsread
 	    return returntag
 
 	else:	# user passed more than one argument (array read)
@@ -602,20 +612,27 @@ def Write(*args):
     # If not connected to PLC, abandon ship!
     if self.SocketConnected==False:
 	_openconnection()
+	
+    if args[0] in tagsread:
+	# retreive the datatype from our dictionary
+	DataType=tagsread[args[0]]
+    else:  
+	# read the tag first so that we can get it's datatype
+	tag=Read(args[0])
+	DataType=tag.DataType
+	readValue=tag.Value
 
-    tag=Read(args[0])
-    
     TagName=args[0]
     Value=args[1]
-    DataType=tag.DataType
-    readValue=tag.Value
+    #DataType=tag.DataType
     
     PLC.TagName=TagName
     if len(args)==2: PLC.NumberOfElements=1
     if len(args)==3: PLC.NumberOfElements=args[2]
 
     PLC.Offset=None
-    PLC.CIPDataType=DataType
+    #PLC.CIPDataType=DataType
+    self.CIPDataType=DataType
     PLC.WriteData=[]
     if len(args)==2:
 	if DataType=="REAL":
@@ -625,12 +642,10 @@ def Write(*args):
 	    PLC.WriteData=MakeString(Value)
 	else:
 	    test=TagName.split(".")
-	    if len(test)==1: # Word
+	    if len(test)==1 and BitofWord(TagName): # Word
 	        PLC.WriteData.append(int(Value))
 	    else:  #Bit of a word
-		#print Value, test[1]
 	        newValue=readValue | (int(Value)<<int(test[1]))
-	        #print newValue
 	        PLC.WriteData.append(newValue)
 	    
     elif len(args)==3:
@@ -649,6 +664,12 @@ def Write(*args):
     # check for success, let the user know of failure
     if Status!=205 or ExtendedStatus!=0: # fail
       print "Failed to write to", TagName, " Status", Status, " Extended Status", ExtendedStatus
+
+def BitofWord(tag):
+    if tag.endswith(".ACC"): return False
+    if tag.endswith(".POS"): return False
+    if tag.endswith(".PRE"): return False
+    return True
  
 def GetPLCTime():
     # If not connected to PLC, abandon ship!
@@ -771,6 +792,11 @@ def BitValue(BitNumber, Value):
     if bit==0: return False	# convert to false
     if bit==1: return True	# convert to true
 
+
+'''
+These functions can be removed, Burt had a frigging dictionary that has this information.
+I'm a dummy, just figure out how to use a dictionary!
+'''
 
 def PackFormat(DataType):
     if DataType==193:	#BOOL
