@@ -3,6 +3,7 @@
       when we do a write
   -Back to returning just value instead of tag type
   -Cleaned up write function with new dict changes, fixed issue with bit of word confusion
+  -Cleaned some more commented functions
 
 09/22/15
   -Fixed large array read bug

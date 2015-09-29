@@ -567,10 +567,7 @@ def Read(*args):
 			returnvalue=BitValue(BitPos, returnvalue)
 		except:
 		    do="nothing"
-	    #returntag=LGXTag().Tag(PLC.TagName, GetDataType(DataType), returnvalue)
-	    #tagsread[returntag.TagName]=returntag.DataType
-	    #print tagsread
-	    #return returntag
+		    
 	    return returnvalue
 	else:	# user passed more than one argument (array read)
 	    dataSize=BytesPerElement(DataType)		# get number of bytes per datatype
@@ -581,10 +578,8 @@ def Read(*args):
 		index=52+(counter*dataSize)		# location of data in packet
 		self.Offset+=dataSize
 		
-		ret=TagNameParser(PLC.TagName, i)
+		#ret=TagNameParser(PLC.TagName, i)
 		returnvalue=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
-		#if DataType==211: returnvalue=BitValue(ind, returnvalue)
-	        #Array[i]=LGXTag().Tag(ret[0], GetDataType(DataType), returnvalue)
 	        Array[i]=returnvalue
 		counter+=1
 		# with large arrays, the data takes multiple packets so at the end of
@@ -617,21 +612,8 @@ def Write(*args):
     # check our dict to see if we've read the tag before,
     #	if not, read it so we can store it's data type
     if args[0] not in tagsread:
-	# retreive the datatype from our dictionary
-	#DataType=tagsread[args[0]]	# numerical DataType value
-	#DataType=GetDataType(DataType)
 	readValue=Read(args[0])
-    #else:  
-	## read the tag first so that we can get it's datatype
-	##tag=Read(args[0])
-	##DataType=tag.DataType
-	##readValue=tag.Value
-	#readValue=Read(args[0])
-	#DataType=tagsread[args[0]]
-	##DataType=GetDataType(DataType)
-	#print DataType
-	
-    #readValue=Read(args[0])
+
     DataType=tagsread[args[0]]		# store numerical data type value
     DataType=GetDataType(DataType)	# convert numerical type to text
     TagName=args[0]			# store the tag name
@@ -643,7 +625,6 @@ def Write(*args):
     if len(args)==3: PLC.NumberOfElements=args[2]
 
     PLC.Offset=None
-    #PLC.CIPDataType=DataType
     self.CIPDataType=DataType
     PLC.WriteData=[]
     if len(args)==2:
@@ -653,8 +634,6 @@ def Write(*args):
 	    PLC.StructIdentifier=0x0fCE
 	    PLC.WriteData=MakeString(Value)
 	else:
-	    #test=TagName.split(".")
-	    #if len(test)==1 and BitofWord(TagName): # Word
 	    if BitofWord(TagName): # Word
 	        PLC.WriteData.append(int(Value))
 	    else:  #Bit of a word
