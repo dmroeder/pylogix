@@ -580,7 +580,6 @@ def Read(*args):
 	    else:
 		# this handles SINT, INT, DINT, REAL
 		returnvalue=unpack_from(PackFormat(DataType), PLC.ReceiveData, 52)[0]
-		#print returnvalue
 	        if DataType==211:  #BOOL Array
 		    ugh=PLC.TagName.lower().split('.')
 		    ughlen=len(ugh)-1
@@ -588,7 +587,8 @@ def Read(*args):
 		    returnvalue=BitValue(returnvalue, ret[2]%32)	# get the bit from the returned word
 	    # if we were just reading a bit of a word, convert it to a true/false
 	    SplitTest=name.lower().split(".")
-	    if len(SplitTest)>1:
+	    doo=SplitTest[len(SplitTest)-1]
+	    if doo.isdigit():
 		BitPos=SplitTest[len(SplitTest)-1]
 		BitPos=int(BitPos)
 		try:
@@ -607,7 +607,6 @@ def Read(*args):
 		index=52+(counter*dataSize)		# location of data in packet
 		self.Offset+=dataSize
 		
-		#ret=TagNameParser(PLC.TagName, i)
 		returnvalue=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
 	        Array[i]=returnvalue
 		counter+=1
@@ -812,6 +811,7 @@ def BitValue(value, bitno):
 	return False
 
 def bitSetter(value, bitno, state):
+    # take value, set specified bit to 1 or 0, return new value
     if state:
 	mask = 1 << bitno
 	return(value | mask)
