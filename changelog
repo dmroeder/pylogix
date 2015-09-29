@@ -1,3 +1,6 @@
+09/28/15
+  -Read single BOOL from array works now, reworked initial tag read
+  
 09/27/15
   -Each unique tag read gets stored in a dictionary so we won't read it again
       when we do a write

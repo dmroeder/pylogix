@@ -366,7 +366,7 @@ def _buildEIPHeader():
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
 
-def _buildCIPTagRequest(reqType, partial):
+def _buildCIPTagRequest(reqType, partial, isBoolArray):
     """
     So here's what happens here.  Tags can be super simple like mytag or pretty complex
     like My.Tag[7].Value.  In the example, the tag needs to be split up by the '.' and
@@ -377,6 +377,10 @@ def _buildCIPTagRequest(reqType, partial):
     So throughout this function we have to figure out the number of words necessary
     for this packet as well assemblying the tag portion of the packet.  It might be more
     complicated than it should be but that's all I could come up with.
+    
+    I added the "First Request" because I'm handling the very first read of a tag different
+    in order to get it's data type.  It all has to do with stupid BOOL arrays, someday I'd
+    like to rework this to make it easier to look at.
     """
     RequestPathSize=0		# define path size
     RequestTagData=""		# define tag data
@@ -395,6 +399,7 @@ def _buildCIPTagRequest(reqType, partial):
 	    #ret=TagNameParser(TagSplit[i], 0)
 	    tag, basetag, index = TagNameParser(TagSplit[i], 0)
 	    BaseTagLenBytes=len(basetag)			# get number of bytes
+	    if isBoolArray: index=index/32
 
 	    # Assemble the packet
 	    RequestTagData+=pack('<BB', 0x91, BaseTagLenBytes)	# add the req type and tag len to packet
@@ -406,12 +411,13 @@ def _buildCIPTagRequest(reqType, partial):
 	    BaseTagLenWords=BaseTagLenBytes/2			# figure out the words for this segment
 
 	    RequestPathSize+=BaseTagLenWords			# add it to our request size
-	    if index<256:					# if index is 1 byte...
-		RequestPathSize+=1				# add word for array index
-		RequestTagData+=pack('<BB', 0x28, index)	# add one word to packet
-	    if index>255:					# if index is more than 1 byte...
-		RequestPathSize+=2				# add 2 words for array for index
-		RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
+	    if reqType=="Read" or reqType=="Write" or i<len(TagSplit)-1:
+		if index<256:					# if index is 1 byte...
+		    RequestPathSize+=1				# add word for array index
+		    RequestTagData+=pack('<BB', 0x28, index)	# add one word to packet
+		if index>255:					# if index is more than 1 byte...
+		    RequestPathSize+=2				# add 2 words for array for index
+		    RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
 	
 	else:
 	    # for non-array segment of tag
@@ -453,16 +459,17 @@ def _buildCIPTagRequest(reqType, partial):
 	    el=self.WriteData[i]
 	    #print el
 	    self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType.upper()][2],el)
-    if reqType=="Read":
+    # This is really ugly
+    if reqType=="Read" or reqType=="First Read":
 	# do the read related stuff if we are reading
 	if partial==False: RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
-	if partial==True: RequestService=0x52
+	if partial==True or reqType=="First Read": RequestService=0x52
 	CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
 	CIPReadRequest+=RequestTagData					# Tag portion of packet
 	CIPReadRequest+=pack('<H', RequestElements)			# end of packet
 	CIPReadRequest+=pack('<H', self.Offset)
 	self.CIPRequest=CIPReadRequest
-	if partial==True: self.CIPRequest+=pack('<H', 0x0000)
+	if partial==True or reqType=="First Read": self.CIPRequest+=pack('<H', 0x0000)
 
     return
   
@@ -500,6 +507,10 @@ def Read(*args):
     
     args[0] = tag name
     args[1] = Number of Elements
+    
+    I added some really terrible code.  If we are reading the tag for the first time,
+      we need to do a 0x52 to get the data type, then we store it in our dict, then we
+      do the real read to get the value.  This all has to do with handling BOOL values.
     """
     
     # If not connected to PLC, abandon ship!
@@ -518,7 +529,22 @@ def Read(*args):
     PLC.Offset=0
     
     # build our tag
-    _buildCIPTagRequest("Read", False)
+    # if we have not read the tag previously, store it in our dictionary
+    if not args[0] in tagsread:
+	#tagsread[PLC.TagName]=DataType
+	_buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
+	_buildEIPHeader()
+	    # send our tag read request
+	PLC.Socket.send(PLC.EIPFrame)
+	PLC.ReceiveData=PLC.Socket.recv(1024)
+	DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
+	tagsread[args[0]]=DataType
+    
+    if tagsread[args[0]]==211:
+	_buildCIPTagRequest("Read", partial=False, isBoolArray=True)
+    else:
+	_buildCIPTagRequest("Read", partial=False, isBoolArray=False)
+	
     _buildEIPHeader()
     
     # send our tag read request
@@ -528,14 +554,15 @@ def Read(*args):
     # extract some status info
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
-    DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
+    #DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
+    DataType=tagsread[args[0]]
 
     # if we have not read the tag previously, store it in our dictionary
-    if not args[0] in tagsread:
-	tagsread[PLC.TagName]=DataType
+    #if not args[0] in tagsread:
+	#tagsread[PLC.TagName]=DataType
     
     # if we successfully read from the PLC...
-    if Status==204 and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
+    if (Status==204 or Status==210) and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
 	if len(args)==1:	# user passed 1 argument (non array read)
 	    # Do different stuff based on the returned data type
 	    if DataType==0:	
@@ -555,8 +582,10 @@ def Read(*args):
 		returnvalue=unpack_from(PackFormat(DataType), PLC.ReceiveData, 52)[0]
 		#print returnvalue
 	        if DataType==211:  #BOOL Array
-		    ret=TagNameParser(PLC.TagName, 0)		# get array index
-		    returnvalue=BitValue(ret[2], returnvalue)	# get the bit from the returned word
+		    ugh=PLC.TagName.lower().split('.')
+		    ughlen=len(ugh)-1
+		    ret=TagNameParser(ugh[ughlen], 0)		# get array index
+		    returnvalue=BitValue(ret[2]%32, returnvalue)	# get the bit from the returned word
 		
 	    # if we were just reading a bit of a word, convert it to a true/false
 	    SplitTest=name.lower().split(".")
@@ -588,7 +617,7 @@ def Read(*args):
 		    index=0
 		    counter=0
 
-		    _buildCIPTagRequest("Read", True)
+		    _buildCIPTagRequest("Read", partial=True, isBoolArray=False)
 		    _buildEIPHeader()
     
 		    PLC.Socket.send(PLC.EIPFrame)
@@ -598,6 +627,7 @@ def Read(*args):
 	    return Array
     else: # didn't nail it
 	print "Did not nail it, read fail", name
+	print "Status:", Status, "Extended Status:", ExtendedStatus
       
 def Write(*args):
     """
@@ -646,7 +676,7 @@ def Write(*args):
     else:
 	print "fix this"
 	
-    _buildCIPTagRequest("Write", False)
+    _buildCIPTagRequest("Write", partial=False, isBoolArray=False)
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
@@ -764,20 +794,28 @@ def ffs(data):
     packetStart=packetStart+tagLen+22
 
 def TagNameParser(tag, offset):
+    #print tag, offset
     # parse the packet to get the base tag name
     # the offset is so that we can increment the array pointer if need be
     pos=(len(tag)-tag.index("["))	# find position of [
+    #print pos
     bt=tag[:-pos]			# remove [x]: result=SuperDuper
+    #print bt
     temp=tag[-pos:]			# remove tag: result=[x]
+    #print temp
     ind=int(temp[1:-1])			# strip the []: result=x
+    #print ind
     newTagName=bt+'['+str(ind+offset)+']'
+    #print newTagName
     return newTagName, bt, ind
   
 def BitValue(BitNumber, Value):
+    print BitNumber, Value
     BitNumber=int(BitNumber)	# convert to int just in case
     Value=int(Value)		# convert to int just in case
     if Value==0: return False	# must be false if our value is 0
     dectobin=list(bin(Value)[2:])	# convert value to bit array
+    print dectobin
     listlen=len(dectobin)-1		# get the length of the array
     bit=dectobin[listlen-BitNumber]	# get the specific bit that we were after
     bit=int(bit)		# convert to int
