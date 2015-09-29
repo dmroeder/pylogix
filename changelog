@@ -1,5 +1,6 @@
 09/28/15
   -Read single BOOL from array works now, reworked initial tag read
+  -Fixed bit of a word reading, changed code for checking value of bit of a word
   
 09/27/15
   -Each unique tag read gets stored in a dictionary so we won't read it again

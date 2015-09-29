@@ -585,15 +585,15 @@ def Read(*args):
 		    ugh=PLC.TagName.lower().split('.')
 		    ughlen=len(ugh)-1
 		    ret=TagNameParser(ugh[ughlen], 0)		# get array index
-		    returnvalue=BitValue(ret[2]%32, returnvalue)	# get the bit from the returned word
-		
+		    returnvalue=BitValue(returnvalue, ret[2]%32)	# get the bit from the returned word
 	    # if we were just reading a bit of a word, convert it to a true/false
 	    SplitTest=name.lower().split(".")
 	    if len(SplitTest)>1:
 		BitPos=SplitTest[len(SplitTest)-1]
+		BitPos=int(BitPos)
 		try:
 		    if int(BitPos)<=31:
-			returnvalue=BitValue(BitPos, returnvalue)
+			returnvalue=BitValue(returnvalue, BitPos)
 		except:
 		    do="nothing"
 		    
@@ -794,35 +794,30 @@ def ffs(data):
     packetStart=packetStart+tagLen+22
 
 def TagNameParser(tag, offset):
-    #print tag, offset
     # parse the packet to get the base tag name
     # the offset is so that we can increment the array pointer if need be
     pos=(len(tag)-tag.index("["))	# find position of [
-    #print pos
     bt=tag[:-pos]			# remove [x]: result=SuperDuper
-    #print bt
     temp=tag[-pos:]			# remove tag: result=[x]
-    #print temp
     ind=int(temp[1:-1])			# strip the []: result=x
-    #print ind
     newTagName=bt+'['+str(ind+offset)+']'
-    #print newTagName
     return newTagName, bt, ind
   
-def BitValue(BitNumber, Value):
-    print BitNumber, Value
-    BitNumber=int(BitNumber)	# convert to int just in case
-    Value=int(Value)		# convert to int just in case
-    if Value==0: return False	# must be false if our value is 0
-    dectobin=list(bin(Value)[2:])	# convert value to bit array
-    print dectobin
-    listlen=len(dectobin)-1		# get the length of the array
-    bit=dectobin[listlen-BitNumber]	# get the specific bit that we were after
-    bit=int(bit)		# convert to int
-    if bit==0: return False	# convert to false
-    if bit==1: return True	# convert to true
+def BitValue(value, bitno):
+    # return whether the specific bit in a value is true or false
+    mask = 1 << bitno
+    if (value & mask):
+	return True
+    else:
+	return False
 
-
+def bitSetter(value, bitno, state):
+    if state:
+	mask = 1 << bitno
+	return(value | mask)
+    else:
+	mask = ~(1 << bitno)
+	return(value & mask)
 '''
 These functions can be removed, Burt had a frigging dictionary that has this information.
 I'm a dummy, just figure out how to use a dictionary!
