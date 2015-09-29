@@ -1,6 +1,8 @@
 09/27/15
   -Each unique tag read gets stored in a dictionary so we won't read it again
       when we do a write
+  -Back to returning just value instead of tag type
+  -Cleaned up write function with new dict changes, fixed issue with bit of word confusion
 
 09/22/15
   -Fixed large array read bug
