@@ -545,14 +545,7 @@ def Read(*args):
     # build our tag
     # if we have not read the tag previously, store it in our dictionary
     if not args[0] in tagsread:
-	#tagsread[PLC.TagName]=DataType
-	_buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
-	_buildEIPHeader()
-	    # send our tag read request
-	PLC.Socket.send(PLC.EIPFrame)
-	PLC.ReceiveData=PLC.Socket.recv(1024)
-	DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
-	tagsread[args[0]]=DataType
+	InitialRead(name)
     
     if tagsread[args[0]]==211:
 	_buildCIPTagRequest("Read", partial=False, isBoolArray=True)
@@ -568,13 +561,8 @@ def Read(*args):
     # extract some status info
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
-    #DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
     DataType=tagsread[args[0]]
 
-    # if we have not read the tag previously, store it in our dictionary
-    #if not args[0] in tagsread:
-	#tagsread[PLC.TagName]=DataType
-    
     # if we successfully read from the PLC...
     if (Status==204 or Status==210) and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
 	if len(args)==1:	# user passed 1 argument (non array read)
@@ -652,20 +640,17 @@ def Write(*args):
     if self.SocketConnected==False:
 	_openconnection()
 
+    self.TagName=args[0]		# store the tag name
+    Value=args[1]			# store the value
+
     # check our dict to see if we've read the tag before,
     #	if not, read it so we can store it's data type
     if args[0] not in tagsread:
-	readValue=Read(args[0])
-
-    print tagsread
-
+	InitialRead(args[0])
+    
     DataType=tagsread[args[0]]		# store numerical data type value
     DataType=GetDataType(DataType)	# convert numerical type to text
-    TagName=args[0]			# store the tag name
-    Value=args[1]			# store the value
-    #DataType=tag.DataType
-    
-    PLC.TagName=TagName
+
     if len(args)==2: PLC.NumberOfElements=1
     if len(args)==3: PLC.NumberOfElements=args[2]
 
@@ -679,7 +664,7 @@ def Write(*args):
 	    PLC.StructIdentifier=0x0fCE
 	    PLC.WriteData=MakeString(Value)
 	else:
-	    if BitofWord(TagName): # Word
+	    if BitofWord(self.TagName): # Word
 		newValue=bitSetter(readValue, 0, Value)
 	      	PLC.WriteData.append(newValue)
 	    else:  #Bit of a word
@@ -691,7 +676,7 @@ def Write(*args):
     else:
 	print "fix this"
 	
-    if BitofWord(TagName):
+    if BitofWord(self.TagName):
 	_buildCIPTagRequest("Write Bit", partial=False, isBoolArray=False)
     else:
 	_buildCIPTagRequest("Write", partial=False, isBoolArray=False)
@@ -703,7 +688,16 @@ def Write(*args):
         
     # check for success, let the user know of failure
     if Status!=205 and Status!=206 or ExtendedStatus!=0: # fail
-      print "Failed to write to", TagName, " Status", Status, " Extended Status", ExtendedStatus
+      print "Failed to write to", self.TagName, " Status", Status, " Extended Status", ExtendedStatus
+
+def InitialRead(tag):
+	_buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
+	_buildEIPHeader()
+	    # send our tag read request
+	PLC.Socket.send(PLC.EIPFrame)
+	PLC.ReceiveData=PLC.Socket.recv(1024)
+	DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
+	tagsread[tag]=DataType
 
 def BitofWord(tag):
     s=tag.split('.')

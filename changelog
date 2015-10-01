@@ -1,5 +1,6 @@
 10/01/15
   -A bunch of rework for reading/writing bit of a word
+  -Cleaned up extra read when writing to tag
 
 09/28/15
   -Read single BOOL from array works now, reworked initial tag read
