@@ -644,6 +644,7 @@ def Write(*args):
     self.TagName=args[0]		# store the tag name
     Value=args[1]			# store the value
 
+  
     # check our dict to see if we've read the tag before,
     #	if not, read it so we can store it's data type
     if args[0] not in tagsread:
@@ -665,22 +666,19 @@ def Write(*args):
 	    PLC.StructIdentifier=0x0fCE
 	    PLC.WriteData=MakeString(Value)
 	else:
-	    if BitofWord(self.TagName): # Word
-		newValue=bitSetter(readValue, 0, Value)
-	      	PLC.WriteData.append(newValue)
-	    else:  #Bit of a word
-		PLC.WriteData.append(int(Value))
+	    PLC.WriteData.append(int(Value))
 	    
     elif len(args)==3:
 	for i in xrange(PLC.NumberOfElements):
 	    PLC.WriteData.append(int(Value[i]))		  
     else:
 	print "fix this"
-	
+    
     if BitofWord(self.TagName):
 	_buildCIPTagRequest("Write Bit", partial=False, isBoolArray=False)
     else:
 	_buildCIPTagRequest("Write", partial=False, isBoolArray=False)
+	
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
@@ -697,7 +695,7 @@ def InitialRead(tag):
 	    # send our tag read request
 	PLC.Socket.send(PLC.EIPFrame)
 	PLC.ReceiveData=PLC.Socket.recv(1024)
-	DataType=unpack_from('<h',PLC.ReceiveData,50)[0]	
+	DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
 	tagsread[tag]=DataType
 
 def BitofWord(tag):
@@ -739,7 +737,6 @@ def GetPLCTime():
     
     PLC.Socket.send(self.EIPFrame)
     PLC.Receive=PLC.Socket.recv(1024)
-    #status = unpack_from('<h', PLC.Receive, 48)[0]
     # get the time from the packet
     plcTime=unpack_from('<Q', PLC.Receive, 56)[0]
     # get the timezone offset from the packet (this will include sign)
@@ -802,7 +799,6 @@ def ffs(data):
     # extract the offset
     self.Offset=unpack_from('<H', packet, 0)[0]
     # add the tag to our tag list
-    #taglist.append(LGXTag(packet))
     taglist.append(LGXTag().ParsePacket(packet))
     # increment ot the next tag in the packet
     packetStart=packetStart+tagLen+22
@@ -810,7 +806,6 @@ def ffs(data):
 def TagNameParser(tag, offset):
     # parse the packet to get the base tag name
     # the offset is so that we can increment the array pointer if need be
-    #print tag
     pos=(len(tag)-tag.index("["))	# find position of [
     bt=tag[:-pos]			# remove [x]: result=SuperDuper
     temp=tag[-pos:]			# remove tag: result=[x]
