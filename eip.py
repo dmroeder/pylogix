@@ -392,11 +392,6 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     
 	if TagSplit[i].endswith("]"):
 	    RequestPathSize+=1					# add a word for 0x91 and len
-	    #ElementPosition=(len(TagSplit[i])-TagSplit[i].index("["))	# find position of [
-	    #basetag=TagSplit[i][:-ElementPosition]		# remove [x]: result=SuperDuper
-	    #temp=TagSplit[i][-ElementPosition:]		# remove tag: result=[x]
-	    #index=int(temp[1:-1])				# strip the []: result=x
-	    #ret=TagNameParser(TagSplit[i], 0)
 	    tag, basetag, index = TagNameParser(TagSplit[i], 0)
 	    BaseTagLenBytes=len(basetag)			# get number of bytes
 	    if isBoolArray: index=index/32
@@ -441,7 +436,7 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 		RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
     
     
-    if reqType=="Write":
+    if reqType=="Write" or reqType=="Write Bit":
 	# do the write related stuff if we're writing a tag
       	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
 	self.NumberOfElements=len(self.WriteData)            #list of elements to write
@@ -449,16 +444,35 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	RequestNumberOfElements=self.NumberOfElements
 	if self.CIPDataType.upper()=="STRUCT":  #Strings are special
 	    RequestNumberOfElements=self.StructIdentifier    
-    	RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
+    	if reqType=="Write": RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
+	if reqType=="Write Bit": RequestService=0x4E
 	RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
         CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
 	CIPReadRequest+=RequestTagData					# Tag portion of packet 
-	CIPReadRequest+=pack('<HH', RequestElementType, RequestNumberOfElements)
-	self.CIPRequest=CIPReadRequest
-	for i in xrange(len(self.WriteData)):
-	    el=self.WriteData[i]
-	    #print el
-	    self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType.upper()][2],el)
+
+	if reqType=="Write":
+	    CIPReadRequest+=pack('<HH', RequestElementType, RequestNumberOfElements)
+	    self.CIPRequest=CIPReadRequest
+	    for i in xrange(len(self.WriteData)):
+		el=self.WriteData[i]
+		self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType.upper()][2],el)
+	if reqType=="Write Bit":
+	    self.CIPRequest=CIPReadRequest
+	    fmt=self.CIPDataTypes[self.CIPDataType][2]		# get the pack format ('b')
+	    fmt=fmt.upper()					# convert it to unsigned ('B')
+	    s=self.TagName.split('.')				# split by decimal to get bit
+	    bit=s[len(s)-1]					# get the bit number we're writing to
+	    bit=int(bit)					# convert it to integer
+	    self.CIPRequest+=pack('<h', self.NumberOfBytes)	# pack the number of bytes
+	    byte=2**(self.NumberOfBytes*8)-1			
+	    bits=2**bit
+	    if self.WriteData[0]:
+		self.CIPRequest+=pack(fmt, bits)
+		self.CIPRequest+=pack(fmt, byte)
+	    else:
+		self.CIPRequest+=pack(fmt, 0x00)
+		self.CIPRequest+=pack(fmt, (byte-bits))
+	    
     # This is really ugly
     if reqType=="Read" or reqType=="First Read":
 	# do the read related stuff if we are reading
@@ -643,6 +657,8 @@ def Write(*args):
     if args[0] not in tagsread:
 	readValue=Read(args[0])
 
+    print tagsread
+
     DataType=tagsread[args[0]]		# store numerical data type value
     DataType=GetDataType(DataType)	# convert numerical type to text
     TagName=args[0]			# store the tag name
@@ -664,10 +680,10 @@ def Write(*args):
 	    PLC.WriteData=MakeString(Value)
 	else:
 	    if BitofWord(TagName): # Word
-	        PLC.WriteData.append(int(Value))
+		newValue=bitSetter(readValue, 0, Value)
+	      	PLC.WriteData.append(newValue)
 	    else:  #Bit of a word
-	        newValue=readValue | (int(Value)<<int(test[1]))
-	        PLC.WriteData.append(newValue)
+		PLC.WriteData.append(int(Value))
 	    
     elif len(args)==3:
 	for i in xrange(PLC.NumberOfElements):
@@ -675,7 +691,10 @@ def Write(*args):
     else:
 	print "fix this"
 	
-    _buildCIPTagRequest("Write", partial=False, isBoolArray=False)
+    if BitofWord(TagName):
+	_buildCIPTagRequest("Write Bit", partial=False, isBoolArray=False)
+    else:
+	_buildCIPTagRequest("Write", partial=False, isBoolArray=False)
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
@@ -683,15 +702,16 @@ def Write(*args):
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
         
     # check for success, let the user know of failure
-    if Status!=205 or ExtendedStatus!=0: # fail
+    if Status!=205 and Status!=206 or ExtendedStatus!=0: # fail
       print "Failed to write to", TagName, " Status", Status, " Extended Status", ExtendedStatus
 
 def BitofWord(tag):
-    if tag.endswith(".ACC"): return False
-    if tag.endswith(".POS"): return False
-    if tag.endswith(".PRE"): return False
-    return True
- 
+    s=tag.split('.')
+    if s[len(s)-1].isdigit():
+	return True
+    else:
+	return False
+
 def GetPLCTime():
     # If not connected to PLC, abandon ship!
     if self.SocketConnected==False:
@@ -812,6 +832,11 @@ def BitValue(value, bitno):
 
 def bitSetter(value, bitno, state):
     # take value, set specified bit to 1 or 0, return new value
+    if state==0: state=False
+    if state==1: state=True
+    bitno=int(bitno)
+    value=int(value)
+    
     if state:
 	mask = 1 << bitno
 	return(value | mask)

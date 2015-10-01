@@ -1,3 +1,6 @@
+10/01/15
+  -A bunch of rework for reading/writing bit of a word
+
 09/28/15
   -Read single BOOL from array works now, reworked initial tag read
   -Fixed bit of a word reading, changed code for checking value of bit of a word
