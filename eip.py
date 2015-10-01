@@ -394,7 +394,8 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	    RequestPathSize+=1					# add a word for 0x91 and len
 	    tag, basetag, index = TagNameParser(TagSplit[i], 0)
 	    BaseTagLenBytes=len(basetag)			# get number of bytes
-	    if isBoolArray: index=index/32
+	    #print i, len(TagSplit)
+	    if isBoolArray and i==len(TagSplit)-1: index=index/32
 
 	    # Assemble the packet
 	    RequestTagData+=pack('<BB', 0x91, BaseTagLenBytes)	# add the req type and tag len to packet
@@ -696,7 +697,7 @@ def InitialRead(tag):
 	    # send our tag read request
 	PLC.Socket.send(PLC.EIPFrame)
 	PLC.ReceiveData=PLC.Socket.recv(1024)
-	DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
+	DataType=unpack_from('<h',PLC.ReceiveData,50)[0]	
 	tagsread[tag]=DataType
 
 def BitofWord(tag):
@@ -809,6 +810,7 @@ def ffs(data):
 def TagNameParser(tag, offset):
     # parse the packet to get the base tag name
     # the offset is so that we can increment the array pointer if need be
+    #print tag
     pos=(len(tag)-tag.index("["))	# find position of [
     bt=tag[:-pos]			# remove [x]: result=SuperDuper
     temp=tag[-pos:]			# remove tag: result=[x]
@@ -890,3 +892,6 @@ def GetDataType(value):
   if value==206: return "STRING"
   if value==672: return "STRUCT"
   return value
+
+def PrintTagList():
+    print tagsread
