@@ -1,3 +1,7 @@
+10/05/15
+  -Fixed multi dim write
+  -Added write single array bool support
+  
 10/04/15
   -Added multi dim read support
 
