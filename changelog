@@ -1,3 +1,6 @@
+10/04/15
+  -Added multi dim read support
+
 10/01/15
   -A bunch of rework for reading/writing bit of a word
   -Cleaned up extra read when writing to tag

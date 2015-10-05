@@ -385,6 +385,7 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     RequestPathSize=0		# define path size
     RequestTagData=""		# define tag data
     RequestElements=self.NumberOfElements
+    #print self.TagName
     TagSplit=self.TagName.lower().split(".")
     
     # this loop figures out the packet length and builds our packet
@@ -392,9 +393,12 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     
 	if TagSplit[i].endswith("]"):
 	    RequestPathSize+=1					# add a word for 0x91 and len
+	    #if ',' in TagSplit[i]:
 	    tag, basetag, index = TagNameParser(TagSplit[i], 0)
+	    #else:
+		#print "MultiDIM"
+	    
 	    BaseTagLenBytes=len(basetag)			# get number of bytes
-	    #print i, len(TagSplit)
 	    if isBoolArray and i==len(TagSplit)-1: index=index/32
 
 	    # Assemble the packet
@@ -408,12 +412,23 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 
 	    RequestPathSize+=BaseTagLenWords			# add it to our request size
 	    if reqType=="Read" or reqType=="Write" or i<len(TagSplit)-1:
-		if index<256:					# if index is 1 byte...
-		    RequestPathSize+=1				# add word for array index
-		    RequestTagData+=pack('<BB', 0x28, index)	# add one word to packet
-		if index>255:					# if index is more than 1 byte...
-		    RequestPathSize+=2				# add 2 words for array for index
-		    RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
+		#if len(index)==1:
+		if isinstance(index, list)==False:
+		    if index<256:					# if index is 1 byte...
+			RequestPathSize+=1				# add word for array index
+			RequestTagData+=pack('<BB', 0x28, index)	# add one word to packet
+		    if index>255:					# if index is more than 1 byte...
+			RequestPathSize+=2				# add 2 words for array for index
+			RequestTagData+=pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
+		else:
+		    for i in xrange(len(index)):
+			#print index
+			if index[i]<256:					# if index is 1 byte...
+			    RequestPathSize+=1					# add word for array index
+			    RequestTagData+=pack('<BB', 0x28, index[i])		# add one word to packet
+			if index[i]>255:					# if index is more than 1 byte...
+			    RequestPathSize+=2					# add 2 words for array for index
+			    RequestTagData+=pack('<BBH', 0x29, 0x00, index[i])  # add 2 words to packet		    
 	
 	else:
 	    # for non-array segment of tag
@@ -435,7 +450,6 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 		    BaseTagLenBytes+=1					# add byte to make it even
 		    RequestTagData+=pack('<B', 0x00)			# also add to packet
 		RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
-    
     
     if reqType=="Write" or reqType=="Write Bit":
 	# do the write related stuff if we're writing a tag
@@ -532,6 +546,7 @@ def Read(*args):
     if self.SocketConnected==False:
 	_openconnection()
 	
+  
     name=args[0]
     PLC.TagName=name
     if len(args)==2:	# array read
@@ -545,9 +560,12 @@ def Read(*args):
     
     # build our tag
     # if we have not read the tag previously, store it in our dictionary
+    #print tagsread
     if not args[0] in tagsread:
+	#print "Adding Tag!"
 	InitialRead(name)
-    
+    #print "Yoohoo"
+    # handles either BOOL arrays, or everything else
     if tagsread[args[0]]==211:
 	_buildCIPTagRequest("Read", partial=False, isBoolArray=True)
     else:
@@ -563,7 +581,7 @@ def Read(*args):
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
     DataType=tagsread[args[0]]
-
+    
     # if we successfully read from the PLC...
     if (Status==204 or Status==210) and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
 	if len(args)==1:	# user passed 1 argument (non array read)
@@ -586,7 +604,7 @@ def Read(*args):
 	        if DataType==211:  #BOOL Array
 		    ugh=PLC.TagName.lower().split('.')
 		    ughlen=len(ugh)-1
-		    ret=TagNameParser(ugh[ughlen], 0)		# get array index
+		    ret=TagNameParser(ugh[ughlen], 0)			# get array index
 		    returnvalue=BitValue(returnvalue, ret[2]%32)	# get the bit from the returned word
 	    # if we were just reading a bit of a word, convert it to a true/false
 	    SplitTest=name.lower().split(".")
@@ -644,7 +662,6 @@ def Write(*args):
     self.TagName=args[0]		# store the tag name
     Value=args[1]			# store the value
 
-  
     # check our dict to see if we've read the tag before,
     #	if not, read it so we can store it's data type
     if args[0] not in tagsread:
@@ -674,6 +691,7 @@ def Write(*args):
     else:
 	print "fix this"
     
+    # write a bit of a word, or everything else
     if BitofWord(self.TagName):
 	_buildCIPTagRequest("Write Bit", partial=False, isBoolArray=False)
     else:
@@ -690,13 +708,13 @@ def Write(*args):
       print "Failed to write to", self.TagName, " Status", Status, " Extended Status", ExtendedStatus
 
 def InitialRead(tag):
-	_buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
-	_buildEIPHeader()
-	    # send our tag read request
-	PLC.Socket.send(PLC.EIPFrame)
-	PLC.ReceiveData=PLC.Socket.recv(1024)
-	DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
-	tagsread[tag]=DataType
+    _buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
+    _buildEIPHeader()
+    # send our tag read request
+    PLC.Socket.send(PLC.EIPFrame)
+    PLC.ReceiveData=PLC.Socket.recv(1024)
+    DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
+    tagsread[tag]=DataType
 
 def BitofWord(tag):
     s=tag.split('.')
@@ -806,12 +824,23 @@ def ffs(data):
 def TagNameParser(tag, offset):
     # parse the packet to get the base tag name
     # the offset is so that we can increment the array pointer if need be
+    #print "WTF?", tag
     pos=(len(tag)-tag.index("["))	# find position of [
     bt=tag[:-pos]			# remove [x]: result=SuperDuper
     temp=tag[-pos:]			# remove tag: result=[x]
-    ind=int(temp[1:-1])			# strip the []: result=x
-    newTagName=bt+'['+str(ind+offset)+']'
-    return newTagName, bt, ind
+    ind=temp[1:-1]			# strip the []: result=x
+    s=ind.split(',')			# split so we can check for multi dimensin array
+    if len(s)==1:
+	ind=int(ind)
+	newTagName=bt+'['+str(ind+offset)+']'
+    else:
+	# if we have a multi dim array, return the index
+	ind=[]
+	for i in xrange(len(s)):
+	    s[i]=int(s[i])
+	    ind.append(s[i])
+    #print "Stuff:", tag, bt, ind
+    return tag, bt, ind
   
 def BitValue(value, bitno):
     # return whether the specific bit in a value is true or false
