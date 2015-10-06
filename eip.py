@@ -64,8 +64,8 @@ class LGXTag():
     length=unpack_from('<H', packet, 20)[0]
     self.TagName=packet[22:length+22]
     self.Offset=unpack_from('<H', packet, 0)[0]
-    datatype=unpack_from('<B', packet, 4)[0]
-    self.DataType=GetDataType(datatype)
+    self.DataType=unpack_from('<B', packet, 4)[0]
+
     return self
   
   #def Tag(self, tagname, datatype, value):
@@ -454,21 +454,16 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     
     if "Write" in reqType:
 	# do the write related stuff if we're writing a tag
-      	#self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
 	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     #Dints are 4 bytes each
 	self.NumberOfElements=len(self.WriteData)            #list of elements to write
 	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
 	RequestNumberOfElements=self.NumberOfElements
-	#if self.CIPDataType.upper()=="STRUCT":  #Strings are special
 	if self.CIPDataType==672:  #Strings are special
 	    RequestNumberOfElements=self.StructIdentifier
     	if reqType=="Write": RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
 	if reqType=="Write Bit": RequestService=0x4E
 	if reqType=="Write DWORD": RequestService=0x4E
-	#RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
 	RequestElementType=self.CIPDataType
-	#print self.
-	#print RequestElementType
         CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
 	CIPReadRequest+=RequestTagData					# Tag portion of packet 
 
@@ -477,7 +472,6 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	    self.CIPRequest=CIPReadRequest
 	    for i in xrange(len(self.WriteData)):
 		el=self.WriteData[i]
-		#self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType.upper()][2],el)
 		self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType][2],el)
 		
 	if reqType=="Write Bit" or reqType=="Write DWORD":
@@ -575,7 +569,6 @@ def Read(*args):
     # build our tag
     # if we have not read the tag previously, store it in our dictionary
     if not args[0] in tagsread:
-	#print "Adding Tag!"
 	InitialRead(name)
 
     # handles either BOOL arrays, or everything else
@@ -593,19 +586,21 @@ def Read(*args):
     # extract some status info
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
-    DataType=tagsread[args[0]]
+    self.CIPDataType=tagsread[args[0]]
+    datatype=self.CIPDataType
+    CIPFormat=self.CIPDataTypes[datatype][2]
     
     # if we successfully read from the PLC...
     if (Status==204 or Status==210) and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
 	if len(args)==1:	# user passed 1 argument (non array read)
 	    # Do different stuff based on the returned data type
-	    if DataType==0:	
-		print "I'm not sure what happened, data type returned:", DataType
-	    elif DataType==197:
+	    if datatype==0:	
+		print "I'm not sure what happened, data type returned:", datatype
+	    elif datatype==197:
 	        rawTime=unpack_from('<Q', PLC.ReceiveData, 52)[0]
 	        #print datetime(1970, 1, 1) + timedelta(microseconds=rawTime)
 	        returnvalue=rawTime
-	    elif DataType==672:
+	    elif datatype==672:
 		# gotta handle strings a little different
 		NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
 		stringLen=unpack_from('<H', PLC.ReceiveData, 2)[0]
@@ -613,8 +608,8 @@ def Read(*args):
 		returnvalue=PLC.ReceiveData[-stringLen:(-stringLen+NameLength)]
 	    else:
 		# this handles SINT, INT, DINT, REAL
-		returnvalue=unpack_from(PackFormat(DataType), PLC.ReceiveData, 52)[0]
-	        if DataType==211:  #BOOL Array
+		returnvalue=unpack_from(CIPFormat, PLC.ReceiveData, 52)[0]
+	        if datatype==211:  #BOOL Array
 		    ugh=PLC.TagName.lower().split('.')
 		    ughlen=len(ugh)-1
 		    ret=TagNameParser(ugh[ughlen], 0)			# get array index
@@ -633,9 +628,7 @@ def Read(*args):
 		    
 	    return returnvalue
 	else:	# user passed more than one argument (array read)
-
-	    dataSize=BytesPerElement(DataType)		# get number of bytes per datatype
-	    #dataSize=
+	    dataSize=self.CIPDataTypes[datatype][0]
 	    numbytes=len(PLC.ReceiveData)-dataSize	# total number of bytes in packet
 	    counter=0					# counter for indexing through packet
 	    self.Offset=0				# offset for next packet request
@@ -643,7 +636,7 @@ def Read(*args):
 		index=52+(counter*dataSize)		# location of data in packet
 		self.Offset+=dataSize
 		
-		returnvalue=unpack_from(PackFormat(DataType),PLC.ReceiveData,index)[0]
+		returnvalue=unpack_from(CIPFormat,PLC.ReceiveData,index)[0]
 	        Array[i]=returnvalue
 		counter+=1
 		# with large arrays, the data takes multiple packets so at the end of
@@ -683,13 +676,11 @@ def Write(*args):
 	InitialRead(args[0])
     
     self.CIPDataType=tagsread[args[0]]		# store numerical data type value
-    #DataType=GetDataType(DataType)	# convert numerical type to text
 
     if len(args)==2: PLC.NumberOfElements=1
     if len(args)==3: PLC.NumberOfElements=args[2]
 
     self.Offset=0
-    #self.CIPDataType=DataType
     PLC.WriteData=[]
     if len(args)==2:
 	if self.CIPDataType==202:
@@ -867,60 +858,6 @@ def BitValue(value, bitno):
     else:
 	return False
 
-'''
-These functions can be removed, Burt had a frigging dictionary that has this information.
-I'm a dummy, just figure out how to use a dictionary!
-'''
-
-def PackFormat(DataType):
-    if DataType==193:	#BOOL
-	return '<?'
-    elif DataType==194:	#SINT
-	return '<b'
-    elif DataType==195:	#INT
-	return '<h'
-    elif DataType==196:	#DINT
-	return '<i'
-    elif DataType==197: #LINT
-	return '<q'
-    elif DataType==202:	#REAL
-	return '<f'
-    elif DataType==211: #BOOL Array
-        return '<i'
-    elif DataType==672:	#STRING
-	return '<L'
-
-def BytesPerElement(DataType):
-    if DataType==193:	#BOOL
-	return 1
-    elif DataType==194:	#SINT
-	return 1
-    elif DataType==195:	#INT
-	return 2
-    elif DataType==196:	#DINT
-	return 4
-    elif DataType==197: #LINT
-	return 8
-    elif DataType==202:	#REAL
-	return 4
-    elif DataType==211: #BOOL Array
-        return 4
-    elif DataType==672:	#STRING
-	return 4
-      
-def GetDataType(value):
-  if value==130: return "COUNTER"
-  if value==131: return "TIMER"
-  if value==193: return "BOOL"
-  if value==194: return "SINT"
-  if value==195: return "INT"
-  if value==196: return "DINT"
-  if value==197: return "LINT"
-  if value==202: return "REAL"
-  if value==206: return "STRING"
-  if value==211: return "DWORD"
-  if value==672: return "STRUCT"
-  return value
 
 def PrintTagList():
     print tagsread
