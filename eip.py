@@ -51,7 +51,7 @@ class LGXTag():
     self.TagName=""
     self.Offset=0
     self.DataType=""
-    self.Value=None
+    #self.Value=None
   
   def ParsePacket(self, packet):
     length=unpack_from('<H', packet, 20)[0]
@@ -61,11 +61,11 @@ class LGXTag():
     self.DataType=GetDataType(datatype)
     return self
   
-  def Tag(self, tagname, datatype, value):
-    self.TagName=tagname
-    self.DataType=datatype
-    self.Value=value
-    return self
+  #def Tag(self, tagname, datatype, value):
+    #self.TagName=tagname
+    #self.DataType=datatype
+    #self.Value=value
+    #return self
     
 def _openconnection():
     self.SocketConnected=False
@@ -445,7 +445,6 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 		    RequestTagData+=pack('<B', 0x00)			# also add to packet
 		RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
     
-    #if reqType=="Write" or reqType=="Write Bit":
     if "Write" in reqType:
 	# do the write related stuff if we're writing a tag
       	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
@@ -472,12 +471,13 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	    self.CIPRequest=CIPReadRequest
 	    fmt=self.CIPDataTypes[self.CIPDataType][2]		# get the pack format ('b')
 	    fmt=fmt.upper()					# convert it to unsigned ('B')
+	    s=self.TagName.split('.')				# split by decimal to get bit
 	    if reqType=="Write Bit":
-		s=self.TagName.split('.')			# split by decimal to get bit
 		bit=s[len(s)-1]					# get the bit number we're writing to
 		bit=int(bit)					# convert it to integer
 	    if reqType=="Write DWORD":
-		tag, basetag, bit=TagNameParser(self.TagName, 0)
+		t=s[len(s)-1]
+		tag, basetag, bit=TagNameParser(t, 0)
 	    
 	    self.CIPRequest+=pack('<h', self.NumberOfBytes)	# pack the number of bytes
 	    byte=2**(self.NumberOfBytes*8)-1			
@@ -557,15 +557,14 @@ def Read(*args):
 	NumberOfElements=1  # if non array, then only 1 element
 	
     PLC.NumberOfElements=NumberOfElements
-    PLC.Offset=0
+    self.Offset=0
     
     # build our tag
     # if we have not read the tag previously, store it in our dictionary
-    #print tagsread
     if not args[0] in tagsread:
 	#print "Adding Tag!"
 	InitialRead(name)
-    #print "Yoohoo"
+
     # handles either BOOL arrays, or everything else
     if tagsread[args[0]]==211:
 	_buildCIPTagRequest("Read", partial=False, isBoolArray=True)
@@ -674,7 +673,7 @@ def Write(*args):
     if len(args)==2: PLC.NumberOfElements=1
     if len(args)==3: PLC.NumberOfElements=args[2]
 
-    PLC.Offset=None
+    self.Offset=0
     self.CIPDataType=DataType
     PLC.WriteData=[]
     if len(args)==2:
@@ -828,7 +827,6 @@ def ffs(data):
 def TagNameParser(tag, offset):
     # parse the packet to get the base tag name
     # the offset is so that we can increment the array pointer if need be
-    #print "WTF?", tag
     pos=(len(tag)-tag.index("["))	# find position of [
     bt=tag[:-pos]			# remove [x]: result=SuperDuper
     temp=tag[-pos:]			# remove tag: result=[x]
@@ -843,7 +841,7 @@ def TagNameParser(tag, offset):
 	for i in xrange(len(s)):
 	    s[i]=int(s[i])
 	    ind.append(s[i])
-    #print "Stuff:", tag, bt, ind
+
     return tag, bt, ind
   
 def BitValue(value, bitno):
@@ -854,19 +852,6 @@ def BitValue(value, bitno):
     else:
 	return False
 
-def bitSetter(value, bitno, state):
-    # take value, set specified bit to 1 or 0, return new value
-    if state==0: state=False
-    if state==1: state=True
-    bitno=int(bitno)
-    value=int(value)
-    
-    if state:
-	mask = 1 << bitno
-	return(value | mask)
-    else:
-	mask = ~(1 << bitno)
-	return(value & mask)
 '''
 These functions can be removed, Burt had a frigging dictionary that has this information.
 I'm a dummy, just figure out how to use a dictionary!

@@ -1,3 +1,6 @@
+10/06/15
+  -Fixed single bool array read derp, removed some old code
+  
 10/05/15
   -Fixed multi dim write
   -Added write single array bool support
