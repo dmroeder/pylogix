@@ -22,7 +22,14 @@ def __init__():
     self.IPAddress=""
     self.Port=44818
     self.Context='00000000'
-    self.CIPDataTypes={"STRUCT":(0,0x02A0,'B'),"BOOL":(1,0x00C1,'?'),"SINT":(1,0x00C2,'b'),"INT":(2,0x00C3,'h'),"DINT":(4,0x00C4,'i'),"REAL":(4,0x00CA,'f'),"DWORD":(4,0x00D3,'I'),"LINT":(8,0x00C5,'Q')}
+    self.CIPDataTypes={672:(0,"STRUCT",'B'),
+		      193:(1,"BOOL",'?'),
+		      194:(1,"SINT",'b'),
+		      195:(2,"INT",'h'),
+		      196:(4,"DINT",'i'),
+		      202:(4,"REAL",'f'),
+		      211:(4,"DWORD",'I'),
+		      197:(8,"LINT",'Q')}
     self.CIPDataType=None
     self.CIPData=None
     self.VendorID=0x1337
@@ -447,16 +454,21 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     
     if "Write" in reqType:
 	# do the write related stuff if we're writing a tag
-      	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
+      	#self.SizeOfElements=self.CIPDataTypes[self.CIPDataType.upper()][0]     #Dints are 4 bytes each
+	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     #Dints are 4 bytes each
 	self.NumberOfElements=len(self.WriteData)            #list of elements to write
 	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
 	RequestNumberOfElements=self.NumberOfElements
-	if self.CIPDataType.upper()=="STRUCT":  #Strings are special
+	#if self.CIPDataType.upper()=="STRUCT":  #Strings are special
+	if self.CIPDataType==672:  #Strings are special
 	    RequestNumberOfElements=self.StructIdentifier
     	if reqType=="Write": RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
 	if reqType=="Write Bit": RequestService=0x4E
 	if reqType=="Write DWORD": RequestService=0x4E
-	RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
+	#RequestElementType=self.CIPDataTypes[self.CIPDataType.upper()][1]
+	RequestElementType=self.CIPDataType
+	#print self.
+	#print RequestElementType
         CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
 	CIPReadRequest+=RequestTagData					# Tag portion of packet 
 
@@ -465,7 +477,8 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	    self.CIPRequest=CIPReadRequest
 	    for i in xrange(len(self.WriteData)):
 		el=self.WriteData[i]
-		self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType.upper()][2],el)
+		#self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType.upper()][2],el)
+		self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType][2],el)
 		
 	if reqType=="Write Bit" or reqType=="Write DWORD":
 	    self.CIPRequest=CIPReadRequest
@@ -620,7 +633,9 @@ def Read(*args):
 		    
 	    return returnvalue
 	else:	# user passed more than one argument (array read)
+
 	    dataSize=BytesPerElement(DataType)		# get number of bytes per datatype
+	    #dataSize=
 	    numbytes=len(PLC.ReceiveData)-dataSize	# total number of bytes in packet
 	    counter=0					# counter for indexing through packet
 	    self.Offset=0				# offset for next packet request
@@ -667,19 +682,19 @@ def Write(*args):
     if args[0] not in tagsread:
 	InitialRead(args[0])
     
-    DataType=tagsread[args[0]]		# store numerical data type value
-    DataType=GetDataType(DataType)	# convert numerical type to text
+    self.CIPDataType=tagsread[args[0]]		# store numerical data type value
+    #DataType=GetDataType(DataType)	# convert numerical type to text
 
     if len(args)==2: PLC.NumberOfElements=1
     if len(args)==3: PLC.NumberOfElements=args[2]
 
     self.Offset=0
-    self.CIPDataType=DataType
+    #self.CIPDataType=DataType
     PLC.WriteData=[]
     if len(args)==2:
-	if DataType=="REAL":
+	if self.CIPDataType==202:
 	    PLC.WriteData.append(float(Value))
-	elif DataType=="STRUCT":
+	elif self.CIPDataType==672:
 	    PLC.StructIdentifier=0x0fCE
 	    PLC.WriteData=MakeString(Value)
 	else:
@@ -695,7 +710,7 @@ def Write(*args):
     if BitofWord(self.TagName):
 	_buildCIPTagRequest("Write Bit", partial=False, isBoolArray=False)
     else:
-	if self.CIPDataType=="DWORD":
+	if self.CIPDataType==211:
 	    _buildCIPTagRequest("Write DWORD", partial=False, isBoolArray=False)
 	else:
 	    _buildCIPTagRequest("Write", partial=False, isBoolArray=False)
