@@ -382,8 +382,8 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     """
     RequestPathSize=0		# define path size
     RequestTagData=""		# define tag data
-    RequestElements=self.NumberOfElements
     TagSplit=self.TagName.lower().split(".")
+    if reqType=="First Read": NoOfElements=1
     
     # this loop figures out the packet length and builds our packet
     for i in xrange(len(TagSplit)):
@@ -445,6 +445,7 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     
     if "Write" in reqType:
 	# do the write related stuff if we're writing a tag
+	#print self.CIPDataType
 	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     	#Dints are 4 bytes each
 	self.NumberOfElements=len(self.WriteData)            		#list of elements to write
 	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
@@ -493,7 +494,9 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	if partial==True or reqType=="First Read": RequestService=0x52
 	CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
 	CIPReadRequest+=RequestTagData					# Tag portion of packet
-	CIPReadRequest+=pack('<H', RequestElements)			# end of packet
+	NoOfElements=self.NumberOfElements
+	if reqType=="First Read": NoOfElements=1	# for first read, only read one element
+	CIPReadRequest+=pack('<H', NoOfElements)	# end of packet
 	CIPReadRequest+=pack('<H', self.Offset)
 	self.CIPRequest=CIPReadRequest
 	if partial==True or reqType=="First Read": self.CIPRequest+=pack('<H', 0x0000)
@@ -713,6 +716,8 @@ def Write(*args):
       print "Failed to write to", self.TagName, " Status", Status, " Extended Status", ExtendedStatus
 
 def InitialRead(tag):
+    # Store each unique tag read in a dict so that we can retreive the
+    # data type or data length (for STRING) later
     _buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
     _buildEIPHeader()
     # send our tag read request
@@ -720,6 +725,10 @@ def InitialRead(tag):
     PLC.ReceiveData=PLC.Socket.recv(1024)
     DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
     tagsread[tag]=DataType
+    #DataLen=unpack_from('<H', PLC.ReceiveData, 2)[0] # this is really just used for STRING
+    #tagsread[tag]=(DataType, DataLen)	
+    return
+
 
 def BitofWord(tag):
     s=tag.split('.')
