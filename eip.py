@@ -58,7 +58,6 @@ class LGXTag():
     self.TagName=""
     self.Offset=0
     self.DataType=""
-    #self.Value=None
   
   def ParsePacket(self, packet):
     length=unpack_from('<H', packet, 20)[0]
@@ -68,12 +67,6 @@ class LGXTag():
 
     return self
   
-  #def Tag(self, tagname, datatype, value):
-    #self.TagName=tagname
-    #self.DataType=datatype
-    #self.Value=value
-    #return self
-    
 def _openconnection():
     self.SocketConnected=False
     try:    
@@ -111,7 +104,7 @@ def _buildRegisterSession():
     EIPLength=0x0004                        #(H)Lenght of Payload          (2-3.3)
     EIPSessionHandle=self.SessionHandle     #(I)Session Handle             (2-3.4)
     EIPStatus=0x0000                        #(I)Status always 0x00         (2-3.5)
-    EIPContext=self.Context                 #(8s)                          (2-3.6)
+    EIPContext=self.Context                 #(Q)                           (2-3.6)
     EIPOptions=0x0000                       #(I)Options always 0x00        (2-3.7)
                                             #Begin Command Specific Data
     EIPProtocolVersion=0x01                 #(H)Always 0x01                (2-4.7)
@@ -166,7 +159,7 @@ def _buildEIPSendRRDataHeader():
     EIPLength=16+len(self.CIPForwardOpenFrame)      #(H)
     EIPSessionHandle=self.SessionHandle             #(I)
     EIPStatus=0x00                                  #(I)
-    EIPContext=self.Context                         #(8s)
+    EIPContext=self.Context                         #(Q)
     EIPOptions=0x00                                 #(I)
                                                     #Begin Command Specific Data
     EIPInterfaceHandle=0x00                         #(I) Interface Handel       (2-4.7.2)
@@ -221,7 +214,6 @@ def _buildCIPForwardOpen():
                                                      # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
     CIPTransportTrigger=0xA3                         #(B)                                   (3-5.5.1.12)
     CIPConnectionPathSize=0x03                       #(B)                                   (3-5.5.1.9)
-    #CIPConnectionPath=(0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01,0x2c,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
     CIPConnectionPath=(0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
     """
     Port Identifier [BackPlane]
@@ -256,7 +248,6 @@ def _buildCIPForwardOpen():
                                   CIPTransportTrigger,
                                   CIPConnectionPathSize,
                                   CIPConnectionPath[0],CIPConnectionPath[1],CIPConnectionPath[2],CIPConnectionPath[3],
-                                  #CIPConnectionPath[4],CIPConnectionPath[5],CIPConnectionPath[6],CIPConnectionPath[7])
                                   CIPConnectionPath[4],CIPConnectionPath[5])
                                   
                                    
@@ -338,7 +329,7 @@ def _buildEIPHeader():
     EIPLength=22+len(self.CIPRequest)       #(H) Length of encapsulated command
     EIPSessionHandle=self.SessionHandle     #(I)Setup when session crated
     EIPStatus=0x00                          #(I)Always 0x00
-    EIPContext=self.Context                 #(8s) String echoed back
+    EIPContext=self.Context                 #(Q) String echoed back
                                             #Here down is command specific data
                                             #For our purposes it is always 22 bytes
     EIPOptions=0x0000                       #(I) Always 0x00
@@ -412,8 +403,8 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 		RequestTagData+=pack('<B', 0x00)		# add the byte to our packet
 	    
 	    BaseTagLenWords=BaseTagLenBytes/2			# figure out the words for this segment
-
 	    RequestPathSize+=BaseTagLenWords			# add it to our request size
+	    
 	    if reqType=="Read" or reqType=="Write" or i<len(TagSplit)-1:
 		if isinstance(index, list)==False:
 		    if index<256:					# if index is 1 byte...
@@ -454,21 +445,20 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     
     if "Write" in reqType:
 	# do the write related stuff if we're writing a tag
-	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     #Dints are 4 bytes each
-	self.NumberOfElements=len(self.WriteData)            #list of elements to write
+	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     	#Dints are 4 bytes each
+	self.NumberOfElements=len(self.WriteData)            		#list of elements to write
 	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
 	RequestNumberOfElements=self.NumberOfElements
 	if self.CIPDataType==672:  #Strings are special
 	    RequestNumberOfElements=self.StructIdentifier
     	if reqType=="Write": RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
-	if reqType=="Write Bit": RequestService=0x4E
-	if reqType=="Write DWORD": RequestService=0x4E
-	RequestElementType=self.CIPDataType
+	if reqType=="Write Bit": RequestService=0x4E			#CIP Write (special)
+	if reqType=="Write DWORD": RequestService=0x4E			#CIP Write (special)
         CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
 	CIPReadRequest+=RequestTagData					# Tag portion of packet 
 
 	if reqType=="Write":
-	    CIPReadRequest+=pack('<HH', RequestElementType, RequestNumberOfElements)
+	    CIPReadRequest+=pack('<HH', self.CIPDataType, RequestNumberOfElements)
 	    self.CIPRequest=CIPReadRequest
 	    for i in xrange(len(self.WriteData)):
 		el=self.WriteData[i]
@@ -554,22 +544,19 @@ def Read(*args):
     if self.SocketConnected==False:
 	_openconnection()
 	
-  
-    name=args[0]
-    PLC.TagName=name
-    if len(args)==2:	# array read
-	NumberOfElements=args[1]
-	Array=[0 for i in xrange(NumberOfElements)]   #create array
-    else:
-	NumberOfElements=1  # if non array, then only 1 element
-	
-    PLC.NumberOfElements=NumberOfElements
+    self.TagName=args[0]
     self.Offset=0
+    
+    if len(args)==2:	# array read
+	self.NumberOfElements=args[1]
+	Array=[0 for i in xrange(self.NumberOfElements)]   #create array
+    else:
+	self.NumberOfElements=1  # if non array, then only 1 element
     
     # build our tag
     # if we have not read the tag previously, store it in our dictionary
     if not args[0] in tagsread:
-	InitialRead(name)
+	InitialRead(self.TagName)
 
     # handles either BOOL arrays, or everything else
     if tagsread[args[0]]==211:
@@ -586,6 +573,7 @@ def Read(*args):
     # extract some status info
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
+    
     self.CIPDataType=tagsread[args[0]]
     datatype=self.CIPDataType
     CIPFormat=self.CIPDataTypes[datatype][2]
@@ -615,7 +603,7 @@ def Read(*args):
 		    ret=TagNameParser(ugh[ughlen], 0)			# get array index
 		    returnvalue=BitValue(returnvalue, ret[2]%32)	# get the bit from the returned word
 	    # if we were just reading a bit of a word, convert it to a true/false
-	    SplitTest=name.lower().split(".")
+	    SplitTest=self.TagName.lower().split(".")
 	    doo=SplitTest[len(SplitTest)-1]
 	    if doo.isdigit():
 		BitPos=SplitTest[len(SplitTest)-1]
@@ -632,7 +620,7 @@ def Read(*args):
 	    numbytes=len(PLC.ReceiveData)-dataSize	# total number of bytes in packet
 	    counter=0					# counter for indexing through packet
 	    self.Offset=0				# offset for next packet request
-	    for i in xrange(NumberOfElements):	
+	    for i in xrange(self.NumberOfElements):	
 		index=52+(counter*dataSize)		# location of data in packet
 		self.Offset+=dataSize
 		
@@ -654,7 +642,7 @@ def Read(*args):
 		    numbytes=len(PLC.ReceiveData)-dataSize
 	    return Array
     else: # didn't nail it
-	print "Did not nail it, read fail", name
+	print "Did not nail it, read fail", self.TagName
 	print "Status:", Status, "Extended Status:", ExtendedStatus
       
 def Write(*args):
@@ -672,10 +660,10 @@ def Write(*args):
 
     # check our dict to see if we've read the tag before,
     #	if not, read it so we can store it's data type
-    if args[0] not in tagsread:
-	InitialRead(args[0])
+    if self.TagName not in tagsread:
+	InitialRead(self.TagName)
     
-    self.CIPDataType=tagsread[args[0]]		# store numerical data type value
+    self.CIPDataType=tagsread[self.TagName]		# store numerical data type value
 
     if len(args)==2: PLC.NumberOfElements=1
     if len(args)==3: PLC.NumberOfElements=args[2]
