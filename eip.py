@@ -21,7 +21,7 @@ def __init__():
     PLC=self
     self.IPAddress=""
     self.Port=44818
-    self.Context='00000000'
+    self.Context=0x00
     self.CIPDataTypes={672:(0,"STRUCT",'B'),
 		      193:(1,"BOOL",'?'),
 		      194:(1,"SINT",'b'),
@@ -117,7 +117,7 @@ def _buildRegisterSession():
     EIPProtocolVersion=0x01                 #(H)Always 0x01                (2-4.7)
     EIPOptionFlag=0x00                      #(H)Always 0x00                (2-4.7)
 
-    self.registersession=pack('<HHII8sIHH',
+    self.registersession=pack('<HHIIQIHH',
                               EIPCommand,
                               EIPLength,
                               EIPSessionHandle,
@@ -136,7 +136,7 @@ def _buildUnregisterSession():
     EIPContext=self.Context
     EIPOptions=0x00
 
-    self.UnregisterSession=pack('<HHII8sI',
+    self.UnregisterSession=pack('<HHIIQI',
                                 EIPCommand,
                                 EIPLength,
                                 EIPSessionHandle,
@@ -177,7 +177,7 @@ def _buildEIPSendRRDataHeader():
     EIPItem2Type=0xB2                               #(H) Uconnected CIP message to follow
     EIPItem2Length=len(self.CIPForwardOpenFrame)    #(H)
 
-    self.EIPSendRRFrame=pack('<HHII8sIIHHHHHH',
+    self.EIPSendRRFrame=pack('<HHIIQIIHHHHHH',
                              EIPCommand,
                              EIPLength,
                              EIPSessionHandle,
@@ -356,7 +356,7 @@ def _buildEIPHeader():
     self.SequenceCounter+=1
     self.SequenceCounter=self.SequenceCounter%0x10000
     
-    self.EIPHeaderFrame=pack('<HHII8sIIHHHHIHHH',
+    self.EIPHeaderFrame=pack('<HHIIQIIHHHHIHHH',
                         EIPCommand,
                         EIPLength,
                         EIPSessionHandle,

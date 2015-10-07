@@ -2,6 +2,7 @@
   -Fixed single bool array read derp, removed some old code
   -Reworked CIPDataTypes dict
   -Removed, obsolete functions
+  -Context is no longer a string
   
 10/05/15
   -Fixed multi dim write
