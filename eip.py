@@ -624,7 +624,15 @@ def Read(*args):
 		index=52+(counter*dataSize)		# location of data in packet
 		self.Offset+=dataSize
 		
-		returnvalue=unpack_from(CIPFormat,PLC.ReceiveData,index)[0]
+		if self.CIPDataType==672:
+		    # gotta handle strings a little different
+		    NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
+		    stringLen=unpack_from('<H', PLC.ReceiveData, 2)[0]
+		    stringLen=stringLen-34
+		    returnvalue=PLC.ReceiveData[-stringLen:(-stringLen+NameLength)]		    
+		else:
+		    returnvalue=unpack_from(CIPFormat,PLC.ReceiveData,index)[0]
+	        
 	        Array[i]=returnvalue
 		counter+=1
 		# with large arrays, the data takes multiple packets so at the end of

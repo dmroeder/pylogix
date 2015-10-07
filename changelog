@@ -3,6 +3,7 @@
   -Reworked CIPDataTypes dict
   -Removed, obsolete functions
   -Context is no longer a string
+  -Fixed STRING array reads
   
 10/05/15
   -Fixed multi dim write
