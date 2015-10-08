@@ -445,7 +445,6 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
     
     if "Write" in reqType:
 	# do the write related stuff if we're writing a tag
-	#print self.CIPDataType
 	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     	#Dints are 4 bytes each
 	self.NumberOfElements=len(self.WriteData)            		#list of elements to write
 	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
@@ -560,10 +559,11 @@ def Read(*args):
     # if we have not read the tag previously, store it in our dictionary
     t,b,i=TagNameParser(args[0], 0)
     if b not in tagsread:
-	InitialRead(self.TagName)
+	InitialRead(b)
 
     # handles either BOOL arrays, or everything else
-    if tagsread[b]==211:
+    #print b
+    if tagsread[b][0]==211:
 	_buildCIPTagRequest("Read", partial=False, isBoolArray=True)
     else:
 	_buildCIPTagRequest("Read", partial=False, isBoolArray=False)
@@ -578,7 +578,7 @@ def Read(*args):
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
     
-    self.CIPDataType=tagsread[b]
+    self.CIPDataType=tagsread[b][0]
     datatype=self.CIPDataType
     CIPFormat=self.CIPDataTypes[datatype][2]
     
@@ -620,20 +620,27 @@ def Read(*args):
 		    
 	    return returnvalue
 	else:	# user passed more than one argument (array read)
-	    dataSize=self.CIPDataTypes[datatype][0]
+	    t,b,i=TagNameParser(self.TagName, 0)
+	    if self.CIPDataType==672:
+		dataSize=tagsread[b][1]-30
+	    else:
+		dataSize=self.CIPDataTypes[datatype][0]
+	    
 	    numbytes=len(PLC.ReceiveData)-dataSize	# total number of bytes in packet
 	    counter=0					# counter for indexing through packet
 	    self.Offset=0				# offset for next packet request
+	    stringLen=tagsread[b][1]-30	      		# get the stored length (only for string)
+	    
 	    for i in xrange(self.NumberOfElements):	
+		
 		index=52+(counter*dataSize)		# location of data in packet
 		self.Offset+=dataSize
 		
 		if self.CIPDataType==672:
 		    # gotta handle strings a little different
-		    NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
-		    stringLen=unpack_from('<H', PLC.ReceiveData, 2)[0]
-		    stringLen=stringLen-34
-		    returnvalue=PLC.ReceiveData[-stringLen:(-stringLen+NameLength)]		    
+		    index=54+(counter*stringLen)
+		    NameLength=unpack_from('<L' ,PLC.ReceiveData, index)[0]
+		    returnvalue=PLC.ReceiveData[index+4:index+4+NameLength]
 		else:
 		    returnvalue=unpack_from(CIPFormat,PLC.ReceiveData,index)[0]
 	        
@@ -674,9 +681,9 @@ def Write(*args):
     #	if not, read it so we can store it's data type
     t,b,i=TagNameParser(self.TagName, 0)
     if b not in tagsread:
-	InitialRead(self.TagName)
+	InitialRead(b)
     
-    self.CIPDataType=tagsread[b]		# store numerical data type value
+    self.CIPDataType=tagsread[b][0]		# store numerical data type value
 
     if len(args)==2: PLC.NumberOfElements=1
     if len(args)==3: PLC.NumberOfElements=args[2]
@@ -720,18 +727,15 @@ def Write(*args):
 def InitialRead(tag):
     # Store each unique tag read in a dict so that we can retreive the
     # data type or data length (for STRING) later
-    t, b, i=TagNameParser(tag, 0)
-    #print b
     _buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
     _buildEIPHeader()
     # send our tag read request
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
     DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
-    tagsread[b]=DataType
-    #print tagsread
-    #DataLen=unpack_from('<H', PLC.ReceiveData, 2)[0] # this is really just used for STRING
-    #tagsread[tag]=(DataType, DataLen)	
+    #tagsread[tag]=DataType
+    DataLen=unpack_from('<H', PLC.ReceiveData, 2)[0] # this is really just used for STRING
+    tagsread[tag]=(DataType, DataLen)	
     return
 
 

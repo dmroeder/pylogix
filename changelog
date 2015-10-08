@@ -1,5 +1,6 @@
 10/08/15
   -Updated TagNameParser and InitialRead to store only base tag
+  -Fixed read STRING array returning only the first string
   
 10/07/15
   -Initial reads minimum amount of data to get data type
