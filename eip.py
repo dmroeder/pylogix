@@ -558,11 +558,12 @@ def Read(*args):
     
     # build our tag
     # if we have not read the tag previously, store it in our dictionary
-    if not args[0] in tagsread:
+    t,b,i=TagNameParser(args[0], 0)
+    if b not in tagsread:
 	InitialRead(self.TagName)
 
     # handles either BOOL arrays, or everything else
-    if tagsread[args[0]]==211:
+    if tagsread[b]==211:
 	_buildCIPTagRequest("Read", partial=False, isBoolArray=True)
     else:
 	_buildCIPTagRequest("Read", partial=False, isBoolArray=False)
@@ -577,7 +578,7 @@ def Read(*args):
     Status=unpack_from('<h',PLC.ReceiveData,46)[0]
     ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
     
-    self.CIPDataType=tagsread[args[0]]
+    self.CIPDataType=tagsread[b]
     datatype=self.CIPDataType
     CIPFormat=self.CIPDataTypes[datatype][2]
     
@@ -671,10 +672,11 @@ def Write(*args):
 
     # check our dict to see if we've read the tag before,
     #	if not, read it so we can store it's data type
-    if self.TagName not in tagsread:
+    t,b,i=TagNameParser(self.TagName, 0)
+    if b not in tagsread:
 	InitialRead(self.TagName)
     
-    self.CIPDataType=tagsread[self.TagName]		# store numerical data type value
+    self.CIPDataType=tagsread[b]		# store numerical data type value
 
     if len(args)==2: PLC.NumberOfElements=1
     if len(args)==3: PLC.NumberOfElements=args[2]
@@ -718,13 +720,16 @@ def Write(*args):
 def InitialRead(tag):
     # Store each unique tag read in a dict so that we can retreive the
     # data type or data length (for STRING) later
+    t, b, i=TagNameParser(tag, 0)
+    #print b
     _buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
     _buildEIPHeader()
     # send our tag read request
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
     DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
-    tagsread[tag]=DataType
+    tagsread[b]=DataType
+    #print tagsread
     #DataLen=unpack_from('<H', PLC.ReceiveData, 2)[0] # this is really just used for STRING
     #tagsread[tag]=(DataType, DataLen)	
     return
@@ -838,22 +843,27 @@ def ffs(data):
 def TagNameParser(tag, offset):
     # parse the packet to get the base tag name
     # the offset is so that we can increment the array pointer if need be
-    pos=(len(tag)-tag.index("["))	# find position of [
-    bt=tag[:-pos]			# remove [x]: result=SuperDuper
-    temp=tag[-pos:]			# remove tag: result=[x]
-    ind=temp[1:-1]			# strip the []: result=x
-    s=ind.split(',')			# split so we can check for multi dimensin array
-    if len(s)==1:
-	ind=int(ind)
-	newTagName=bt+'['+str(ind+offset)+']'
-    else:
-	# if we have a multi dim array, return the index
-	ind=[]
-	for i in xrange(len(s)):
-	    s[i]=int(s[i])
-	    ind.append(s[i])
+    bt=tag
+    try:
+	pos=(len(tag)-tag.rindex("["))	# find position of [
+	bt=tag[:-pos]			# remove [x]: result=SuperDuper
+	temp=tag[-pos:]			# remove tag: result=[x]
+	ind=temp[1:-1]			# strip the []: result=x
+	s=ind.split(',')		# split so we can check for multi dimensin array
+	if len(s)==1:
+	    ind=int(ind)
+	    newTagName=bt+'['+str(ind+offset)+']'
+	else:
+	    # if we have a multi dim array, return the index
+	    ind=[]
+	    for i in xrange(len(s)):
+		s[i]=int(s[i])
+		ind.append(s[i])
 
-    return tag, bt, ind
+	return tag, bt, ind    
+    except:
+	return tag, bt, 0
+
   
 def BitValue(value, bitno):
     # return whether the specific bit in a value is true or false
