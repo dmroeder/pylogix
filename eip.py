@@ -501,45 +501,44 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	if partial==True or reqType=="First Read": self.CIPRequest+=pack('<H', 0x0000)
 
     return
+
+def _readBitOfWord(split_tag, value):
+    # get bit of word
+    BitPos=split_tag[len(split_tag)-1]
+    BitPos=int(BitPos)
+    try:
+	if int(BitPos)<=31:
+	    returnvalue=BitValue(value, BitPos)
+    except:
+	do="nothing"  
+    return returnvalue
+
+def _readSingleAtomic(CIPFormat):
+    # get a BOOL from array
+    returnvalue=unpack_from(CIPFormat, PLC.ReceiveData, 52)[0]
+    ugh=PLC.TagName.split('.')
+    ughlen=len(ugh)-1
+    t,b,i=TagNameParser(ugh[ughlen], 0)			# get array index
+    return BitValue(returnvalue, i%32)		# get the bit from the returned word    
+
+def _readSingleString():
+    # get STRING
+    NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
+    stringLen=unpack_from('<H', PLC.ReceiveData, 2)[0]
+    stringLen=stringLen-34
+    return PLC.ReceiveData[-stringLen:(-stringLen+NameLength)]
   
 def SetIPAddress(address):
     self.IPAddress=address
     return
 
-def SetProcessorSlot(slot):
-    if isinstance(slot, int) and (slot>=0 and slot<17):
-	# set the processor slot
-	self.ProcessorSlot=0x00+slot
-    else:
-	print "Processor slot must be an integer between 0 and 16, defaulting to 0"
-	self.SocketConnected=False
-	self.ProcessorSlot=0x00  
-  
-def MakeString(string):
-    work=[]
-    work.append(0x01)
-    work.append(0x00)
-    temp=pack('<I',len(string))
-    for char in temp:
-        work.append(ord(char))
-    for char in string:
-        work.append(ord(char))
-    for x in xrange(len(string),84):
-        work.append(0x00)
-    return work
 
-        
 def Read(*args):
     """
      Reads any data type.  We use the args so that the user can either send just a
     	tag name or a tag name and length (for reading arrays)
     
-    args[0] = tag name
-    args[1] = Number of Elements
-    
-    I added some really terrible code.  If we are reading the tag for the first time,
-      we need to do a 0x52 to get the data type, then we store it in our dict, then we
-      do the real read to get the value.  This all has to do with handling BOOL values.
+    args[0] = tag name    args[1] = Number of Elements
     """
     
     # If not connected to PLC, abandon ship!
@@ -562,7 +561,6 @@ def Read(*args):
 	InitialRead(b)
 
     # handles either BOOL arrays, or everything else
-    #print b
     if tagsread[b][0]==211:
 	_buildCIPTagRequest("Read", partial=False, isBoolArray=True)
     else:
@@ -586,42 +584,23 @@ def Read(*args):
     if (Status==204 or Status==210) and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
 	if len(args)==1:	# user passed 1 argument (non array read)
 	    # Do different stuff based on the returned data type
-	    if datatype==0:	
-		print "I'm not sure what happened, data type returned:", datatype
-	    elif datatype==197:
-	        rawTime=unpack_from('<Q', PLC.ReceiveData, 52)[0]
-	        #print datetime(1970, 1, 1) + timedelta(microseconds=rawTime)
-	        returnvalue=rawTime
+	    if datatype==211:
+		returnvalue=_readSingleAtomic(CIPFormat)
 	    elif datatype==672:
-		# gotta handle strings a little different
-		NameLength=unpack_from('<L' ,PLC.ReceiveData, 54)[0]
-		stringLen=unpack_from('<H', PLC.ReceiveData, 2)[0]
-		stringLen=stringLen-34
-		returnvalue=PLC.ReceiveData[-stringLen:(-stringLen+NameLength)]
+		returnvalue=_readSingleString()
 	    else:
-		# this handles SINT, INT, DINT, REAL
 		returnvalue=unpack_from(CIPFormat, PLC.ReceiveData, 52)[0]
-	        if datatype==211:  #BOOL Array
-		    ugh=PLC.TagName.lower().split('.')
-		    ughlen=len(ugh)-1
-		    ret=TagNameParser(ugh[ughlen], 0)			# get array index
-		    returnvalue=BitValue(returnvalue, ret[2]%32)	# get the bit from the returned word
-	    # if we were just reading a bit of a word, convert it to a true/false
-	    SplitTest=self.TagName.lower().split(".")
-	    doo=SplitTest[len(SplitTest)-1]
+	    
+	    # check if we were trying to read a bit of a word
+	    s=self.TagName.split(".")
+	    doo=s[len(s)-1]
 	    if doo.isdigit():
-		BitPos=SplitTest[len(SplitTest)-1]
-		BitPos=int(BitPos)
-		try:
-		    if int(BitPos)<=31:
-			returnvalue=BitValue(returnvalue, BitPos)
-		except:
-		    do="nothing"
-		    
+		returnvalue=_readBitOfWord(s, returnvalue)
+ 
 	    return returnvalue
+	  
 	else:	# user passed more than one argument (array read)
-	    t,b,i=TagNameParser(self.TagName, 0)
-	    if self.CIPDataType==672:
+	    if datatype==672:
 		dataSize=tagsread[b][1]-30
 	    else:
 		dataSize=self.CIPDataTypes[datatype][0]
@@ -724,6 +703,15 @@ def Write(*args):
     if Status!=205 and Status!=206 or ExtendedStatus!=0: # fail
       print "Failed to write to", self.TagName, " Status", Status, " Extended Status", ExtendedStatus
 
+def SetProcessorSlot(slot):
+    if isinstance(slot, int) and (slot>=0 and slot<17):
+	# set the processor slot
+	self.ProcessorSlot=0x00+slot
+    else:
+	print "Processor slot must be an integer between 0 and 16, defaulting to 0"
+	self.SocketConnected=False
+	self.ProcessorSlot=0x00
+	
 def InitialRead(tag):
     # Store each unique tag read in a dict so that we can retreive the
     # data type or data length (for STRING) later
@@ -733,7 +721,6 @@ def InitialRead(tag):
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
     DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
-    #tagsread[tag]=DataType
     DataLen=unpack_from('<H', PLC.ReceiveData, 2)[0] # this is really just used for STRING
     tagsread[tag]=(DataType, DataLen)	
     return
@@ -844,6 +831,19 @@ def ffs(data):
     # increment ot the next tag in the packet
     packetStart=packetStart+tagLen+22
 
+def MakeString(string):
+    work=[]
+    work.append(0x01)
+    work.append(0x00)
+    temp=pack('<I',len(string))
+    for char in temp:
+        work.append(ord(char))
+    for char in string:
+        work.append(ord(char))
+    for x in xrange(len(string),84):
+        work.append(0x00)
+    return work
+
 def TagNameParser(tag, offset):
     # parse the packet to get the base tag name
     # the offset is so that we can increment the array pointer if need be
@@ -868,7 +868,6 @@ def TagNameParser(tag, offset):
     except:
 	return tag, bt, 0
 
-  
 def BitValue(value, bitno):
     # return whether the specific bit in a value is true or false
     mask = 1 << bitno

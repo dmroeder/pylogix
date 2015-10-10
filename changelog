@@ -1,3 +1,6 @@
+10/09/15
+  -Reworked the Read function a bit
+  
 10/08/15
   -Updated TagNameParser and InitialRead to store only base tag
   -Fixed read STRING array returning only the first string
