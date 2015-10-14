@@ -452,6 +452,9 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	RequestNumberOfElements=self.NumberOfElements
 	if self.CIPDataType==160:  #Strings are special
 	    RequestNumberOfElements=self.StructIdentifier
+	    TypeCodeLen=0x02
+	else:
+	    TypeCodeLen=0x00
     	if reqType=="Write": RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
 	if reqType=="Write Bit": RequestService=0x4E			#CIP Write (special)
 	if reqType=="Write DWORD": RequestService=0x4E			#CIP Write (special)
@@ -459,7 +462,7 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	CIPReadRequest+=RequestTagData					# Tag portion of packet 
 
 	if reqType=="Write":
-	    CIPReadRequest+=pack('<HH', self.CIPDataType, RequestNumberOfElements)
+	    CIPReadRequest+=pack('<BBH', self.CIPDataType, TypeCodeLen, RequestNumberOfElements)
 	    self.CIPRequest=CIPReadRequest
 	    for i in xrange(len(self.WriteData)):
 		el=self.WriteData[i]
