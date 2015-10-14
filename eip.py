@@ -22,7 +22,7 @@ def __init__():
     self.IPAddress=""
     self.Port=44818
     self.Context=0x00
-    self.CIPDataTypes={672:(0,"STRUCT",'B'),
+    self.CIPDataTypes={160:(0,"STRUCT",'B'),
 		      193:(1,"BOOL",'?'),
 		      194:(1,"SINT",'b'),
 		      195:(2,"INT",'h'),
@@ -64,6 +64,7 @@ class LGXTag():
     self.TagName=packet[22:length+22]
     self.Offset=unpack_from('<H', packet, 0)[0]
     self.DataType=unpack_from('<B', packet, 4)[0]
+    print self.TagName, self.Offset
 
     return self
   
@@ -449,7 +450,7 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	self.NumberOfElements=len(self.WriteData)            		#list of elements to write
 	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
 	RequestNumberOfElements=self.NumberOfElements
-	if self.CIPDataType==672:  #Strings are special
+	if self.CIPDataType==160:  #Strings are special
 	    RequestNumberOfElements=self.StructIdentifier
     	if reqType=="Write": RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
 	if reqType=="Write Bit": RequestService=0x4E			#CIP Write (special)
@@ -579,14 +580,14 @@ def Read(*args):
     self.CIPDataType=tagsread[b][0]
     datatype=self.CIPDataType
     CIPFormat=self.CIPDataTypes[datatype][2]
-    
+    #print datatype
     # if we successfully read from the PLC...
     if (Status==204 or Status==210) and (ExtendedStatus==0 or ExtendedStatus==6): # nailed it!
 	if len(args)==1:	# user passed 1 argument (non array read)
 	    # Do different stuff based on the returned data type
 	    if datatype==211:
 		returnvalue=_readSingleAtomic(CIPFormat)
-	    elif datatype==672:
+	    elif datatype==160:
 		returnvalue=_readSingleString()
 	    else:
 		returnvalue=unpack_from(CIPFormat, PLC.ReceiveData, 52)[0]
@@ -600,7 +601,7 @@ def Read(*args):
 	    return returnvalue
 	  
 	else:	# user passed more than one argument (array read)
-	    if datatype==672:
+	    if datatype==160:
 		dataSize=tagsread[b][1]-30
 	    else:
 		dataSize=self.CIPDataTypes[datatype][0]
@@ -615,7 +616,7 @@ def Read(*args):
 		index=52+(counter*dataSize)		# location of data in packet
 		self.Offset+=dataSize
 		
-		if self.CIPDataType==672:
+		if self.CIPDataType==160:
 		    # gotta handle strings a little different
 		    index=54+(counter*stringLen)
 		    NameLength=unpack_from('<L' ,PLC.ReceiveData, index)[0]
@@ -672,7 +673,7 @@ def Write(*args):
     if len(args)==2:
 	if self.CIPDataType==202:
 	    PLC.WriteData.append(float(Value))
-	elif self.CIPDataType==672:
+	elif self.CIPDataType==160:
 	    PLC.StructIdentifier=0x0fCE
 	    PLC.WriteData=MakeString(Value)
 	else:
@@ -720,7 +721,7 @@ def InitialRead(tag):
     # send our tag read request
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
-    DataType=unpack_from('<h',PLC.ReceiveData,50)[0]
+    DataType=unpack_from('<B',PLC.ReceiveData,50)[0]
     DataLen=unpack_from('<H', PLC.ReceiveData, 2)[0] # this is really just used for STRING
     tagsread[tag]=(DataType, DataLen)	
     return

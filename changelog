@@ -1,3 +1,6 @@
+10/14/15
+  -DataType is retreived properly now (one byte)
+
 10/09/15
   -Reworked the Read function a bit
   
