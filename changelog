@@ -1,3 +1,6 @@
+10/15/15
+  -Pretty major rewrite of how we build the CIP request, more to come I'm sure
+
 10/14/15
   -DataType is retreived properly now (one byte)
 

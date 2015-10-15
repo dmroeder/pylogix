@@ -365,36 +365,20 @@ def _buildEIPHeader():
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
 
-def _buildCIPTagRequest(reqType, partial, isBoolArray):
-    """
-    So here's what happens here.  Tags can be super simple like mytag or pretty complex
-    like My.Tag[7].Value.  In the example, the tag needs to be split up by the '.' and
-    assembled different depending on if the portion is an array or not.  The other thing
-    we have to consider is if the tag segment is an even number of bytes or not.  If it's
-    not, then we have to add a byte.
-    
-    So throughout this function we have to figure out the number of words necessary
-    for this packet as well assemblying the tag portion of the packet.  It might be more
-    complicated than it should be but that's all I could come up with.
-    
-    I added the "First Request" because I'm handling the very first read of a tag different
-    in order to get it's data type.  It all has to do with stupid BOOL arrays, someday I'd
-    like to rework this to make it easier to look at.
-    """
+def _buildCIPTag(isBoolArray):
     RequestPathSize=0		# define path size
     RequestTagData=""		# define tag data
-    TagSplit=self.TagName.lower().split(".")
-    if reqType=="First Read": NoOfElements=1
-    
+    s=self.TagName.lower().split(".")
+
     # this loop figures out the packet length and builds our packet
-    for i in xrange(len(TagSplit)):
+    for i in xrange(len(s)):
     
-	if TagSplit[i].endswith("]"):
+	if s[i].endswith("]"):
 	    RequestPathSize+=1					# add a word for 0x91 and len
-	    tag, basetag, index = TagNameParser(TagSplit[i], 0)
+	    tag, basetag, index = TagNameParser(s[i], 0)
 
 	    BaseTagLenBytes=len(basetag)			# get number of bytes
-	    if isBoolArray and i==len(TagSplit)-1: index=index/32
+	    if isBoolArray and i==len(s)-1: index=index/32
 
 	    # Assemble the packet
 	    RequestTagData+=pack('<BB', 0x91, BaseTagLenBytes)	# add the req type and tag len to packet
@@ -406,7 +390,7 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	    BaseTagLenWords=BaseTagLenBytes/2			# figure out the words for this segment
 	    RequestPathSize+=BaseTagLenWords			# add it to our request size
 	    
-	    if reqType=="Read" or reqType=="Write" or i<len(TagSplit)-1:
+	    if i<len(s)-1:
 		if isinstance(index, list)==False:
 		    if index<256:					# if index is 1 byte...
 			RequestPathSize+=1				# add word for array index
@@ -431,79 +415,133 @@ def _buildCIPTagRequest(reqType, partial, isBoolArray):
 	    #	the read request as a UDT, just read the value of the DINT.  We'll figure out
 	    #	the individual bit in the read function.
 	    try:
-		if int(TagSplit[i])<=31:
+		if int(s[i])<=31:
 		    #do nothing
 		    test="test"
 	    except:
-		RequestPathSize+=1					# add a word for 0x91 and len
-		BaseTagLenBytes=len(TagSplit[i])			# store len of tag
-		RequestTagData+=pack('<BB', 0x91, len(TagSplit[i]))	# add to packet
-		RequestTagData+=TagSplit[i]				# add tag req type and len to packet
-		if BaseTagLenBytes%2==1:				# if odd number of bytes
-		    BaseTagLenBytes+=1					# add byte to make it even
-		    RequestTagData+=pack('<B', 0x00)			# also add to packet
-		RequestPathSize+=BaseTagLenBytes/2			# add words to our path size    
+		RequestPathSize+=1				# add a word for 0x91 and len
+		BaseTagLenBytes=len(s[i])			# store len of tag
+		RequestTagData+=pack('<BB', 0x91, len(s[i]))	# add to packet
+		RequestTagData+=s[i]				# add tag req type and len to packet
+		if BaseTagLenBytes%2==1:			# if odd number of bytes
+		    BaseTagLenBytes+=1				# add byte to make it even
+		    RequestTagData+=pack('<B', 0x00)		# also add to packet
+		RequestPathSize+=BaseTagLenBytes/2		# add words to our path size    
+
+    self.CIPRequest=RequestTagData
+    return
+
+def _addCIPReadData():
+    # do the read related stuff if we are reading
+    RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
+    RequestPathSize=len(self.CIPRequest)/2
+    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    CIPReadRequest+=self.CIPRequest				# Tag portion of packet
+    NoOfElements=self.NumberOfElements
+    CIPReadRequest+=pack('<H', NoOfElements)	# end of packet
+    CIPReadRequest+=pack('<H', self.Offset)
+    self.CIPRequest=CIPReadRequest
+    return
+
+def _addCIPReadPartial():
+    # do the read related stuff if we are reading
+    RequestService=0x52
+    RequestPathSize=len(self.CIPRequest)/2
+    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    CIPReadRequest+=self.CIPRequest					# Tag portion of packet
+    NoOfElements=self.NumberOfElements
+    CIPReadRequest+=pack('<H', NoOfElements)	# end of packet
+    CIPReadRequest+=pack('<H', self.Offset)
+    self.CIPRequest=CIPReadRequest
+    self.CIPRequest+=pack('<H', 0x0000)    
+    return
+  
+def _addCIPWriteData():
+    # do the write related stuff if we're writing a tag
+    self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     	#Dints are 4 bytes each
+    self.NumberOfElements=len(self.WriteData)            		#list of elements to write
+    self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
+    RequestNumberOfElements=self.NumberOfElements
+    RequestPathSize=len(self.CIPRequest)/2
+    if self.CIPDataType==160:  #Strings are special
+	RequestNumberOfElements=self.StructIdentifier
+	TypeCodeLen=0x02
+    else:
+	TypeCodeLen=0x00
+    RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
+    CIPWriteRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    CIPWriteRequest+=self.CIPRequest					# Tag portion of packet 
+
+    CIPWriteRequest+=pack('<BBH', self.CIPDataType, TypeCodeLen, RequestNumberOfElements)
+    self.CIPRequest=CIPWriteRequest
+    for i in xrange(len(self.WriteData)):
+	el=self.WriteData[i]
+	self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType][2],el)
+    return
+  
+def _addCIPWriteBitData():
+    # do the write related stuff if we're writing a tag
+    self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     	#Dints are 4 bytes each
+    self.NumberOfElements=len(self.WriteData)            		#list of elements to write
+    self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
+    RequestNumberOfElements=self.NumberOfElements
+    RequestPathSize=len(self.CIPRequest)/2
+    RequestService=0x4E			#CIP Write (special)
+    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    CIPReadRequest+=self.CIPRequest
     
-    if "Write" in reqType:
-	# do the write related stuff if we're writing a tag
-	self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     	#Dints are 4 bytes each
-	self.NumberOfElements=len(self.WriteData)            		#list of elements to write
-	self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
-	RequestNumberOfElements=self.NumberOfElements
-	if self.CIPDataType==160:  #Strings are special
-	    RequestNumberOfElements=self.StructIdentifier
-	    TypeCodeLen=0x02
-	else:
-	    TypeCodeLen=0x00
-    	if reqType=="Write": RequestService=0x4D			#CIP Write_TAG_Service (PM020 Page 17)
-	if reqType=="Write Bit": RequestService=0x4E			#CIP Write (special)
-	if reqType=="Write DWORD": RequestService=0x4E			#CIP Write (special)
-        CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
-	CIPReadRequest+=RequestTagData					# Tag portion of packet 
+    self.CIPRequest=CIPReadRequest
+    fmt=self.CIPDataTypes[self.CIPDataType][2]		# get the pack format ('b')
+    fmt=fmt.upper()					# convert it to unsigned ('B')
+    s=self.TagName.split('.')				# split by decimal to get bit
+    bit=s[len(s)-1]					# get the bit number we're writing to
+    bit=int(bit)					# convert it to integer
+	    
+    self.CIPRequest+=pack('<h', self.NumberOfBytes)	# pack the number of bytes
+    byte=2**(self.NumberOfBytes*8)-1			
+    bits=2**bit
+    if self.WriteData[0]:
+	self.CIPRequest+=pack(fmt, bits)
+	self.CIPRequest+=pack(fmt, byte)
+    else:
+	self.CIPRequest+=pack(fmt, 0x00)
+	self.CIPRequest+=pack(fmt, (byte-bits))
+    return
+  
+def _addCIPWriteDWORDData():
+    # do the write related stuff if we're writing a tag
+    self.SizeOfElements=self.CIPDataTypes[self.CIPDataType][0]     	#Dints are 4 bytes each
+    self.NumberOfElements=len(self.WriteData)            		#list of elements to write
+    self.NumberOfBytes=self.SizeOfElements*self.NumberOfElements
+    RequestNumberOfElements=self.NumberOfElements
+    RequestPathSize=(len(self.CIPRequest)/2)+1
+    RequestService=0x4E			#CIP Write (special)
+    CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    CIPReadRequest+=self.CIPRequest				# Tag portion of packet 
 
-	if reqType=="Write":
-	    CIPReadRequest+=pack('<BBH', self.CIPDataType, TypeCodeLen, RequestNumberOfElements)
-	    self.CIPRequest=CIPReadRequest
-	    for i in xrange(len(self.WriteData)):
-		el=self.WriteData[i]
-		self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType][2],el)
+    CIPReadRequest+=pack('<H', 0x28)
+    self.CIPRequest=CIPReadRequest
+    for i in xrange(len(self.WriteData)):
+	el=self.WriteData[i]
+	self.CIPRequest+=pack(self.CIPDataTypes[self.CIPDataType][2],el)
 		
-	if reqType=="Write Bit" or reqType=="Write DWORD":
-	    self.CIPRequest=CIPReadRequest
-	    fmt=self.CIPDataTypes[self.CIPDataType][2]		# get the pack format ('b')
-	    fmt=fmt.upper()					# convert it to unsigned ('B')
-	    s=self.TagName.split('.')				# split by decimal to get bit
-	    if reqType=="Write Bit":
-		bit=s[len(s)-1]					# get the bit number we're writing to
-		bit=int(bit)					# convert it to integer
-	    if reqType=="Write DWORD":
-		t=s[len(s)-1]
-		tag, basetag, bit=TagNameParser(t, 0)
-	    
-	    self.CIPRequest+=pack('<h', self.NumberOfBytes)	# pack the number of bytes
-	    byte=2**(self.NumberOfBytes*8)-1			
-	    bits=2**bit
-	    if self.WriteData[0]:
-		self.CIPRequest+=pack(fmt, bits)
-		self.CIPRequest+=pack(fmt, byte)
-	    else:
-		self.CIPRequest+=pack(fmt, 0x00)
-		self.CIPRequest+=pack(fmt, (byte-bits))
-	    
-    # This is really ugly
-    if reqType=="Read" or reqType=="First Read":
-	# do the read related stuff if we are reading
-	if partial==False: RequestService=0x4C			#CIP Read_TAG_Service (PM020 Page 17)
-	if partial==True or reqType=="First Read": RequestService=0x52
-	CIPReadRequest=pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
-	CIPReadRequest+=RequestTagData					# Tag portion of packet
-	NoOfElements=self.NumberOfElements
-	if reqType=="First Read": NoOfElements=1	# for first read, only read one element
-	CIPReadRequest+=pack('<H', NoOfElements)	# end of packet
-	CIPReadRequest+=pack('<H', self.Offset)
-	self.CIPRequest=CIPReadRequest
-	if partial==True or reqType=="First Read": self.CIPRequest+=pack('<H', 0x0000)
+    self.CIPRequest=CIPReadRequest
+    fmt=self.CIPDataTypes[self.CIPDataType][2]		# get the pack format ('b')
+    fmt=fmt.upper()					# convert it to unsigned ('B')
+    s=self.TagName.split('.')				# split by decimal to get bit
 
+    t=s[len(s)-1]
+    t,b,i=TagNameParser(t, 0)
+
+    self.CIPRequest+=pack('<h', self.NumberOfBytes)	# pack the number of bytes
+    byte=2**(self.NumberOfBytes*8)-1			
+    bits=2**i
+    if self.WriteData[0]:
+	self.CIPRequest+=pack(fmt, bits)
+	self.CIPRequest+=pack(fmt, byte)
+    else:
+	self.CIPRequest+=pack(fmt, 0x00)
+	self.CIPRequest+=pack(fmt, (byte-bits))
     return
 
 def _readBitOfWord(split_tag, value):
@@ -536,7 +574,6 @@ def SetIPAddress(address):
     self.IPAddress=address
     return
 
-
 def Read(*args):
     """
      Reads any data type.  We use the args so that the user can either send just a
@@ -552,24 +589,24 @@ def Read(*args):
     self.TagName=args[0]
     self.Offset=0
     
-    if len(args)==2:	# array read
-	self.NumberOfElements=args[1]
-	Array=[0 for i in xrange(self.NumberOfElements)]   #create array
-    else:
-	self.NumberOfElements=1  # if non array, then only 1 element
-    
     # build our tag
     # if we have not read the tag previously, store it in our dictionary
     t,b,i=TagNameParser(args[0], 0)
     if b not in tagsread:
 	InitialRead(b)
 
+    # if we are reading an array, update the number of elements
+    if len(args)==2:
+	self.NumberOfElements=args[1]
+	Array=[0 for i in xrange(self.NumberOfElements)]   #create array
+	
     # handles either BOOL arrays, or everything else
     if tagsread[b][0]==211:
-	_buildCIPTagRequest("Read", partial=False, isBoolArray=True)
+	_buildCIPTag(isBoolArray=True)
     else:
-	_buildCIPTagRequest("Read", partial=False, isBoolArray=False)
+	_buildCIPTag(isBoolArray=False)
 	
+    _addCIPReadData()
     _buildEIPHeader()
     
     # send our tag read request
@@ -613,7 +650,6 @@ def Read(*args):
 	    counter=0					# counter for indexing through packet
 	    self.Offset=0				# offset for next packet request
 	    stringLen=tagsread[b][1]-30	      		# get the stored length (only for string)
-	    
 	    for i in xrange(self.NumberOfElements):	
 		
 		index=52+(counter*dataSize)		# location of data in packet
@@ -635,13 +671,15 @@ def Read(*args):
 		    index=0
 		    counter=0
 
-		    _buildCIPTagRequest("Read", partial=True, isBoolArray=False)
+		    _buildCIPTag(isBoolArray=False)
+		    _addCIPReadPartial()
 		    _buildEIPHeader()
     
 		    PLC.Socket.send(PLC.EIPFrame)
 		    PLC.ReceiveData=PLC.Socket.recv(1024)
 		    ExtendedStatus=unpack_from('<h',PLC.ReceiveData,48)[0]
 		    numbytes=len(PLC.ReceiveData)-dataSize
+		    
 	    return Array
     else: # didn't nail it
 	print "Did not nail it, read fail", self.TagName
@@ -688,14 +726,18 @@ def Write(*args):
     else:
 	print "fix this"
     
+    
     # write a bit of a word, or everything else
     if BitofWord(self.TagName):
-	_buildCIPTagRequest("Write Bit", partial=False, isBoolArray=False)
+	_buildCIPTag(isBoolArray=False)
+	_addCIPWriteBitData()
     else:
 	if self.CIPDataType==211:
-	    _buildCIPTagRequest("Write DWORD", partial=False, isBoolArray=False)
+	    _buildCIPTag(isBoolArray=False)
+	    _addCIPWriteDWORDData()
 	else:
-	    _buildCIPTagRequest("Write", partial=False, isBoolArray=False)
+	    _buildCIPTag(isBoolArray=False)
+	    _addCIPWriteData()
 	
     _buildEIPHeader()
     PLC.Socket.send(PLC.EIPFrame)
@@ -719,8 +761,11 @@ def SetProcessorSlot(slot):
 def InitialRead(tag):
     # Store each unique tag read in a dict so that we can retreive the
     # data type or data length (for STRING) later
-    _buildCIPTagRequest("First Read", partial=False, isBoolArray=False)
+    self.NumberOfElements=1
+    _buildCIPTag(isBoolArray=False)
+    _addCIPReadPartial()
     _buildEIPHeader()
+    
     # send our tag read request
     PLC.Socket.send(PLC.EIPFrame)
     PLC.ReceiveData=PLC.Socket.recv(1024)
@@ -879,7 +924,6 @@ def BitValue(value, bitno):
 	return True
     else:
 	return False
-
 
 def PrintTagList():
     print tagsread
