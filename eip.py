@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from struct import *
 from random import randrange
+import context
 import ctypes
 import socket
 import sys
@@ -49,6 +50,7 @@ def __init__():
     self.RegisterSesionDone=False
     self.SocketConnected=False
     self.ProcessorSlot=0x00
+    self.ContextPointer=0
     PLC=self
 
 
@@ -64,15 +66,15 @@ class LGXTag():
     self.TagName=packet[22:length+22]
     self.Offset=unpack_from('<H', packet, 0)[0]
     self.DataType=unpack_from('<B', packet, 4)[0]
-    print self.TagName, self.Offset
+    #print self.TagName, self.Offset
 
     return self
   
 def _openconnection():
     self.SocketConnected=False
     try:    
-        self.Socket=socket.socket()
-        self.Socket.settimeout(0.5)
+        #self.Socket=socket.socket()
+        #self.Socket.settimeout(0.5)
         self.Socket.connect((self.IPAddress,self.Port))
         self.SocketConnected=True
     except:
@@ -322,7 +324,9 @@ def _buildTagListRequest(partial):
 
   
 def _buildEIPHeader():
-
+    
+    if self.ContextPointer==156: self.ContextPointer=0
+    
     EIPPayloadLength=22+len(self.CIPRequest)   #22 bytes of command specific data + the size of the CIP Payload
     EIPConnectedDataLength=len(self.CIPRequest)+2 #Size of CIP packet plus the sequence counter
 
@@ -330,8 +334,9 @@ def _buildEIPHeader():
     EIPLength=22+len(self.CIPRequest)       #(H) Length of encapsulated command
     EIPSessionHandle=self.SessionHandle     #(I)Setup when session crated
     EIPStatus=0x00                          #(I)Always 0x00
-    EIPContext=self.Context                 #(Q) String echoed back
-                                            #Here down is command specific data
+    #EIPContext=self.Context                 #(Q) String echoed back
+    EIPContext=context.value(self.ContextPointer)
+    self.ContextPointer+=1                  #Here down is command specific data
                                             #For our purposes it is always 22 bytes
     EIPOptions=0x0000                       #(I) Always 0x00
     EIPInterfaceHandle=0x00                 #(I) Always 0x00
@@ -831,8 +836,8 @@ def GetPLCTime():
 def GetTagList():
     self.SocketConnected=False
     try:    
-        self.Socket=socket.socket()
-        self.Socket.settimeout(0.5)
+        #self.Socket=socket.socket()
+        #self.Socket.settimeout(0.5)
         self.Socket.connect((self.IPAddress,self.Port))
         self.SocketConnected=True
     except:
