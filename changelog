@@ -1,3 +1,6 @@
+11/27/15
+  -SequencCounter starts at 1, apparently L32E has problem with it starting at zero
+
 11/23/15
   -Added rolling context
 

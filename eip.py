@@ -41,7 +41,7 @@ def __init__():
     self.OTNetworkConnectionID=None
     self.TagName=None
     self.NumberOfElements=1
-    self.SequenceCounter=0
+    self.SequenceCounter=1
     self.CIPRequest=None
     self.Socket.settimeout(0.5)
     self.Offset=0
@@ -373,7 +373,8 @@ def _buildEIPHeader():
 def _buildCIPTag(isBoolArray):
     RequestPathSize=0		# define path size
     RequestTagData=""		# define tag data
-    s=self.TagName.lower().split(".")
+    #s=self.TagName.lower().split(".")
+    s=self.TagName.split(".")
 
     # this loop figures out the packet length and builds our packet
     for i in xrange(len(s)):
