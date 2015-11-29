@@ -4,9 +4,9 @@ USAGE:
 
 2) init:  PLC.__init__()
 
-3) Set the IP Address property: PLC.SetIPAddress("192.168.1.10")
+3) Set the IP Address property: PLC.IPAddress("192.168.1.10")
 
-4) If your processor is in a slot other than 0, set that: PLC.SetProcessorSlot(n)
+4) If your processor is in a slot other than 0, set that: PLC.ProcessorSlot(n)
 
 5) Do one of the following:
 
@@ -18,8 +18,8 @@ USAGE:
 	ex: value = PLC.Read("MyDINT", 10)
 		    print value(3)
 		    
-    Write a value: PLC.Write("tagname", value, "datatype")
-	ex: PLC.Write("MyTimer.PRE", 100, "DINT")
+    Write a value: PLC.Write("tagname", value)
+	ex: PLC.Write("MyTimer.PRE", 100")
 	
     Get a list of the controller tags:  taglist = PLC.GetTagList()
 	taglist will be an object with the following properties:
@@ -38,6 +38,32 @@ So a complete script to read a tag would look like this:
 
 import eip as PLC
 PLC.__init__()
-PLC.SetIPAddress("192.168.1.10")
+PLC.IPAddress("192.168.1.10")
 value = PLC.Read("MyTimer.ACC")
 print value
+
+
+*************************************************************************
+Added identify.py.  If you call the ListIdentity() function, it will send out a
+UDP packet which will request that all listening devices respond with some
+information about each device.  It will be returned to you in a list.
+
+Usage would look like this:
+
+from identify import *
+devices=ListIdentity()
+for i in xrange(len(devices)):
+  print devices[i].Address, devices[i].ProductName
+  
+The complete data structure returned is:
+  .Address
+  .VendorID
+  .Vendor
+  .DeviceID
+  .DeviceType
+  .ProductCode
+  .Revision
+  .Status
+  .SerialNumber
+  .ProductName
+  .State

@@ -1,3 +1,7 @@
+11/28/15
+  -Renamed SetIPAddress to IPAddress and SetProcessorSlot to ProcessorSlot
+  -Updated README with identify.py info
+
 11/27/15
   -SequencCounter starts at 1, apparently L32E has problem with it starting at zero
 

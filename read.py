@@ -6,7 +6,7 @@ import sys
 def main():
   
   PLC.__init__()			# initialize PLC object
-  PLC.OpenConnection("192.168.1.10")	# connect to PLC
+  PLC.IPAddress("192.168.1.10")		# connect to PLC
   
   plctag = "TestBOOL"
   value = PLC.ReadStuffs(plctag)

@@ -575,10 +575,6 @@ def _readSingleString():
     stringLen=unpack_from('<H', PLC.ReceiveData, 2)[0]
     stringLen=stringLen-34
     return PLC.ReceiveData[-stringLen:(-stringLen+NameLength)]
-  
-def SetIPAddress(address):
-    self.IPAddress=address
-    return
 
 def Read(*args):
     """
@@ -755,7 +751,11 @@ def Write(*args):
     if Status!=205 and Status!=206 or ExtendedStatus!=0: # fail
       print "Failed to write to", self.TagName, " Status", Status, " Extended Status", ExtendedStatus
 
-def SetProcessorSlot(slot):
+def IPAddress(address):
+    self.IPAddress=address
+    return
+
+def ProcessorSlot(slot):
     if isinstance(slot, int) and (slot>=0 and slot<17):
 	# set the processor slot
 	self.ProcessorSlot=0x00+slot
