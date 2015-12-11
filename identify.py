@@ -21,6 +21,7 @@ class DeviceID():
     self.State=None
     
   def WhosThere(self, data):
+
     self.Length=unpack_from('<H', data, 28)[0]
     self.EncapsulationVersion=unpack_from('<H', data, 30)[0]
     
@@ -42,7 +43,7 @@ class DeviceID():
     self.SerialNumber=unpack_from('<I', data, 58)[0]
     self.ProductNameLength=unpack_from('<B', data, 62)[0]
     self.ProductName=data[63:63+self.ProductNameLength]
-    self.State=unpack_from('<B', data, self.Length+self.ProductNameLength+1)[0]
+    self.State=unpack_from('<B', data, self.Length+self.ProductNameLength)[0]
     
     return self
 
@@ -52,9 +53,9 @@ def _buildListIdentity():
   ListSessionHandle=0x00
   ListStatus=0x00
   ListResponse=0x00
-  ListContext1=0x00
-  ListContext2=0x00
-  ListContext3=0x00
+  ListContext1=0x6168
+  ListContext2=0x6c79
+  ListContext3=0x6569
   ListOptions=0x00
   
   return pack("<HHIIHHHHI",
@@ -69,19 +70,27 @@ def _buildListIdentity():
 	      ListOptions)
 
 def ListIdentity():
-  stuff=[]
+  devices=[]
   request=_buildListIdentity()
   s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   s.settimeout(0.5)
   s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+  
+  # you can bind to you IP address to force it to use the correct
+  #	network adapter
+  #s.bind(('192.168.1.201', 0))
+  
   s.sendto(request, ('255.255.255.255', 44818))
   try:
     while(1):
       ret=s.recv(1024)
-      stuff.append(DeviceID().WhosThere(ret))
+      context=unpack_from('<Q', ret, 14)[0]
+      if context==0x65696c796168:
+        # the data came from our request
+        devices.append(DeviceID().WhosTherhttp://gogle.com/e(ret))
   except:
       do="Nothing"
-  return stuff
+  return devices
 
 
 # List originally came from Wireshark /epan/dissectors/packet-cip.c
@@ -1244,107 +1253,105 @@ def VendorNames(vid):
   if vid==1116: return "Graco Inc."
   if vid==1117: return "Altera Corporation"
   if vid==1118: return "Technology Brewing Corporation"
-  if vid==1119: return "CSE Servelec"
-  if vid==1120: return "Fluke Networks"
-  if vid==1121: return "Tetra Pak Packaging Solutions SPA"
-  if vid==1122: return "Racine Federated, Inc."
-  if vid==1123: return "Pureron Japan Co., Ltd."
-  if vid==1124: return "Brother Industries, Ltd."
-  if vid==1125: return "Leroy Automation"
-  if vid==1126: return "THK CO., LTD."
-  if vid==1127: return "TR-Electronic GmbH"
-  if vid==1128: return "ASCON S.p.A."
-  if vid==1129: return "Toledo do Brasil Industria de Balancas Ltda."
-  if vid==1130: return "Bucyrus DBT Europe GmbH"
-  if vid==1131: return "Emerson Process Management Valve Automation"
-  if vid==1132: return "Alstom Transport"
-  if vid==1133: return "Matrox Electronic Systems"
-  if vid==1134: return "Littelfuse"
-  if vid==1135: return "PLASMART, Inc."
-  if vid==1136: return "Miyachi Corporation"
-  if vid==1137: return "Promess Incorporated"
-  if vid==1138: return "COPA-DATA GmbH"
-  if vid==1139: return "Precision Engine Controls Corporation"
-  if vid==1140: return "Alga Automacao e controle LTDA"
-  if vid==1141: return "U.I. Lapp GmbH"
-  if vid==1142: return "ICES"
-  if vid==1143: return "Philips Lighting bv"
-  if vid==1144: return "Aseptomag AG"
-  if vid==1145: return "ARC Informatique"
-  if vid==1146: return "Hesmor GmbH"
-  if vid==1147: return "Kobe Steel, Ltd."
-  if vid==1148: return "FLIR Systems"
-  if vid==1149: return "Simcon A/S"
-  if vid==1150: return "COPALP"
-  if vid==1151: return "Zypcom, Inc."
-  if vid==1152: return "Swagelok"
-  if vid==1153: return "Elspec"
-  if vid==1154: return "ITT Water & Wastewater AB"
-  if vid==1155: return "Kunbus GmbH Industrial Communication"
-  if vid==1156: return "Performance Controls, Inc."
-  if vid==1157: return "ACS Motion Control, Ltd."
-  if vid==1158: return "IStar Technology Limited"
-  if vid==1159: return "Alicat Scientific, Inc."
-  if vid==1160: return "ADFweb.com SRL"
-  if vid==1161: return "Tata Consultancy Services Limited"
-  if vid==1162: return "CXR Ltd."
-  if vid==1163: return "Vishay Nobel AB"
-  if vid==1164: return "SolaHD"
-  if vid==1165: return "Endress+Hauser"
-  if vid==1166: return "Bartec GmbH"
-  if vid==1167: return "AccuSentry, Inc."
-  if vid==1168: return "Exlar Corporation"
-  if vid==1169: return "ILS Technology"
-  if vid==1170: return "Control Concepts Inc."
-  if vid==1171: return "Procon Engineering Limited"
-  if vid==1172: return "Hermary Opto Electronics Inc."
-  if vid==1173: return "Q-Lambda"
-  if vid==1174: return "VAMP Ltd"
-  if vid==1175: return "FlexLink"
-  if vid==1176: return "Office FA.com Co., Ltd."
-  if vid==1177: return "SPMC (Changzhou) Co. Ltd."
-  if vid==1178: return "Anton Paar GmbH"
-  if vid==1179: return "Zhuzhou CSR Times Electric Co., Ltd."
-  if vid==1180: return "DeStaCo"
-  if vid==1181: return "Synrad, Inc"
-  if vid==1182: return "Bonfiglioli Vectron GmbH"
-  if vid==1183: return "Pivotal Systems"
-  if vid==1184: return "TKSCT"
-  if vid==1185: return "Randy Nuernberger"
-  if vid==1186: return "CENTRALP"
-  if vid==1187: return "Tengen Group"
-  if vid==1188: return "OES, Inc."
-  if vid==1189: return "Actel Corporation"
-  if vid==1190: return "Monaghan Engineering, Inc."
-  if vid==1191: return "wenglor sensoric gmbh"
-  if vid==1192: return "HSA Systems"
-  if vid==1193: return "MK Precision Co., Ltd."
-  if vid==1194: return "Tappan Wire and Cable"
-  if vid==1195: return "Heinzmann GmbH & Co. KG"
-  if vid==1196: return "Process Automation International Ltd."
-  if vid==1197: return "Secure Crossing"
-  if vid==1198: return "SMA Railway Technology GmbH"
-  if vid==1199: return "FMS Force Measuring Systems AG"
-  if vid==1200: return "ABT Endustri Enerji Sistemleri Sanayi Tic. Ltd. Sti."
-  if vid==1201: return "MagneMotion Inc."
-  if vid==1202: return "STS Co., Ltd."
-  if vid==1203: return "MERAK SIC, SA"
-  if vid==1204: return "ABOUNDI, Inc."
-  if vid==1205: return "Rosemount Inc."
-  if vid==1206: return "GEA FES, Inc."
-  if vid==1207: return "TMG Technologie und Engineering GmbH"
-  if vid==1208: return "embeX GmbH"
-  if vid==1209: return "GH Electrotermia, S.A."
-  if vid==1210: return "Tolomatic"
-  if vid==1211: return "Dukane"
-  if vid==1212: return "Elco (Tian Jin) Electronics Co., Ltd."
-  if vid==1213: return "Jacobs Automation"
-  if vid==1214: return "Noda Radio Frequency Technologies Co., Ltd."
-  if vid==1215: return "MSC Tuttlingen GmbH"
-  if vid==1216: return "Hitachi Cable Manchester"
-  if vid==1217: return "ACOREL SAS"
-  if vid==1218: return "Global Engineering Solutions Co., Ltd."
-  if vid==1219: return "ALTE Transportation, S.L."
-  if vid==1220: return "Penko Engineering B.V."
-
-  
+  if vid==1121: return "CSE Servelec"
+  if vid==1124: return "Fluke Networks"
+  if vid==1125: return "Tetra Pak Packaging Solutions SPA"
+  if vid==1126: return "Racine Federated, Inc."
+  if vid==1127: return "Pureron Japan Co., Ltd."
+  if vid==1130: return "Brother Industries, Ltd."
+  if vid==1132: return "Leroy Automation"
+  if vid==1134: return "THK CO., LTD."
+  if vid==1137: return "TR-Electronic GmbH"
+  if vid==1138: return "ASCON S.p.A."
+  if vid==1139: return "Toledo do Brasil Industria de Balancas Ltda."
+  if vid==1140: return "Bucyrus DBT Europe GmbH"
+  if vid==1141: return "Emerson Process Management Valve Automation"
+  if vid==1142: return "Alstom Transport"
+  if vid==1144: return "Matrox Electronic Systems"
+  if vid==1145: return "Littelfuse"
+  if vid==1146: return "PLASMART, Inc."
+  if vid==1147: return "Miyachi Corporation"
+  if vid==1150: return "Promess Incorporated"
+  if vid==1151: return "COPA-DATA GmbH"
+  if vid==1152: return "Precision Engine Controls Corporation"
+  if vid==1153: return "Alga Automacao e controle LTDA"
+  if vid==1154: return "U.I. Lapp GmbH"
+  if vid==1155: return "ICES"
+  if vid==1156: return "Philips Lighting bv"
+  if vid==1157: return "Aseptomag AG"
+  if vid==1158: return "ARC Informatique"
+  if vid==1159: return "Hesmor GmbH"
+  if vid==1160: return "Kobe Steel, Ltd."
+  if vid==1161: return "FLIR Systems"
+  if vid==1162: return "Simcon A/S"
+  if vid==1163: return "COPALP"
+  if vid==1164: return "Zypcom, Inc."
+  if vid==1165: return "Swagelok"
+  if vid==1166: return "Elspec"
+  if vid==1167: return "ITT Water & Wastewater AB"
+  if vid==1168: return "Kunbus GmbH Industrial Communication"
+  if vid==1170: return "Performance Controls, Inc."
+  if vid==1171: return "ACS Motion Control, Ltd."
+  if vid==1173: return "IStar Technology Limited"
+  if vid==1174: return "Alicat Scientific, Inc."
+  if vid==1176: return "ADFweb.com SRL"
+  if vid==1177: return "Tata Consultancy Services Limited"
+  if vid==1178: return "CXR Ltd."
+  if vid==1179: return "Vishay Nobel AB"
+  if vid==1181: return "SolaHD"
+  if vid==1182: return "Endress+Hauser"
+  if vid==1183: return "Bartec GmbH"
+  if vid==1185: return "AccuSentry, Inc."
+  if vid==1186: return "Exlar Corporation"
+  if vid==1187: return "ILS Technology"
+  if vid==1188: return "Control Concepts Inc."
+  if vid==1190: return "Procon Engineering Limited"
+  if vid==1191: return "Hermary Opto Electronics Inc."
+  if vid==1192: return "Q-Lambda"
+  if vid==1194: return "VAMP Ltd"
+  if vid==1195: return "FlexLink"
+  if vid==1196: return "Office FA.com Co., Ltd."
+  if vid==1197: return "SPMC (Changzhou) Co. Ltd."
+  if vid==1198: return "Anton Paar GmbH"
+  if vid==1199: return "Zhuzhou CSR Times Electric Co., Ltd."
+  if vid==1200: return "DeStaCo"
+  if vid==1201: return "Synrad, Inc"
+  if vid==1202: return "Bonfiglioli Vectron GmbH"
+  if vid==1203: return "Pivotal Systems"
+  if vid==1204: return "TKSCT"
+  if vid==1205: return "Randy Nuernberger"
+  if vid==1206: return "CENTRALP"
+  if vid==1207: return "Tengen Group"
+  if vid==1208: return "OES, Inc."
+  if vid==1209: return "Actel Corporation"
+  if vid==1210: return "Monaghan Engineering, Inc."
+  if vid==1211: return "wenglor sensoric gmbh"
+  if vid==1212: return "HSA Systems"
+  if vid==1213: return "MK Precision Co., Ltd."
+  if vid==1214: return "Tappan Wire and Cable"
+  if vid==1215: return "Heinzmann GmbH & Co. KG"
+  if vid==1216: return "Process Automation International Ltd."
+  if vid==1217: return "Secure Crossing"
+  if vid==1218: return "SMA Railway Technology GmbH"
+  if vid==1219: return "FMS Force Measuring Systems AG"
+  if vid==1220: return "ABT Endustri Enerji Sistemleri Sanayi Tic. Ltd. Sti."
+  if vid==1221: return "MagneMotion Inc."
+  if vid==1222: return "STS Co., Ltd."
+  if vid==1223: return "MERAK SIC, SA"
+  if vid==1224: return "ABOUNDI, Inc."
+  if vid==1225: return "Rosemount Inc."
+  if vid==1226: return "GEA FES, Inc."
+  if vid==1227: return "TMG Technologie und Engineering GmbH"
+  if vid==1228: return "embeX GmbH"
+  if vid==1229: return "GH Electrotermia, S.A."
+  if vid==1230: return "Tolomatic"
+  if vid==1231: return "Dukane"
+  if vid==1232: return "Elco (Tian Jin) Electronics Co., Ltd."
+  if vid==1233: return "Jacobs Automation"
+  if vid==1234: return "Noda Radio Frequency Technologies Co., Ltd."
+  if vid==1235: return "MSC Tuttlingen GmbH"
+  if vid==1236: return "Hitachi Cable Manchester"
+  if vid==1237: return "ACOREL SAS"
+  if vid==1238: return "Global Engineering Solutions Co., Ltd."
+  if vid==1239: return "ALTE Transportation, S.L."
+  if vid==1240: return "Penko Engineering B.V."

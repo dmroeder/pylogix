@@ -1,3 +1,6 @@
+12/11/15
+  -Fixed incorrect vendorID's in identify.py
+
 11/28/15
   -Renamed SetIPAddress to IPAddress and SetProcessorSlot to ProcessorSlot
   -Updated README with identify.py info
