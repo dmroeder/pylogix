@@ -882,7 +882,10 @@ def ffs(data):
     # extract the offset
     self.Offset=unpack_from('<H', packet, 0)[0]
     # add the tag to our tag list
-    taglist.append(LGXTag().ParsePacket(packet))
+    tag=LGXTag().ParsePacket(packet)
+    # filter out garbage
+    if "__DEFVAL_" not in tag.TagName:
+	taglist.append(tag)
     # increment ot the next tag in the packet
     packetStart=packetStart+tagLen+22
 
