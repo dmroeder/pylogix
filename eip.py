@@ -370,6 +370,22 @@ def _buildEIPHeader():
     self.EIPFrame=self.EIPHeaderFrame+self.CIPRequest
     return
 
+def _buildMultiServiceHeader():
+    MultiService=0X0A
+    MultiPathSize=0x02
+    MutliClassType=0x20
+    MultiClassSegment=0x02
+    MultiInstanceType=0x24
+    MultiInstanceSegment=0x01
+    
+    return pack('<BBBBBB',
+		MultiService,
+		MultiPathSize,
+		MutliClassType,
+		MultiClassSegment,
+		MultiInstanceType,
+		MultiInstanceSegment)
+
 def _buildCIPTag(isBoolArray):
     RequestPathSize=0		# define path size
     RequestTagData=""		# define tag data
@@ -445,7 +461,7 @@ def _addCIPReadData():
     CIPReadRequest+=self.CIPRequest				# Tag portion of packet
     NoOfElements=self.NumberOfElements
     CIPReadRequest+=pack('<H', NoOfElements)	# end of packet
-    CIPReadRequest+=pack('<H', self.Offset)
+    #CIPReadRequest+=pack('<H', self.Offset)
     self.CIPRequest=CIPReadRequest
     return
 
@@ -750,6 +766,68 @@ def Write(*args):
     # check for success, let the user know of failure
     if Status!=205 and Status!=206 or ExtendedStatus!=0: # fail
       print "Failed to write to", self.TagName, " Status", Status, " Extended Status", ExtendedStatus
+def MultiRead(*args):
+    serviceSegments=[]
+    segments=""
+    tagCount=len(args)
+    # If not connected to PLC, abandon ship!
+    if self.SocketConnected==False:
+	_openconnection()
+  
+    for i in xrange(tagCount):
+	self.TagName=args[i]
+	t,b,i=TagNameParser(self.TagName, 0)
+	if b not in tagsread:
+	    InitialRead(b)
+	    
+	_buildCIPTag(False)
+	_addCIPReadData()
+	serviceSegments.append(self.CIPRequest)
+    
+    header=_buildMultiServiceHeader()
+    segmentCount=pack('<H', tagCount)
+    temp=len(header)
+    if tagCount>2:
+	temp+=(tagCount-2)*2
+    offsets=pack('<H', temp)
+
+    # assemble all the segments
+    for i in xrange(tagCount):
+	segments+=serviceSegments[i]
+
+    for i in xrange(tagCount-1):	
+	temp+=len(serviceSegments[i])
+	offsets+=pack('<H', temp)
+	
+    self.CIPRequest=header+segmentCount+offsets+segments
+    _buildEIPHeader()
+    PLC.Socket.send(PLC.EIPFrame)
+    PLC.ReceiveData=PLC.Socket.recv(1024)
+    
+    return MultiParser(PLC.ReceiveData)
+
+def MultiParser(data):
+    # remove the beginning of the packet because we just don't care about it
+    stripped=data[50:]
+    tagCount=unpack_from('<H', stripped, 0)[0]
+    
+    # get the offset values for each of the tags in the packet
+    reply=[]
+    for i in xrange(tagCount):
+	loc=2+(i*2)					# pointer to offset
+	offset=unpack_from('<H', stripped, loc)[0]	# get offset
+	replyStatus=unpack_from('<b', stripped, offset+2)[0]
+	replyExtended=unpack_from('<b', stripped, offset+3)[0]
+
+	# successful reply, add the value to our list
+	if replyStatus==0 and replyExtended==0:
+	    dataTypeValue=unpack_from('<B', stripped, offset+4)[0]	# data type
+	    dataTypeFormat=self.CIPDataTypes[dataTypeValue][2]     	# number of bytes for datatype	  
+	    reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
+	else:
+	    reply.append("Error")
+	    
+    return reply
 
 def IPAddress(address):
     self.IPAddress=address

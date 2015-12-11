@@ -18,6 +18,9 @@ USAGE:
 	ex: value = PLC.Read("MyDINT", 10)
 		    print value(3)
 		    
+    Multi-read values = PLC.MultiRead("Tag1", "Tag2", "Tag3")
+			print values
+			
     Write a value: PLC.Write("tagname", value)
 	ex: PLC.Write("MyTimer.PRE", 100")
 	
