@@ -1,6 +1,9 @@
+# created by Dustin Roeder 2016
+# dmroeder@gmail.com
+# use at your own risk!!!
+
 from struct import *
 import socket
-
 
 class DeviceID():
   
@@ -40,7 +43,7 @@ class DeviceID():
     self.Revision=str(major) + '.' + str(minor)
     
     self.Status=unpack_from('<H', data, 56)[0]
-    self.SerialNumber=unpack_from('<I', data, 58)[0]
+    self.SerialNumber=hex(unpack_from('<I', data, 58)[0])
     self.ProductNameLength=unpack_from('<B', data, 62)[0]
     self.ProductName=data[63:63+self.ProductNameLength]
     self.State=unpack_from('<B', data, self.Length+self.ProductNameLength)[0]
@@ -72,24 +75,30 @@ def _buildListIdentity():
 def ListIdentity():
   devices=[]
   request=_buildListIdentity()
-  s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  s.settimeout(0.5)
-  s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
   
-  # you can bind to you IP address to force it to use the correct
-  #	network adapter
-  #s.bind(('192.168.1.201', 0))
-  
-  s.sendto(request, ('255.255.255.255', 44818))
-  try:
-    while(1):
-      ret=s.recv(1024)
-      context=unpack_from('<Q', ret, 14)[0]
-      if context==0x65696c796168:
-        # the data came from our request
-        devices.append(DeviceID().WhosTherhttp://gogle.com/e(ret))
-  except:
-      do="Nothing"
+  # get available ip addresses
+  addresses = socket.getaddrinfo(socket.gethostname(), None)
+
+  # we're going to send a request for all available ipv4
+  # addresses and build a list of all the devices that reply
+  for ip in addresses:
+    if ip[0]==2:  # IP v4
+      # create a socket
+      s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+      s.settimeout(0.5)
+      s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+      s.bind((ip[4][0], 0))
+      s.sendto(request, ('255.255.255.255', 44818))
+      try:
+        while(1):
+          ret=s.recv(1024)
+          context=unpack_from('<Q', ret, 14)[0]
+          if context==0x65696c796168:
+            # the data came from our request
+            devices.append(DeviceID().WhosThere(ret))
+      except:
+          do="Nothing"
+
   return devices
 
 

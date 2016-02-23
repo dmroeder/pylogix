@@ -1,3 +1,6 @@
+02/22/16
+  -identify.py now sends packet out each network adapter
+
 12/11/15
   -Fixed incorrect vendorID's in identify.py
   -Filter out garbage from GetTagList
