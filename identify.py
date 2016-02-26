@@ -5,50 +5,64 @@
 from struct import *
 import socket
 
-class DeviceID():
-  
+class Identify():
+	
   def __init__(self):
-    self.Length=None
-    self.EncapsulationVersion=None
-    self.Address=None
-    self.VendorID=None
-    self.Vendor=None
-    self.DeviceID=None
-    self.DeviceType=""
-    self.ProductCode=None
-    self.Revision=None
-    self.Status=None
-    self.SerialNumber=None
-    self.ProductNameLength=None
-    self.ProductName=""
-    self.State=None
-    
-  def WhosThere(self, data):
-
-    self.Length=unpack_from('<H', data, 28)[0]
-    self.EncapsulationVersion=unpack_from('<H', data, 30)[0]
-    
-    longIP=unpack_from('<I', data, 36)[0]
-    self.Address=socket.inet_ntoa(pack('<L', longIP))
-    
-    self.VendorID=unpack_from('<H', data, 48)[0]
-    self.Vendor=VendorNames(self.VendorID)
-    
-    self.DeviceID=unpack_from('<H', data, 50)[0]
-    self.DeviceType=DeviceTypes(self.DeviceID)
-    self.ProductCode=unpack_from('<H', data, 52)[0]
-    
-    major=unpack_from('<B', data, 54)[0]
-    minor=unpack_from('<B', data, 55)[0]
-    self.Revision=str(major) + '.' + str(minor)
-    
-    self.Status=unpack_from('<H', data, 56)[0]
-    self.SerialNumber=hex(unpack_from('<I', data, 58)[0])
-    self.ProductNameLength=unpack_from('<B', data, 62)[0]
-    self.ProductName=data[63:63+self.ProductNameLength]
-    self.State=unpack_from('<B', data, self.Length+self.ProductNameLength)[0]
-    
-    return self
+	# makeup of a reply
+	self.Length=None
+	self.EncapsulationVersion=None
+	self.Address=None
+	self.VendorID=None
+	self.Vendor=None
+	self.DeviceID=None
+	self.DeviceType=""
+	self.ProductCode=None
+	self.Revision=None
+	self.Status=None
+	self.SerialNumber=None
+	self.ProductNameLength=None
+	self.ProductName=""
+	self.State=None
+	
+	# global stuff
+	global devices
+	global vendors
+	devices=DeviceTypes()
+	vendors=VendorNames()
+	
+  def ParseResponse(self, data):
+	# we're going to take the packet and parse all
+	#  the data that is in it.
+	self.Length=unpack_from('<H', data, 28)[0]
+	self.EncapsulationVersion=unpack_from('<H', data, 30)[0]
+	
+	longIP=unpack_from('<I', data, 36)[0]
+	self.Address=socket.inet_ntoa(pack('<L', longIP))
+	
+	self.VendorID=unpack_from('<H', data, 48)[0]
+	if self.VendorID in vendors.keys():
+		self.Vendor=vendors[self.VendorID]
+	else:
+		self.Vendor="Unknown Vendor"
+		
+	self.DeviceID=unpack_from('<H', data, 50)[0]
+	if self.DeviceID in devices.keys():
+	  self.DeviceType=devices[self.DeviceID]
+	else:
+	  self.DeviceType="Unknown Device Type"
+	  
+	self.ProductCode=unpack_from('<H', data, 52)[0]
+	major=unpack_from('<B', data, 54)[0]
+	minor=unpack_from('<B', data, 55)[0]
+	self.Revision=str(major) + '.' + str(minor)
+	
+	self.Status=unpack_from('<H', data, 56)[0]
+	self.SerialNumber=hex(unpack_from('<I', data, 58)[0])
+	self.ProductNameLength=unpack_from('<B', data, 62)[0]
+	self.ProductName=data[63:63+self.ProductNameLength]
+	self.State=unpack_from('<B', data, self.Length+self.ProductNameLength)[0]
+	
+	return self
 
 def _buildListIdentity():
   ListService=0x63
@@ -62,15 +76,15 @@ def _buildListIdentity():
   ListOptions=0x00
   
   return pack("<HHIIHHHHI",
-	      ListService,
-	      ListLength,
-	      ListSessionHandle,
-	      ListStatus,
-	      ListResponse,
-	      ListContext1,
-	      ListContext2,
-	      ListContext3,
-	      ListOptions)
+		  ListService,
+		  ListLength,
+		  ListSessionHandle,
+		  ListStatus,
+		  ListResponse,
+		  ListContext1,
+		  ListContext2,
+		  ListContext3,
+		  ListOptions)
 
 def ListIdentity():
   devices=[]
@@ -78,1289 +92,1293 @@ def ListIdentity():
   
   # get available ip addresses
   addresses = socket.getaddrinfo(socket.gethostname(), None)
-
+  #print addresses
   # we're going to send a request for all available ipv4
   # addresses and build a list of all the devices that reply
   for ip in addresses:
-    if ip[0]==2:  # IP v4
-      # create a socket
-      s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-      s.settimeout(0.5)
-      s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-      s.bind((ip[4][0], 0))
-      s.sendto(request, ('255.255.255.255', 44818))
-      try:
-        while(1):
-          ret=s.recv(1024)
-          context=unpack_from('<Q', ret, 14)[0]
-          if context==0x65696c796168:
-            # the data came from our request
-            devices.append(DeviceID().WhosThere(ret))
-      except:
-          do="Nothing"
-
+	if ip[0]==2:  # IP v4
+	  # create a socket
+	  s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	  s.settimeout(0.5)
+	  s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+	  s.bind((ip[4][0], 0))
+	  s.sendto(request, ('255.255.255.255', 44818))
+	  try:
+		while(1):
+		  ret=s.recv(1024)
+		  context=unpack_from('<Q', ret, 14)[0]
+		  if context==0x65696c796168:
+			# the data came from our request
+			devices.append(Identify().ParseResponse(ret))
+	  except:
+		  do="Nothing"
+		  
   return devices
 
 
 # List originally came from Wireshark /epan/dissectors/packet-cip.c
-def DeviceTypes(deviceID):
-  if deviceID==0x00: return "Generic Device (deprecated)"
-  if deviceID==0x02: return "AC Drive"
-  if deviceID==0x03: return "Motor Overload"
-  if deviceID==0x04: return "Limit Switch"
-  if deviceID==0x05: return "Inductive Proximity Switch"
-  if deviceID==0x06: return "Photoelectric Sensor"
-  if deviceID==0x07: return "General Purpose Discrete I/O"
-  if deviceID==0x09: return "Resolver"
-  if deviceID==0x0C: return "Communications Adapter"
-  if deviceID==0x0E: return "Programmable Logic Controller"
-  if deviceID==0x10: return "Position Controller"
-  if deviceID==0x13: return "DC Drive"
-  if deviceID==0x15: return "Contactor"
-  if deviceID==0x16: return "Motor Starter"
-  if deviceID==0x17: return "Soft Start"
-  if deviceID==0x18: return "Human-Machine Interface"
-  if deviceID==0x1A: return "Mass Flow Controller"
-  if deviceID==0x1B: return "Pneumatic Valve"
-  if deviceID==0x1C: return "Vacuum Pressure Gauge"
-  if deviceID==0x1D: return "Process Control Value"
-  if deviceID==0x1E: return "Residual Gas Analyzer"
-  if deviceID==0x1F: return "DC Power Generator"
-  if deviceID==0x20: return "RF Power Generator"
-  if deviceID==0x21: return "Turbomolecular Vacuum Pump"
-  if deviceID==0x22: return "Encoder"
-  if deviceID==0x23: return "Safety Discrete I/O Device"
-  if deviceID==0x24: return "Fluid Flow Controller"
-  if deviceID==0x25: return "CIP Motion Drive"
-  if deviceID==0x26: return "CompoNet Repeater"
-  if deviceID==0x27: return "Mass Flow Controller, Enhanced"
-  if deviceID==0x28: return "CIP Modbus Device"
-  if deviceID==0x29: return "CIP Modbus Translator"
-  if deviceID==0x2A: return "Safety Analog I/O Device"
-  if deviceID==0x2B: return "Generic Device (keyable)"
-  if deviceID==0x2C: return "Managed Switch"
-  if deviceID==0x32: return "ControlNet Physical Layer Component"
+def DeviceTypes():
+	deviceList={0x00: 'Generic Device (deprecated)',
+		0x02: 'AC Drive',
+		0x03: 'Motor Overload',
+		0x04: 'Limit Switch',
+		0x05: 'Inductive Proximity Switch',
+		0x06: 'Photoelectric Sensor',
+		0x07: 'General Purpose Discrete I/O',
+		0x09: 'Resolver',
+		0x0C: 'Communications Adapter',
+		0x0E: 'Programmable Logic Controller',
+		0x10: 'Position Controller',
+		0x13: 'DC Drive',
+		0x15: 'Contactor',
+		0x16: 'Motor Starter',
+		0x17: 'Soft Start',
+		0x18: 'Human-Machine Interface',
+		0x1A: 'Mass Flow Controller',
+		0x1B: 'Pneumatic Valve',
+		0x1C: 'Vacuum Pressure Gauge',
+		0x1D: 'Process Control Value',
+		0x1E: 'Residual Gas Analyzer',
+		0x1F: 'DC Power Generator',
+		0x20: 'RF Power Generator',
+		0x21: 'Turbomolecular Vacuum Pump',
+		0x22: 'Encoder',
+		0x23: 'Safety Discrete I/O Device',
+		0x24: 'Fluid Flow Controller',
+		0x25: 'CIP Motion Drive',
+		0x26: 'CompoNet Repeater',
+		0x27: 'Mass Flow Controller, Enhanced',
+		0x28: 'CIP Modbus Device',
+		0x29: 'CIP Modbus Translator',
+		0x2A: 'Safety Analog I/O Device',
+		0x2B: 'Generic Device (keyable)',
+		0x2C: 'Managed Switch',
+		0x32: 'ControlNet Physical Layer Component'}
+  
+	return deviceList
 
 # List originally came from Wireshark /epan/dissectors/packet-cip.c
-def VendorNames(vid):  
-  if vid==0: return "Reserved"
-  if vid==1: return "Rockwell Automation/Allen-Bradley"
-  if vid==2: return "Namco Controls Corp."
-  if vid==3: return "Honeywell Inc."
-  if vid==4: return "Parker Hannifin Corp. (Veriflo Division)"
-  if vid==5: return "Rockwell Automation/Reliance Elec."
-  if vid==6: return "Reserved"
-  if vid==7: return "SMC Corporation"
-  if vid==8: return "Molex Incorporated"
-  if vid==9: return "Western Reserve Controls Corp."
-  if vid==10: return "Advanced Micro Controls Inc. (AMCI)"
-  if vid==11: return "ASCO Pneumatic Controls"
-  if vid==12: return "Banner Engineering Corp."
-  if vid==13: return "Belden Wire & Cable Company"
-  if vid==14: return "Cooper Interconnect"
-  if vid==15: return "Reserved"
-  if vid==16: return "Daniel Woodhead Co. (Woodhead Connectivity)"
-  if vid==17: return "Dearborn Group Inc."
-  if vid==18: return "Reserved"
-  if vid==19: return "Helm Instrument Company"
-  if vid==20: return "Huron Net Works"
-  if vid==21: return "Lumberg, Inc."
-  if vid==22: return "Online Development Inc.(Automation Value)"
-  if vid==23: return "Vorne Industries, Inc."
-  if vid==24: return "ODVA Special Reserve"
-  if vid==25: return "Reserved"
-  if vid==26: return "Festo Corporation"
-  if vid==27: return "Reserved"
-  if vid==28: return "Reserved"
-  if vid==29: return "Reserved"
-  if vid==30: return "Unico, Inc."
-  if vid==31: return "Ross Controls"
-  if vid==32: return "Reserved"
-  if vid==33: return "Reserved"
-  if vid==34: return "Hohner Corp."
-  if vid==35: return "Micro Mo Electronics, Inc."
-  if vid==36: return "MKS Instruments, Inc."
-  if vid==37: return "Yaskawa Electric America formerly Magnetek Drives"
-  if vid==38: return "Reserved"
-  if vid==39: return "AVG Automation (Uticor)"
-  if vid==40: return "Wago Corporation"
-  if vid==41: return "Kinetics (Unit Instruments)"
-  if vid==42: return "IMI Norgren Limited"
-  if vid==43: return "BALLUFF, Inc."
-  if vid==44: return "Yaskawa Electric America, Inc."
-  if vid==45: return "Eurotherm Controls Inc"
-  if vid==46: return "ABB Industrial Systems"
-  if vid==47: return "Omron Corporation"
-  if vid==48: return "TURCk, Inc."
-  if vid==49: return "Grayhill Inc."
-  if vid==50: return "Real Time Automation (C&ID)"
-  if vid==51: return "Reserved"
-  if vid==52: return "Numatics, Inc."
-  if vid==53: return "Lutze, Inc."
-  if vid==54: return "Reserved"
-  if vid==55: return "Reserved"
-  if vid==56: return "Softing GmbH"
-  if vid==57: return "Pepperl + Fuchs"
-  if vid==58: return "Spectrum Controls, Inc."
-  if vid==59: return "D.I.P. Inc. MKS Inst."
-  if vid==60: return "Applied Motion Products, Inc."
-  if vid==61: return "Sencon Inc."
-  if vid==62: return "High Country Tek"
-  if vid==63: return "SWAC Automation Consult GmbH"
-  if vid==64: return "Clippard Instrument Laboratory"
-  if vid==65: return "Reserved"
-  if vid==66: return "Reserved"
-  if vid==67: return "Reserved"
-  if vid==68: return "Eaton Electrical"
-  if vid==69: return "Reserved"
-  if vid==70: return "Reserved"
-  if vid==71: return "Toshiba International Corp."
-  if vid==72: return "Control Technology Incorporated"
-  if vid==73: return "TCS (NZ) Ltd."
-  if vid==74: return "Hitachi, Ltd."
-  if vid==75: return "ABB Robotics Products AB"
-  if vid==76: return "NKE Corporation"
-  if vid==77: return "Rockwell Software, Inc."
-  if vid==78: return "Escort Memory Systems (A Datalogic Group Co.)"
-  if vid==79: return "Reserved"
-  if vid==80: return "Industrial Devices Corporation"
-  if vid==81: return "IXXAT Automation GmbH"
-  if vid==82: return "Mitsubishi Electric Automation, Inc."
-  if vid==83: return "OPTO-22"
-  if vid==84: return "Reserved"
-  if vid==85: return "Reserved"
-  if vid==86: return "Horner Electric"
-  if vid==87: return "Burkert Werke GmbH & Co. KG"
-  if vid==88: return "Reserved"
-  if vid==89: return "Industrial Indexing Systems, Inc."
-  if vid==90: return "HMS Industrial Networks AB"
-  if vid==91: return "Robicon"
-  if vid==92: return "Helix Technology (Granville-Phillips)"
-  if vid==93: return "Arlington Laboratory"
-  if vid==94: return "Advantech Co. Ltd."
-  if vid==95: return "Square D Company"
-  if vid==96: return "Digital Electronics Corp."
-  if vid==97: return "Danfoss"
-  if vid==98: return "Reserved"
-  if vid==99: return "Reserved"
-  if vid==100: return "Bosch Rexroth Corporation, Pneumatics"
-  if vid==101: return "Applied Materials, Inc."
-  if vid==102: return "Showa Electric Wire & Cable Co."
-  if vid==103: return "Pacific Scientific (API Controls Inc.)"
-  if vid==104: return "Sharp Manufacturing Systems Corp."
-  if vid==105: return "Olflex Wire & Cable, Inc."
-  if vid==106: return "Reserved"
-  if vid==107: return "Unitrode"
-  if vid==108: return "Beckhoff Automation GmbH"
-  if vid==109: return "National Instruments"
-  if vid==110: return "Mykrolis Corporations (Millipore)"
-  if vid==111: return "International Motion Controls Corp."
-  if vid==112: return "Reserved"
-  if vid==113: return "SEG Kempen GmbH"
-  if vid==114: return "Reserved"
-  if vid==115: return "Reserved"
-  if vid==116: return "MTS Systems Corp."
-  if vid==117: return "Krones, Inc"
-  if vid==118: return "Reserved"
-  if vid==119: return "EXOR Electronic R & D"
-  if vid==120: return "SIEI S.p.A."
-  if vid==121: return "KUKA Roboter GmbH"
-  if vid==122: return "Reserved"
-  if vid==123: return "SEC (Samsung Electronics Co., Ltd)"
-  if vid==124: return "Binary Electronics Ltd"
-  if vid==125: return "Flexible Machine Controls"
-  if vid==126: return "Reserved"
-  if vid==127: return "ABB Inc. (Entrelec)"
-  if vid==128: return "MAC Valves, Inc."
-  if vid==129: return "Auma Actuators Inc"
-  if vid==130: return "Toyoda Machine Works, Ltd"
-  if vid==131: return "Reserved"
-  if vid==132: return "Reserved"
-  if vid==133: return "Balogh T.A.G., Corporation"
-  if vid==134: return "TR Systemtechnik GmbH"
-  if vid==135: return "UNIPULSE Corporation"
-  if vid==136: return "Reserved"
-  if vid==137: return "Reserved"
-  if vid==138: return "Conxall Corporation Inc."
-  if vid==139: return "Reserved"
-  if vid==140: return "Reserved"
-  if vid==141: return "Kuramo Electric Co., Ltd."
-  if vid==142: return "Creative Micro Designs"
-  if vid==143: return "GE Industrial Systems"
-  if vid==144: return "Leybold Vacuum GmbH"
-  if vid==145: return "Siemens Energy & Automation/Drives"
-  if vid==146: return "Kodensha Ltd"
-  if vid==147: return "Motion Engineering, Inc."
-  if vid==148: return "Honda Engineering Co., Ltd"
-  if vid==149: return "EIM Valve Controls"
-  if vid==150: return "Melec Inc."
-  if vid==151: return "Sony Manufacturing Systems Corporation"
-  if vid==152: return "North American Mfg."
-  if vid==153: return "WATLOW"
-  if vid==154: return "Japan Radio Co., Ltd"
-  if vid==155: return "NADEX Co., Ltd"
-  if vid==156: return "Ametek Automation & Process Technologies"
-  if vid==157: return "Reserved"
-  if vid==158: return "KVASER AB"
-  if vid==159: return "IDEC IZUMI Corporation"
-  if vid==160: return "Mitsubishi Heavy Industries Ltd"
-  if vid==161: return "Mitsubishi Electric Corporation"
-  if vid==162: return "Horiba-STEC Inc."
-  if vid==163: return "esd electronic system design gmbh"
-  if vid==164: return "DAIHEN Corporation"
-  if vid==165: return "Tyco Valves & Controls/Keystone"
-  if vid==166: return "EBARA Corporation"
-  if vid==167: return "Reserved"
-  if vid==168: return "Reserved"
-  if vid==169: return "Hokuyo Electric Co. Ltd"
-  if vid==170: return "Pyramid Solutions, Inc."
-  if vid==171: return "Denso Wave Incorporated"
-  if vid==172: return "HLS Hard-Line Solutions Inc"
-  if vid==173: return "Caterpillar, Inc."
-  if vid==174: return "PDL Electronics Ltd."
-  if vid==175: return "Reserved"
-  if vid==176: return "Red Lion Controls"
-  if vid==177: return "ANELVA Corporation"
-  if vid==178: return "Toyo Denki Seizo KK"
-  if vid==179: return "Sanyo Denki Co., Ltd"
-  if vid==180: return "Advanced Energy Japan K.K. (Aera Japan)"
-  if vid==181: return "Pilz GmbH & Co"
-  if vid==182: return "Marsh Bellofram-Bellofram PCD Division"
-  if vid==183: return "Reserved"
-  if vid==184: return "M-SYSTEM Co. Ltd"
-  if vid==185: return "Nissin Electric Co., Ltd"
-  if vid==186: return "Hitachi Metals Ltd."
-  if vid==187: return "Oriental Motor Company"
-  if vid==188: return "A&D Co., Ltd"
-  if vid==189: return "Phasetronics, Inc."
-  if vid==190: return "Cummins Engine Company"
-  if vid==191: return "Deltron Inc."
-  if vid==192: return "Geneer Corporation"
-  if vid==193: return "Anatol Automation, Inc."
-  if vid==194: return "Reserved"
-  if vid==195: return "Reserved"
-  if vid==196: return "Medar, Inc."
-  if vid==197: return "Comdel Inc."
-  if vid==198: return "Advanced Energy Industries, Inc"
-  if vid==199: return "Reserved"
-  if vid==200: return "DAIDEN Co., Ltd"
-  if vid==201: return "CKD Corporation"
-  if vid==202: return "Toyo Electric Corporation"
-  if vid==203: return "Reserved"
-  if vid==204: return "AuCom Electronics Ltd"
-  if vid==205: return "Shinko Electric Co., Ltd"
-  if vid==206: return "Vector Informatik GmbH"
-  if vid==207: return "Reserved"
-  if vid==208: return "Moog Inc."
-  if vid==209: return "Contemporary Controls"
-  if vid==210: return "Tokyo Sokki Kenkyujo Co., Ltd"
-  if vid==211: return "Schenck-AccuRate, Inc."
-  if vid==212: return "The Oilgear Company"
-  if vid==213: return "Reserved"
-  if vid==214: return "ASM Japan K.K."
-  if vid==215: return "HIRATA Corp."
-  if vid==216: return "SUNX Limited"
-  if vid==217: return "Meidensha Corp."
-  if vid==218: return "NIDEC SANKYO CORPORATION (Sankyo Seiki Mfg. Co., Ltd)"
-  if vid==219: return "KAMRO Corp."
-  if vid==220: return "Nippon System Development Co., Ltd"
-  if vid==221: return "EBARA Technologies Inc."
-  if vid==222: return "Reserved"
-  if vid==223: return "Reserved"
-  if vid==224: return "SG Co., Ltd"
-  if vid==225: return "Vaasa Institute of Technology"
-  if vid==226: return "MKS Instruments (ENI Technology)"
-  if vid==227: return "Tateyama System Laboratory Co., Ltd."
-  if vid==228: return "QLOG Corporation"
-  if vid==229: return "Matric Limited Inc."
-  if vid==230: return "NSD Corporation"
-  if vid==231: return "Reserved"
-  if vid==232: return "Sumitomo Wiring Systems, Ltd"
-  if vid==233: return "Group 3 Technology Ltd"
-  if vid==234: return "CTI Cryogenics"
-  if vid==235: return "POLSYS CORP"
-  if vid==236: return "Ampere Inc."
-  if vid==237: return "Reserved"
-  if vid==238: return "Simplatroll Ltd"
-  if vid==239: return "Reserved"
-  if vid==240: return "Reserved"
-  if vid==241: return "Leading Edge Design"
-  if vid==242: return "Humphrey Products"
-  if vid==243: return "Schneider Automation, Inc."
-  if vid==244: return "Westlock Controls Corp."
-  if vid==245: return "Nihon Weidmuller Co., Ltd"
-  if vid==246: return "Brooks Instrument (Div. of Emerson)"
-  if vid==247: return "Reserved"
-  if vid==248: return " Moeller GmbH"
-  if vid==249: return "Varian Vacuum Products"
-  if vid==250: return "Yokogawa Electric Corporation"
-  if vid==251: return "Electrical Design Daiyu Co., Ltd"
-  if vid==252: return "Omron Software Co., Ltd"
-  if vid==253: return "BOC Edwards"
-  if vid==254: return "Control Technology Corporation"
-  if vid==255: return "Bosch Rexroth"
-  if vid==256: return "Turck"
-  if vid==257: return "Control Techniques PLC"
-  if vid==258: return "Hardy Instruments, Inc."
-  if vid==259: return "LS Industrial Systems"
-  if vid==260: return "E.O.A. Systems Inc."
-  if vid==261: return "Reserved"
-  if vid==262: return "New Cosmos Electric Co., Ltd."
-  if vid==263: return "Sense Eletronica LTDA"
-  if vid==264: return "Xycom, Inc."
-  if vid==265: return "Baldor Electric"
-  if vid==266: return "Reserved"
-  if vid==267: return "Patlite Corporation"
-  if vid==268: return "Reserved"
-  if vid==269: return "Mogami Wire & Cable Corporation"
-  if vid==270: return "Welding Technology Corporation (WTC)"
-  if vid==271: return "Reserved"
-  if vid==272: return "Deutschmann Automation GmbH"
-  if vid==273: return "ICP Panel-Tec Inc."
-  if vid==274: return "Bray Controls USA"
-  if vid==275: return "Reserved"
-  if vid==276: return "Status Technologies"
-  if vid==277: return "Trio Motion Technology Ltd"
-  if vid==278: return "Sherrex Systems Ltd"
-  if vid==279: return "Adept Technology, Inc."
-  if vid==280: return "Spang Power Electronics"
-  if vid==281: return "Reserved"
-  if vid==282: return "Acrosser Technology Co., Ltd"
-  if vid==283: return "Hilscher GmbH"
-  if vid==284: return "IMAX Corporation"
-  if vid==285: return "Electronic Innovation, Inc. (Falter Engineering)"
-  if vid==286: return "Netlogic Inc."
-  if vid==287: return "Bosch Rexroth Corporation, Indramat"
-  if vid==288: return "Reserved"
-  if vid==289: return "Reserved"
-  if vid==290: return "Murata  Machinery Ltd."
-  if vid==291: return "MTT Company Ltd."
-  if vid==292: return "Kanematsu Semiconductor Corp."
-  if vid==293: return "Takebishi Electric Sales Co."
-  if vid==294: return "Tokyo Electron Device Ltd"
-  if vid==295: return "PFU Limited"
-  if vid==296: return "Hakko Automation Co., Ltd."
-  if vid==297: return "Advanet Inc."
-  if vid==298: return "Tokyo Electron Software Technologies Ltd."
-  if vid==299: return "Reserved"
-  if vid==300: return "Shinagawa Electric Wire Co., Ltd."
-  if vid==301: return "Yokogawa M&C Corporation"
-  if vid==302: return "KONAN Electric Co., Ltd."
-  if vid==303: return "Binar Elektronik AB"
-  if vid==304: return "Furukawa Electric Co."
-  if vid==305: return "Cooper Energy Services"
-  if vid==306: return "Schleicher GmbH & Co."
-  if vid==307: return "Hirose Electric Co., Ltd"
-  if vid==308: return "Western Servo Design Inc."
-  if vid==309: return "Prosoft Technology"
-  if vid==310: return "Reserved"
-  if vid==311: return "Towa Shoko Co., Ltd"
-  if vid==312: return "Kyopal Co., Ltd"
-  if vid==313: return "Extron Co."
-  if vid==314: return "Wieland Electric GmbH"
-  if vid==315: return "SEW Eurodrive GmbH"
-  if vid==316: return "Aera Corporation"
-  if vid==317: return "STA Reutlingen"
-  if vid==318: return "Reserved"
-  if vid==319: return "Fuji Electric Co., Ltd."
-  if vid==320: return "Reserved"
-  if vid==321: return "Reserved"
-  if vid==322: return "ifm efector, inc."
-  if vid==323: return "Reserved"
-  if vid==324: return "IDEACOD-Hohner Automation S.A."
-  if vid==325: return "CommScope Inc."
-  if vid==326: return "GE Fanuc Automation North America, Inc."
-  if vid==327: return "Matsushita Electric Industrial Co., Ltd"
-  if vid==328: return "Okaya Electronics Corporation"
-  if vid==329: return "KASHIYAMA Industries, Ltd"
-  if vid==330: return "JVC"
-  if vid==331: return "Interface Corporation"
-  if vid==332: return "Grape Systems Inc."
-  if vid==333: return "Reserved"
-  if vid==334: return "Reserved"
-  if vid==335: return "Toshiba IT & Control Systems Corporation"
-  if vid==336: return "Sanyo Machine Works, Ltd."
-  if vid==337: return "Vansco Electronics Ltd."
-  if vid==338: return "Dart Container Corp."
-  if vid==339: return "Livingston & Co., Inc."
-  if vid==340: return "Alfa Laval LKM as"
-  if vid==341: return "BF ENTRON Ltd. (British Federal)"
-  if vid==342: return "Bekaert Engineering NV"
-  if vid==343: return "Ferran  Scientific Inc."
-  if vid==344: return "KEBA AG"
-  if vid==345: return "Endress + Hauser"
-  if vid==346: return "Reserved"
-  if vid==347: return "ABB ALSTOM Power UK Ltd. (EGT)"
-  if vid==348: return "Berger Lahr GmbH"
-  if vid==349: return "Reserved"
-  if vid==350: return "Federal Signal Corp."
-  if vid==351: return "Kawasaki Robotics (USA), Inc."
-  if vid==352: return "Bently Nevada Corporation"
-  if vid==353: return "Reserved"
-  if vid==354: return "FRABA Posital GmbH"
-  if vid==355: return "Elsag Bailey, Inc."
-  if vid==356: return "Fanuc Robotics America"
-  if vid==357: return "Reserved"
-  if vid==358: return "Surface Combustion, Inc."
-  if vid==359: return "Reserved"
-  if vid==360: return "AILES Electronics Ind. Co., Ltd."
-  if vid==361: return "Wonderware Corporation"
-  if vid==362: return "Particle Measuring Systems, Inc."
-  if vid==363: return "Reserved"
-  if vid==364: return "Reserved"
-  if vid==365: return "BITS Co., Ltd"
-  if vid==366: return "Japan Aviation Electronics Industry Ltd"
-  if vid==367: return "Keyence Corporation"
-  if vid==368: return "Kuroda Precision Industries Ltd."
-  if vid==369: return "Mitsubishi Electric Semiconductor Application"
-  if vid==370: return "Nippon Seisen Cable, Ltd."
-  if vid==371: return "Omron ASO Co., Ltd"
-  if vid==372: return "Seiko Seiki Co., Ltd."
-  if vid==373: return "Sumitomo Heavy Industries, Ltd."
-  if vid==374: return "Tango Computer Service Corporation"
-  if vid==375: return "Technology Service, Inc."
-  if vid==376: return "Toshiba Information Systems (Japan) Corporation"
-  if vid==377: return "TOSHIBA Schneider Inverter Corporation"
-  if vid==378: return "Toyooki Kogyo Co., Ltd."
-  if vid==379: return "XEBEC"
-  if vid==380: return "Madison Cable Corporation"
-  if vid==381: return "Hitati Engineering & Services Co., Ltd"
-  if vid==382: return "TEM-TECH Lab Co., Ltd"
-  if vid==383: return "International Laboratory Corporation"
-  if vid==384: return "Dyadic Systems Co., Ltd."
-  if vid==385: return "SETO Electronics Industry Co., Ltd"
-  if vid==386: return "Tokyo Electron Kyushu Limited"
-  if vid==387: return "KEI System Co., Ltd"
-  if vid==388: return "Reserved"
-  if vid==389: return "Asahi Engineering Co., Ltd"
-  if vid==390: return "Contrex Inc."
-  if vid==391: return "Paradigm Controls Ltd."
-  if vid==392: return "Reserved"
-  if vid==393: return "Ohm Electric Co., Ltd."
-  if vid==394: return "RKC Instrument Inc."
-  if vid==395: return "Suzuki Motor Corporation"
-  if vid==396: return "Custom Servo Motors Inc."
-  if vid==397: return "PACE Control Systems"
-  if vid==398: return "Reserved"
-  if vid==399: return "Reserved"
-  if vid==400: return "LINTEC Co., Ltd."
-  if vid==401: return "Hitachi Cable Ltd."
-  if vid==402: return "BUSWARE Direct"
-  if vid==403: return "Eaton Electric B.V. (former Holec Holland N.V.)"
-  if vid==404: return "VAT Vakuumventile AG"
-  if vid==405: return "Scientific Technologies Incorporated"
-  if vid==406: return "Alfa Instrumentos Eletronicos Ltda"
-  if vid==407: return "TWK Elektronik GmbH"
-  if vid==408: return "ABB Welding Systems AB"
-  if vid==409: return "BYSTRONIC Maschinen AG"
-  if vid==410: return "Kimura Electric Co., Ltd"
-  if vid==411: return "Nissei Plastic Industrial Co., Ltd"
-  if vid==412: return "Reserved"
-  if vid==413: return "Kistler-Morse Corporation"
-  if vid==414: return "Proteous Industries Inc."
-  if vid==415: return "IDC Corporation"
-  if vid==416: return "Nordson Corporation"
-  if vid==417: return "Rapistan Systems"
-  if vid==418: return "LP-Elektronik GmbH"
-  if vid==419: return "GERBI & FASE S.p.A.(Fase Saldatura)"
-  if vid==420: return "Phoenix Digital Corporation"
-  if vid==421: return "Z-World Engineering"
-  if vid==422: return "Honda R&D Co., Ltd."
-  if vid==423: return "Bionics Instrument Co., Ltd."
-  if vid==424: return "Teknic, Inc."
-  if vid==425: return "R.Stahl, Inc."
-  if vid==426: return "Reserved"
-  if vid==427: return "Ryco Graphic Manufacturing Inc."
-  if vid==428: return "Giddings & Lewis, Inc."
-  if vid==429: return "Koganei Corporation"
-  if vid==430: return "Reserved"
-  if vid==431: return "Nichigoh Communication Electric Wire Co., Ltd."
-  if vid==432: return "Reserved"
-  if vid==433: return "Fujikura Ltd."
-  if vid==434: return "AD Link Technology Inc."
-  if vid==435: return "StoneL Corporation"
-  if vid==436: return "Computer Optical Products, Inc."
-  if vid==437: return "CONOS Inc."
-  if vid==438: return "Erhardt + Leimer GmbH"
-  if vid==439: return "UNIQUE Co. Ltd"
-  if vid==440: return "Roboticsware, Inc."
-  if vid==441: return "Nachi Fujikoshi Corporation"
-  if vid==442: return "Hengstler GmbH"
-  if vid==443: return "Reserved"
-  if vid==444: return "SUNNY GIKEN Inc."
-  if vid==445: return "Lenze Drive Systems GmbH"
-  if vid==446: return "CD Systems B.V."
-  if vid==447: return "FMT/Aircraft Gate Support Systems AB"
-  if vid==448: return "Axiomatic Technologies Corp"
-  if vid==449: return "Embedded System Products, Inc."
-  if vid==450: return "Reserved"
-  if vid==451: return "Mencom Corporation"
-  if vid==452: return "Reserved"
-  if vid==453: return "Matsushita Welding Systems Co., Ltd."
-  if vid==454: return "Dengensha Mfg. Co. Ltd."
-  if vid==455: return "Quinn Systems Ltd."
-  if vid==456: return "Tellima Technology Ltd"
-  if vid==457: return "MDT, Software"
-  if vid==458: return "Taiwan Keiso Co., Ltd"
-  if vid==459: return "Pinnacle Systems"
-  if vid==460: return "Ascom Hasler Mailing Sys"
-  if vid==461: return "INSTRUMAR Limited"
-  if vid==462: return "Reserved"
-  if vid==463: return "Navistar International Transportation Corp"
-  if vid==464: return "Huettinger Elektronik GmbH + Co. KG"
-  if vid==465: return "OCM Technology Inc."
-  if vid==466: return "Professional Supply Inc."
-  if vid==467: return "Control Solutions"
-  if vid==468: return "Baumer IVO GmbH & Co. KG"
-  if vid==469: return "Worcester Controls Corporation"
-  if vid==470: return "Pyramid Technical Consultants, Inc."
-  if vid==471: return "Reserved"
-  if vid==472: return "Apollo Fire Detectors Limited"
-  if vid==473: return "Avtron Manufacturing, Inc."
-  if vid==474: return "Reserved"
-  if vid==475: return "Tokyo Keiso Co., Ltd."
-  if vid==476: return "Daishowa Swiki Co., Ltd."
-  if vid==477: return "Kojima Instruments Inc."
-  if vid==478: return "Shimadzu Corporation"
-  if vid==479: return "Tatsuta Electric Wire & Cable Co., Ltd."
-  if vid==480: return "MECS Corporation"
-  if vid==481: return "Tahara Electric"
-  if vid==482: return "Koyo Electronics"
-  if vid==483: return "Clever Devices"
-  if vid==484: return "GCD Hardware & Software GmbH"
-  if vid==485: return "Reserved"
-  if vid==486: return "Miller Electric Mfg Co."
-  if vid==487: return "GEA Tuchenhagen GmbH"
-  if vid==488: return "Riken Keiki Co., LTD"
-  if vid==489: return "Keisokugiken Corporation"
-  if vid==490: return "Fuji Machine Mfg. Co., Ltd"
-  if vid==491: return "Reserved"
-  if vid==492: return "Nidec-Shimpo Corp."
-  if vid==493: return "UTEC Corporation"
-  if vid==494: return "Sanyo Electric Co. Ltd."
-  if vid==495: return "Reserved"
-  if vid==496: return "Reserved"
-  if vid==497: return "Okano Electric Wire Co. Ltd"
-  if vid==498: return "Shimaden Co. Ltd."
-  if vid==499: return "Teddington Controls Ltd"
-  if vid==500: return "Reserved"
-  if vid==501: return "VIPA GmbH"
-  if vid==502: return "Warwick Manufacturing Group"
-  if vid==503: return "Danaher Controls"
-  if vid==504: return "Reserved"
-  if vid==505: return "Reserved"
-  if vid==506: return "American Science & Engineering"
-  if vid==507: return "Accutron Controls International Inc."
-  if vid==508: return "Norcott Technologies Ltd"
-  if vid==509: return "TB Woods, Inc"
-  if vid==510: return "Proportion-Air, Inc."
-  if vid==511: return "SICK Stegmann GmbH"
-  if vid==512: return "Reserved"
-  if vid==513: return "Edwards Signaling"
-  if vid==514: return "Sumitomo Metal Industries, Ltd"
-  if vid==515: return "Cosmo Instruments Co., Ltd."
-  if vid==516: return "Denshosha Co., Ltd."
-  if vid==517: return "Kaijo Corp."
-  if vid==518: return "Michiproducts Co., Ltd."
-  if vid==519: return "Miura Corporation"
-  if vid==520: return "TG Information Network Co., Ltd."
-  if vid==521: return "Fujikin , Inc."
-  if vid==522: return "Estic Corp."
-  if vid==523: return "GS Hydraulic Sales"
-  if vid==524: return "Reserved"
-  if vid==525: return "MTE Limited"
-  if vid==526: return "Hyde Park Electronics, Inc."
-  if vid==527: return "Pfeiffer Vacuum GmbH"
-  if vid==528: return "Cyberlogic Technologies"
-  if vid==529: return "OKUMA Corporation FA Systems Division"
-  if vid==530: return "Reserved"
-  if vid==531: return "Hitachi Kokusai Electric Co., Ltd."
-  if vid==532: return "SHINKO TECHNOS Co., Ltd."
-  if vid==533: return "Itoh Electric Co., Ltd."
-  if vid==534: return "Colorado Flow Tech Inc."
-  if vid==535: return "Love Controls Division/Dwyer Inst."
-  if vid==536: return "Alstom Drives and Controls"
-  if vid==537: return "The Foxboro Company"
-  if vid==538: return "Tescom Corporation"
-  if vid==539: return "Reserved"
-  if vid==540: return "Atlas Copco Controls UK"
-  if vid==541: return "Reserved"
-  if vid==542: return "Autojet Technologies"
-  if vid==543: return "Prima Electronics S.p.A."
-  if vid==544: return "PMA GmbH"
-  if vid==545: return "Shimafuji Electric Co., Ltd"
-  if vid==546: return "Oki Electric Industry Co., Ltd"
-  if vid==547: return "Kyushu Matsushita Electric Co., Ltd"
-  if vid==548: return "Nihon Electric Wire & Cable Co., Ltd"
-  if vid==549: return "Tsuken Electric Ind Co., Ltd"
-  if vid==550: return "Tamadic Co."
-  if vid==551: return "MAATEL SA"
-  if vid==552: return "OKUMA America"
-  if vid==553: return "Control Techniques PLC-NA"
-  if vid==554: return "TPC Wire & Cable"
-  if vid==555: return "ATI Industrial Automation"
-  if vid==556: return "Microcontrol (Australia) Pty Ltd"
-  if vid==557: return "Serra Soldadura, S.A."
-  if vid==558: return "Southwest Research Institute"
-  if vid==559: return "Cabinplant International"
-  if vid==560: return "Sartorius Mechatronics T&H GmbH"
-  if vid==561: return "Comau S.p.A. Robotics & Final Assembly Division"
-  if vid==562: return "Phoenix Contact"
-  if vid==563: return "Yokogawa MAT Corporation"
-  if vid==564: return "asahi sangyo co., ltd."
-  if vid==565: return "Reserved"
-  if vid==566: return "Akita Myotoku Ltd."
-  if vid==567: return "OBARA Corp."
-  if vid==568: return "Suetron Electronic GmbH"
-  if vid==569: return "Reserved"
-  if vid==570: return "Serck Controls Limited"
-  if vid==571: return "Fairchild Industrial Products Company"
-  if vid==572: return "ARO S.A."
-  if vid==573: return "M2C GmbH"
-  if vid==574: return "Shin Caterpillar Mitsubishi Ltd."
-  if vid==575: return "Santest Co., Ltd."
-  if vid==576: return "Cosmotechs Co., Ltd."
-  if vid==577: return "Hitachi Electric Systems"
-  if vid==578: return "Smartscan Ltd"
-  if vid==579: return "Woodhead Software & Electronics France"
-  if vid==580: return "Athena Controls, Inc."
-  if vid==581: return "Syron Engineering & Manufacturing, Inc."
-  if vid==582: return "Asahi Optical Co., Ltd."
-  if vid==583: return "Sansha Electric Mfg. Co., Ltd."
-  if vid==584: return "Nikki Denso Co., Ltd."
-  if vid==585: return "Star Micronics, Co., Ltd."
-  if vid==586: return "Ecotecnia Socirtat Corp."
-  if vid==587: return "AC Technology Corp."
-  if vid==588: return "West Instruments Limited"
-  if vid==589: return "NTI Limited"
-  if vid==590: return "Delta Computer Systems, Inc."
-  if vid==591: return "FANUC Ltd."
-  if vid==592: return "Hearn-Gu Lee"
-  if vid==593: return "ABB Automation Products"
-  if vid==594: return "Orion Machinery Co., Ltd."
-  if vid==595: return "Reserved"
-  if vid==596: return "Wire-Pro, Inc."
-  if vid==597: return "Beijing Huakong Technology Co. Ltd."
-  if vid==598: return "Yokoyama Shokai Co., Ltd."
-  if vid==599: return "Toyogiken Co., Ltd."
-  if vid==600: return "Coester Equipamentos Eletronicos Ltda."
-  if vid==601: return "Reserved"
-  if vid==602: return "Electroplating Engineers of Japan Ltd."
-  if vid==603: return "ROBOX S.p.A."
-  if vid==604: return "Spraying Systems Company"
-  if vid==605: return "Benshaw Inc."
-  if vid==606: return "ZPA-DP A.S."
-  if vid==607: return "Wired Rite Systems"
-  if vid==608: return "Tandis Research, Inc."
-  if vid==609: return "SSD Drives GmbH"
-  if vid==610: return "ULVAC Japan Ltd."
-  if vid==611: return "DYNAX Corporation"
-  if vid==612: return "Nor-Cal Products, Inc."
-  if vid==613: return "Aros Electronics AB"
-  if vid==614: return "Jun-Tech Co., Ltd."
-  if vid==615: return "HAN-MI Co. Ltd."
-  if vid==616: return "uniNtech (formerly SungGi Internet)"
-  if vid==617: return "Hae Pyung Electronics Reserch Institute"
-  if vid==618: return "Milwaukee Electronics"
-  if vid==619: return "OBERG Industries"
-  if vid==620: return "Parker Hannifin/Compumotor Division"
-  if vid==621: return "TECHNO DIGITAL CORPORATION"
-  if vid==622: return "Network Supply Co., Ltd."
-  if vid==623: return "Union Electronics Co., Ltd."
-  if vid==624: return "Tritronics Services PM Ltd."
-  if vid==625: return "Rockwell Automation-Sprecher+Schuh"
-  if vid==626: return "Matsushita Electric Industrial Co., Ltd/Motor Co."
-  if vid==627: return "Rolls-Royce Energy Systems, Inc."
-  if vid==628: return "JEONGIL INTERCOM CO., LTD"
-  if vid==629: return "Interroll Corp."
-  if vid==630: return "Hubbell Wiring Device-Kellems (Delaware)"
-  if vid==631: return "Intelligent Motion Systems"
-  if vid==632: return "Reserved"
-  if vid==633: return "INFICON AG"
-  if vid==634: return "Hirschmann, Inc."
-  if vid==635: return "The Siemon Company"
-  if vid==636: return "YAMAHA Motor Co. Ltd."
-  if vid==637: return "aska corporation"
-  if vid==638: return "Woodhead Connectivity"
-  if vid==639: return "Trimble AB"
-  if vid==640: return "Murrelektronik GmbH"
-  if vid==641: return "Creatrix Labs, Inc."
-  if vid==642: return "TopWorx"
-  if vid==643: return "Kumho Industrial Co., Ltd."
-  if vid==644: return "Wind River Systems, Inc."
-  if vid==645: return "Bihl & Wiedemann GmbH"
-  if vid==646: return "Harmonic Drive Systems Inc."
-  if vid==647: return "Rikei Corporation"
-  if vid==648: return "BL Autotec, Ltd."
-  if vid==649: return "Hana Information & Technology Co., Ltd."
-  if vid==650: return "Seoil Electric Co., Ltd."
-  if vid==651: return "Fife Corporation"
-  if vid==652: return "Shanghai Electrical Apparatus Research Institute"
-  if vid==653: return "Reserved"
-  if vid==654: return "Parasense Development Centre"
-  if vid==655: return "Reserved"
-  if vid==656: return "Reserved"
-  if vid==657: return "Six Tau S.p.A."
-  if vid==658: return "Aucos GmbH"
-  if vid==659: return "Rotork Controls"
-  if vid==660: return "Automationdirect.com"
-  if vid==661: return "Thermo BLH"
-  if vid==662: return "System Controls, Ltd."
-  if vid==663: return "Univer S.p.A."
-  if vid==664: return "MKS-Tenta Technology"
-  if vid==665: return "Lika Electronic SNC"
-  if vid==666: return "Mettler-Toledo, Inc."
-  if vid==667: return "DXL USA Inc."
-  if vid==668: return "Rockwell Automation/Entek IRD Intl."
-  if vid==669: return "Nippon Otis Elevator Company"
-  if vid==670: return "Sinano Electric, Co., Ltd."
-  if vid==671: return "Sony Manufacturing Systems"
-  if vid==672: return "Reserved"
-  if vid==673: return "Contec Co., Ltd."
-  if vid==674: return "Automated Solutions"
-  if vid==675: return "Controlweigh"
-  if vid==676: return "Reserved"
-  if vid==677: return "Fincor Electronics"
-  if vid==678: return "Cognex Corporation"
-  if vid==679: return "Qualiflow"
-  if vid==680: return "Weidmuller, Inc."
-  if vid==681: return "Morinaga Milk Industry Co., Ltd."
-  if vid==682: return "Takagi Industrial Co., Ltd."
-  if vid==683: return "Wittenstein AG"
-  if vid==684: return "Sena Technologies, Inc."
-  if vid==685: return "Reserved"
-  if vid==686: return "APV Products Unna"
-  if vid==687: return "Creator Teknisk Utvedkling AB"
-  if vid==688: return "Reserved"
-  if vid==689: return "Mibu Denki Industrial Co., Ltd."
-  if vid==690: return "Takamastsu Machineer Section"
-  if vid==691: return "Startco Engineering Ltd."
-  if vid==692: return "Reserved"
-  if vid==693: return "Holjeron"
-  if vid==694: return "ALCATEL High Vacuum Technology"
-  if vid==695: return "Taesan LCD Co., Ltd."
-  if vid==696: return "POSCON"
-  if vid==697: return "VMIC"
-  if vid==698: return "Matsushita Electric Works, Ltd."
-  if vid==699: return "IAI Corporation"
-  if vid==700: return "Horst GmbH"
-  if vid==701: return "MicroControl GmbH & Co."
-  if vid==702: return "Leine & Linde AB"
-  if vid==703: return "Reserved"
-  if vid==704: return "EC Elettronica Srl"
-  if vid==705: return "VIT Software HB"
-  if vid==706: return "Bronkhorst High-Tech B.V."
-  if vid==707: return "Optex Co., Ltd."
-  if vid==708: return "Yosio Electronic Co."
-  if vid==709: return "Terasaki Electric Co., Ltd."
-  if vid==710: return "Sodick Co., Ltd."
-  if vid==711: return "MTS Systems Corporation-Automation Division"
-  if vid==712: return "Mesa Systemtechnik"
-  if vid==713: return "SHIN HO SYSTEM Co., Ltd."
-  if vid==714: return "Goyo Electronics Co, Ltd."
-  if vid==715: return "Loreme"
-  if vid==716: return "SAB Brockskes GmbH & Co. KG"
-  if vid==717: return "Trumpf Laser GmbH + Co. KG"
-  if vid==718: return "Niigata Electronic Instruments Co., Ltd."
-  if vid==719: return "Yokogawa Digital Computer Corporation"
-  if vid==720: return "O.N. Electronic Co., Ltd."
-  if vid==721: return "Industrial Control  Communication, Inc."
-  if vid==722: return "ABB, Inc."
-  if vid==723: return "ElectroWave USA, Inc."
-  if vid==724: return "Industrial Network Controls, LLC"
-  if vid==725: return "KDT Systems Co., Ltd."
-  if vid==726: return "SEFA Technology Inc."
-  if vid==727: return "Nippon POP Rivets and Fasteners Ltd."
-  if vid==728: return "Yamato Scale Co., Ltd."
-  if vid==729: return "Zener Electric"
-  if vid==730: return "GSE Scale Systems"
-  if vid==731: return "ISAS (Integrated Switchgear & Sys. Pty Ltd)"
-  if vid==732: return "Beta LaserMike Limited"
-  if vid==733: return "TOEI Electric Co., Ltd."
-  if vid==734: return "Hakko Electronics Co., Ltd"
-  if vid==735: return "Reserved"
-  if vid==736: return "RFID, Inc."
-  if vid==737: return "Adwin Corporation"
-  if vid==738: return "Osaka Vacuum, Ltd."
-  if vid==739: return "A-Kyung Motion, Inc."
-  if vid==740: return "Camozzi S.P. A."
-  if vid==741: return "Crevis Co., LTD"
-  if vid==742: return "Rice Lake Weighing Systems"
-  if vid==743: return "Linux Network Services"
-  if vid==744: return "KEB Antriebstechnik GmbH"
-  if vid==745: return "Hagiwara Electric Co., Ltd."
-  if vid==746: return "Glass Inc. International"
-  if vid==747: return "Reserved"
-  if vid==748: return "DVT Corporation"
-  if vid==749: return "Woodward Governor"
-  if vid==750: return "Mosaic Systems, Inc."
-  if vid==751: return "Laserline GmbH"
-  if vid==752: return "COM-TEC, Inc."
-  if vid==753: return "Weed Instrument"
-  if vid==754: return "Prof-face European Technology Center"
-  if vid==755: return "Fuji Automation Co., Ltd."
-  if vid==756: return "Matsutame Co., Ltd."
-  if vid==757: return "Hitachi Via Mechanics, Ltd."
-  if vid==758: return "Dainippon Screen Mfg. Co. Ltd."
-  if vid==759: return "FLS Automation A/S"
-  if vid==760: return "ABB Stotz Kontakt GmbH"
-  if vid==761: return "Technical Marine Service"
-  if vid==762: return "Advanced Automation Associates, Inc."
-  if vid==763: return "Baumer Ident GmbH"
-  if vid==764: return "Tsubakimoto Chain Co."
-  if vid==765: return "Reserved"
-  if vid==766: return "Furukawa Co., Ltd."
-  if vid==767: return "Active Power"
-  if vid==768: return "CSIRO Mining Automation"
-  if vid==769: return "Matrix Integrated Systems"
-  if vid==770: return "Digitronic Automationsanlagen GmbH"
-  if vid==771: return "SICK STEGMANN Inc."
-  if vid==772: return "TAE-Antriebstechnik GmbH"
-  if vid==773: return "Electronic Solutions"
-  if vid==774: return "Rocon L.L.C."
-  if vid==775: return "Dijitized Communications Inc."
-  if vid==776: return "Asahi Organic Chemicals Industry Co., Ltd."
-  if vid==777: return "Hodensha"
-  if vid==778: return "Harting, Inc. NA"
-  if vid==779: return "Kubler GmbH"
-  if vid==780: return "Yamatake Corporation"
-  if vid==781: return "JEOL"
-  if vid==782: return "Yamatake Industrial Systems Co., Ltd."
-  if vid==783: return "HAEHNE Elektronische Messgerate GmbH"
-  if vid==784: return "Ci Technologies Pty Ltd (for Pelamos Industries)"
-  if vid==785: return "N. SCHLUMBERGER & CIE"
-  if vid==786: return "Teijin Seiki Co., Ltd."
-  if vid==787: return "DAIKIN Industries, Ltd"
-  if vid==788: return "RyuSyo Industrial Co., Ltd."
-  if vid==789: return "SAGINOMIYA SEISAKUSHO, INC."
-  if vid==790: return "Seishin Engineering Co., Ltd."
-  if vid==791: return "Japan Support System Ltd."
-  if vid==792: return "Decsys"
-  if vid==793: return "Metronix Messgerate u. Elektronik GmbH"
-  if vid==794: return "Reserved"
-  if vid==795: return "Vaccon Company, Inc."
-  if vid==796: return "Siemens Energy & Automation, Inc."
-  if vid==797: return "Ten X Technology, Inc."
-  if vid==798: return "Tyco Electronics"
-  if vid==799: return "Delta Power Electronics Center"
-  if vid==800: return "Denker"
-  if vid==801: return "Autonics Corporation"
-  if vid==802: return "JFE Electronic Engineering Pty. Ltd."
-  if vid==803: return "Reserved"
-  if vid==804: return "Electro-Sensors, Inc."
-  if vid==805: return "Digi International, Inc."
-  if vid==806: return "Texas Instruments"
-  if vid==807: return "ADTEC Plasma Technology Co., Ltd"
-  if vid==808: return "SICK AG"
-  if vid==809: return "Ethernet Peripherals, Inc."
-  if vid==810: return "Animatics Corporation"
-  if vid==811: return "Reserved"
-  if vid==812: return "Process Control Corporation"
-  if vid==813: return "SystemV. Inc."
-  if vid==814: return "Danaher Motion SRL"
-  if vid==815: return "SHINKAWA Sensor Technology, Inc."
-  if vid==816: return "Tesch GmbH & Co. KG"
-  if vid==817: return "Reserved"
-  if vid==818: return "Trend Controls Systems Ltd."
-  if vid==819: return "Guangzhou ZHIYUAN Electronic Co., Ltd."
-  if vid==820: return "Mykrolis Corporation"
-  if vid==821: return "Bethlehem Steel Corporation"
-  if vid==822: return "KK ICP"
-  if vid==823: return "Takemoto Denki Corporation"
-  if vid==824: return "The Montalvo Corporation"
-  if vid==825: return "Reserved"
-  if vid==826: return "LEONI Special Cables GmbH"
-  if vid==827: return "Reserved"
-  if vid==828: return "ONO SOKKI CO.,LTD."
-  if vid==829: return "Rockwell Samsung Automation"
-  if vid==830: return "SHINDENGEN ELECTRIC MFG. CO. LTD"
-  if vid==831: return "Origin Electric Co. Ltd."
-  if vid==832: return "Quest Technical Solutions, Inc."
-  if vid==833: return "LS Cable, Ltd."
-  if vid==834: return "Enercon-Nord Electronic GmbH"
-  if vid==835: return "Northwire Inc."
-  if vid==836: return "Engel Elektroantriebe GmbH"
-  if vid==837: return "The Stanley Works"
-  if vid==838: return "Celesco Transducer Products, Inc."
-  if vid==839: return "Chugoku Electric Wire and Cable Co."
-  if vid==840: return "Kongsberg Simrad AS"
-  if vid==841: return "Panduit Corporation"
-  if vid==842: return "Spellman High Voltage Electronics Corp."
-  if vid==843: return "Kokusai Electric Alpha Co., Ltd."
-  if vid==844: return "Brooks Automation, Inc."
-  if vid==845: return "ANYWIRE CORPORATION"
-  if vid==846: return "Honda Electronics Co. Ltd"
-  if vid==847: return "REO Elektronik AG"
-  if vid==848: return "Fusion UV Systems, Inc."
-  if vid==849: return "ASI Advanced Semiconductor Instruments GmbH"
-  if vid==850: return "Datalogic, Inc."
-  if vid==851: return "SoftPLC Corporation"
-  if vid==852: return "Dynisco Instruments LLC"
-  if vid==853: return "WEG Industrias SA"
-  if vid==854: return "Frontline Test Equipment, Inc."
-  if vid==855: return "Tamagawa Seiki Co., Ltd."
-  if vid==856: return "Multi Computing Co., Ltd."
-  if vid==857: return "RVSI"
-  if vid==858: return "Commercial Timesharing Inc."
-  if vid==859: return "Tennessee Rand Automation LLC"
-  if vid==860: return "Wacogiken Co., Ltd"
-  if vid==861: return "Reflex Integration Inc."
-  if vid==862: return "Siemens AG, A&D PI Flow Instruments"
-  if vid==863: return "G. Bachmann Electronic GmbH"
-  if vid==864: return "NT International"
-  if vid==865: return "Schweitzer Engineering Laboratories"
-  if vid==866: return "ATR Industrie-Elektronik GmbH Co."
-  if vid==867: return "PLASMATECH Co., Ltd"
-  if vid==868: return "Reserved"
-  if vid==869: return "GEMU GmbH & Co. KG"
-  if vid==870: return "Alcorn McBride Inc."
-  if vid==871: return "MORI SEIKI CO., LTD"
-  if vid==872: return "NodeTech Systems Ltd"
-  if vid==873: return "Emhart Teknologies"
-  if vid==874: return "Cervis, Inc."
-  if vid==875: return "FieldServer Technologies (Div Sierra Monitor Corp)"
-  if vid==876: return "NEDAP Power Supplies"
-  if vid==877: return "Nippon Sanso Corporation"
-  if vid==878: return "Mitomi Giken Co., Ltd."
-  if vid==879: return "PULS GmbH"
-  if vid==880: return "Reserved"
-  if vid==881: return "Japan Control Engineering Ltd"
-  if vid==882: return "Embedded Systems Korea (Former Zues Emtek Co Ltd.)"
-  if vid==883: return "Automa SRL"
-  if vid==884: return "Harms+Wende GmbH & Co KG"
-  if vid==885: return "SAE-STAHL GmbH"
-  if vid==886: return "Microwave Data Systems"
-  if vid==887: return "Bernecker + Rainer Industrie-Elektronik GmbH"
-  if vid==888: return "Hiprom Technologies"
-  if vid==889: return "Reserved"
-  if vid==890: return "Nitta Corporation"
-  if vid==891: return "Kontron Modular Computers GmbH"
-  if vid==892: return "Marlin Controls"
-  if vid==893: return "ELCIS s.r.l."
-  if vid==894: return "Acromag, Inc."
-  if vid==895: return "Avery Weigh-Tronix"
-  if vid==896: return "Reserved"
-  if vid==897: return "Reserved"
-  if vid==898: return "Reserved"
-  if vid==899: return "Practicon Ltd"
-  if vid==900: return "Schunk GmbH & Co. KG"
-  if vid==901: return "MYNAH Technologies"
-  if vid==902: return "Defontaine Groupe"
-  if vid==903: return "Emerson Process Management Power & Water Solutions"
-  if vid==904: return "F.A. Elec"
-  if vid==905: return "Hottinger Baldwin Messtechnik GmbH"
-  if vid==906: return "Coreco Imaging, Inc."
-  if vid==907: return "London Electronics Ltd."
-  if vid==908: return "HSD SpA"
-  if vid==909: return "Comtrol Corporation"
-  if vid==910: return "TEAM, S.A. (Tecnica Electronica de Automatismo Y Medida)"
-  if vid==911: return "MAN B&W Diesel Ltd. Regulateurs Europa"
-  if vid==912: return "Reserved"
-  if vid==913: return "Reserved"
-  if vid==914: return "Micro Motion, Inc."
-  if vid==915: return "Eckelmann AG"
-  if vid==916: return "Hanyoung Nux"
-  if vid==917: return "Ransburg Industrial Finishing KK"
-  if vid==918: return "Kun Hung Electric Co. Ltd."
-  if vid==919: return "Brimos wegbebakening b.v."
-  if vid==920: return "Nitto Seiki Co., Ltd"
-  if vid==921: return "PPT Vision, Inc."
-  if vid==922: return "Yamazaki Machinery Works"
-  if vid==923: return "SCHMIDT Technology GmbH"
-  if vid==924: return "Parker Hannifin SpA (SBC Division)"
-  if vid==925: return "HIMA Paul Hildebrandt GmbH"
-  if vid==926: return "RivaTek, Inc."
-  if vid==927: return "Misumi Corporation"
-  if vid==928: return "GE Multilin"
-  if vid==929: return "Measurement Computing Corporation"
-  if vid==930: return "Jetter AG"
-  if vid==931: return "Tokyo Electronics Systems Corporation"
-  if vid==932: return "Togami Electric Mfg. Co., Ltd."
-  if vid==933: return "HK Systems"
-  if vid==934: return "CDA Systems Ltd."
-  if vid==935: return "Aerotech Inc."
-  if vid==936: return "JVL Industrie Elektronik A/S"
-  if vid==937: return "NovaTech Process Solutions LLC"
-  if vid==938: return "Reserved"
-  if vid==939: return "Cisco Systems"
-  if vid==940: return "Grid Connect"
-  if vid==941: return "ITW Automotive Finishing"
-  if vid==942: return "HanYang System"
-  if vid==943: return "ABB K.K. Technical Center"
-  if vid==944: return "Taiyo Electric Wire & Cable Co., Ltd."
-  if vid==945: return "Reserved"
-  if vid==946: return "SEREN IPS INC"
-  if vid==947: return "Belden CDT Electronics Division"
-  if vid==948: return "ControlNet International"
-  if vid==949: return "Gefran S.P.A."
-  if vid==950: return "Jokab Safety AB"
-  if vid==951: return "SUMITA OPTICAL GLASS, INC."
-  if vid==952: return "Biffi Italia srl"
-  if vid==953: return "Beck IPC GmbH"
-  if vid==954: return "Copley Controls Corporation"
-  if vid==955: return "Fagor Automation S. Coop."
-  if vid==956: return "DARCOM"
-  if vid==957: return "Frick Controls (div. of York International)"
-  if vid==958: return "SymCom, Inc."
-  if vid==959: return "Infranor"
-  if vid==960: return "Kyosan Cable, Ltd."
-  if vid==961: return "Varian Vacuum Technologies"
-  if vid==962: return "Messung Systems"
-  if vid==963: return "Xantrex Technology, Inc."
-  if vid==964: return "StarThis Inc."
-  if vid==965: return "Chiyoda Co., Ltd."
-  if vid==966: return "Flowserve Corporation"
-  if vid==967: return "Spyder Controls Corp."
-  if vid==968: return "IBA AG"
-  if vid==969: return "SHIMOHIRA ELECTRIC MFG.CO.,LTD"
-  if vid==970: return "Reserved"
-  if vid==971: return "Siemens L&A"
-  if vid==972: return "Micro Innovations AG"
-  if vid==973: return "Switchgear & Instrumentation"
-  if vid==974: return "PRE-TECH CO., LTD."
-  if vid==975: return "National Semiconductor"
-  if vid==976: return "Invensys Process Systems"
-  if vid==977: return "Ametek HDR Power Systems"
-  if vid==978: return "Reserved"
-  if vid==979: return "TETRA-K Corporation"
-  if vid==980: return "C & M Corporation"
-  if vid==981: return "Siempelkamp Maschinen"
-  if vid==982: return "Reserved"
-  if vid==983: return "Daifuku America Corporation"
-  if vid==984: return "Electro-Matic Products Inc."
-  if vid==985: return "BUSSAN MICROELECTRONICS CORP."
-  if vid==986: return "ELAU AG"
-  if vid==987: return "Hetronic USA"
-  if vid==988: return "NIIGATA POWER SYSTEMS Co., Ltd."
-  if vid==989: return "Software Horizons Inc."
-  if vid==990: return "B3 Systems, Inc."
-  if vid==991: return "Moxa Networking Co., Ltd."
-  if vid==992: return "Reserved"
-  if vid==993: return "S4 Integration"
-  if vid==994: return "Elettro Stemi S.R.L."
-  if vid==995: return "AquaSensors"
-  if vid==996: return "Ifak System GmbH"
-  if vid==997: return "SANKEI MANUFACTURING Co.,LTD."
-  if vid==998: return "Emerson Network Power Co., Ltd."
-  if vid==999: return "Fairmount Automation, Inc."
-  if vid==1000: return "Bird Electronic Corporation"
-  if vid==1001: return "Nabtesco Corporation"
-  if vid==1002: return "AGM Electronics, Inc."
-  if vid==1003: return "ARCX Inc."
-  if vid==1004: return "DELTA I/O Co."
-  if vid==1005: return "Chun IL Electric Ind. Co."
-  if vid==1006: return "N-Tron"
-  if vid==1007: return "Nippon Pneumatics/Fludics System CO.,LTD."
-  if vid==1008: return "DDK Ltd."
-  if vid==1009: return "Seiko Epson Corporation"
-  if vid==1010: return "Halstrup-Walcher GmbH"
-  if vid==1011: return "ITT"
-  if vid==1012: return "Ground Fault Systems bv"
-  if vid==1013: return "Scolari Engineering S.p.A."
-  if vid==1014: return "Vialis Traffic bv"
-  if vid==1015: return "Weidmueller Interface GmbH & Co. KG"
-  if vid==1016: return "Shanghai Sibotech Automation Co. Ltd"
-  if vid==1017: return "AEG Power Supply Systems GmbH"
-  if vid==1018: return "Komatsu Electronics Inc."
-  if vid==1019: return "Souriau"
-  if vid==1020: return "Baumuller Chicago Corp."
-  if vid==1021: return "J. Schmalz GmbH"
-  if vid==1022: return "SEN Corporation"
-  if vid==1023: return "Korenix Technology Co. Ltd"
-  if vid==1024: return "Cooper Power Tools"
-  if vid==1025: return "INNOBIS"
-  if vid==1026: return "Shinho System"
-  if vid==1027: return "Xm Services Ltd."
-  if vid==1028: return "KVC Co., Ltd."
-  if vid==1029: return "Sanyu Seiki Co., Ltd."
-  if vid==1030: return "TuxPLC"
-  if vid==1031: return "Northern Network Solutions"
-  if vid==1032: return "Converteam GmbH"
-  if vid==1033: return "Symbol Technologies"
-  if vid==1034: return "S-TEAM Lab"
-  if vid==1035: return "Maguire Products, Inc."
-  if vid==1036: return "AC&T"
-  if vid==1037: return "MITSUBISHI HEAVY INDUSTRIES, LTD. KOBE SHIPYARD & MACHINERY WORKS"
-  if vid==1038: return "Hurletron Inc."
-  if vid==1039: return "Chunichi Denshi Co., Ltd"
-  if vid==1040: return "Cardinal Scale Mfg. Co."
-  if vid==1041: return "BTR NETCOM via RIA Connect, Inc."
-  if vid==1042: return "Base2"
-  if vid==1043: return "ASRC Aerospace"
-  if vid==1044: return "Beijing Stone Automation"
-  if vid==1045: return "Changshu Switchgear Manufacture Ltd."
-  if vid==1046: return "METRONIX Corp."
-  if vid==1047: return "WIT"
-  if vid==1048: return "ORMEC Systems Corp."
-  if vid==1049: return "ASATech (China) Inc."
-  if vid==1050: return "Controlled Systems Limited"
-  if vid==1051: return "Mitsubishi Heavy Ind. Digital System Co., Ltd. (M.H.I.)"
-  if vid==1052: return "Electrogrip"
-  if vid==1053: return "TDS Automation"
-  if vid==1054: return "T&C Power Conversion, Inc."
-  if vid==1055: return "Robostar Co., Ltd"
-  if vid==1056: return "Scancon A/S"
-  if vid==1057: return "Haas Automation, Inc."
-  if vid==1058: return "Eshed Technology"
-  if vid==1059: return "Delta Electronic Inc."
-  if vid==1060: return "Innovasic Semiconductor"
-  if vid==1061: return "SoftDEL Systems Limited"
-  if vid==1062: return "FiberFin, Inc."
-  if vid==1063: return "Nicollet Technologies Corp."
-  if vid==1064: return "B.F. Systems"
-  if vid==1065: return "Empire Wire and Supply LLC"
-  if vid==1066: return "Reserved"
-  if vid==1067: return "Elmo Motion Control LTD"
-  if vid==1068: return "Reserved"
-  if vid==1069: return "Asahi Keiki Co., Ltd."
-  if vid==1070: return "Joy Mining Machinery"
-  if vid==1071: return "MPM Engineering Ltd"
-  if vid==1072: return "Wolke Inks & Printers GmbH"
-  if vid==1073: return "Mitsubishi Electric Engineering Co., Ltd."
-  if vid==1074: return "COMET AG"
-  if vid==1075: return "Real Time Objects & Systems, LLC"
-  if vid==1076: return "MISCO Refractometer"
-  if vid==1077: return "JT Engineering Inc."
-  if vid==1078: return "Automated Packing Systems"
-  if vid==1079: return "Niobrara R&D Corp."
-  if vid==1080: return "Garmin Ltd."
-  if vid==1081: return "Japan Mobile Platform Co., Ltd"
-  if vid==1082: return "Advosol Inc."
-  if vid==1083: return "ABB Global Services Limited"
-  if vid==1084: return "Sciemetric Instruments Inc."
-  if vid==1085: return "Tata Elxsi Ltd."
-  if vid==1086: return "TPC Mechatronics, Co., Ltd."
-  if vid==1087: return "Cooper Bussmann"
-  if vid==1088: return "Trinite Automatisering B.V."
-  if vid==1089: return "Peek Traffic B.V."
-  if vid==1090: return "Acrison, Inc"
-  if vid==1091: return "Applied Robotics, Inc."
-  if vid==1092: return "FireBus Systems, Inc."
-  if vid==1093: return "Beijing Sevenstar Huachuang Electronics"
-  if vid==1094: return "Magnetek"
-  if vid==1095: return "Microscan"
-  if vid==1096: return "Air Water Inc."
-  if vid==1097: return "Sensopart Industriesensorik GmbH"
-  if vid==1098: return "Tiefenbach Control Systems GmbH"
-  if vid==1099: return "INOXPA S.A"
-  if vid==1100: return "Zurich University of Applied Sciences"
-  if vid==1101: return "Ethernet Direct"
-  if vid==1102: return "GSI-Micro-E Systems"
-  if vid==1103: return "S-Net Automation Co., Ltd."
-  if vid==1104: return "Power Electronics S.L."
-  if vid==1105: return "Renesas Technology Corp."
-  if vid==1106: return "NSWCCD-SSES"
-  if vid==1107: return "Porter Engineering Ltd."
-  if vid==1108: return "Meggitt Airdynamics, Inc."
-  if vid==1109: return "Inductive Automation"
-  if vid==1110: return "Neural ID"
-  if vid==1111: return "EEPod LLC"
-  if vid==1112: return "Hitachi Industrial Equipment Systems Co., Ltd."
-  if vid==1113: return "Salem Automation"
-  if vid==1114: return "port GmbH"
-  if vid==1115: return "B & PLUS"
-  if vid==1116: return "Graco Inc."
-  if vid==1117: return "Altera Corporation"
-  if vid==1118: return "Technology Brewing Corporation"
-  if vid==1121: return "CSE Servelec"
-  if vid==1124: return "Fluke Networks"
-  if vid==1125: return "Tetra Pak Packaging Solutions SPA"
-  if vid==1126: return "Racine Federated, Inc."
-  if vid==1127: return "Pureron Japan Co., Ltd."
-  if vid==1130: return "Brother Industries, Ltd."
-  if vid==1132: return "Leroy Automation"
-  if vid==1134: return "THK CO., LTD."
-  if vid==1137: return "TR-Electronic GmbH"
-  if vid==1138: return "ASCON S.p.A."
-  if vid==1139: return "Toledo do Brasil Industria de Balancas Ltda."
-  if vid==1140: return "Bucyrus DBT Europe GmbH"
-  if vid==1141: return "Emerson Process Management Valve Automation"
-  if vid==1142: return "Alstom Transport"
-  if vid==1144: return "Matrox Electronic Systems"
-  if vid==1145: return "Littelfuse"
-  if vid==1146: return "PLASMART, Inc."
-  if vid==1147: return "Miyachi Corporation"
-  if vid==1150: return "Promess Incorporated"
-  if vid==1151: return "COPA-DATA GmbH"
-  if vid==1152: return "Precision Engine Controls Corporation"
-  if vid==1153: return "Alga Automacao e controle LTDA"
-  if vid==1154: return "U.I. Lapp GmbH"
-  if vid==1155: return "ICES"
-  if vid==1156: return "Philips Lighting bv"
-  if vid==1157: return "Aseptomag AG"
-  if vid==1158: return "ARC Informatique"
-  if vid==1159: return "Hesmor GmbH"
-  if vid==1160: return "Kobe Steel, Ltd."
-  if vid==1161: return "FLIR Systems"
-  if vid==1162: return "Simcon A/S"
-  if vid==1163: return "COPALP"
-  if vid==1164: return "Zypcom, Inc."
-  if vid==1165: return "Swagelok"
-  if vid==1166: return "Elspec"
-  if vid==1167: return "ITT Water & Wastewater AB"
-  if vid==1168: return "Kunbus GmbH Industrial Communication"
-  if vid==1170: return "Performance Controls, Inc."
-  if vid==1171: return "ACS Motion Control, Ltd."
-  if vid==1173: return "IStar Technology Limited"
-  if vid==1174: return "Alicat Scientific, Inc."
-  if vid==1176: return "ADFweb.com SRL"
-  if vid==1177: return "Tata Consultancy Services Limited"
-  if vid==1178: return "CXR Ltd."
-  if vid==1179: return "Vishay Nobel AB"
-  if vid==1181: return "SolaHD"
-  if vid==1182: return "Endress+Hauser"
-  if vid==1183: return "Bartec GmbH"
-  if vid==1185: return "AccuSentry, Inc."
-  if vid==1186: return "Exlar Corporation"
-  if vid==1187: return "ILS Technology"
-  if vid==1188: return "Control Concepts Inc."
-  if vid==1190: return "Procon Engineering Limited"
-  if vid==1191: return "Hermary Opto Electronics Inc."
-  if vid==1192: return "Q-Lambda"
-  if vid==1194: return "VAMP Ltd"
-  if vid==1195: return "FlexLink"
-  if vid==1196: return "Office FA.com Co., Ltd."
-  if vid==1197: return "SPMC (Changzhou) Co. Ltd."
-  if vid==1198: return "Anton Paar GmbH"
-  if vid==1199: return "Zhuzhou CSR Times Electric Co., Ltd."
-  if vid==1200: return "DeStaCo"
-  if vid==1201: return "Synrad, Inc"
-  if vid==1202: return "Bonfiglioli Vectron GmbH"
-  if vid==1203: return "Pivotal Systems"
-  if vid==1204: return "TKSCT"
-  if vid==1205: return "Randy Nuernberger"
-  if vid==1206: return "CENTRALP"
-  if vid==1207: return "Tengen Group"
-  if vid==1208: return "OES, Inc."
-  if vid==1209: return "Actel Corporation"
-  if vid==1210: return "Monaghan Engineering, Inc."
-  if vid==1211: return "wenglor sensoric gmbh"
-  if vid==1212: return "HSA Systems"
-  if vid==1213: return "MK Precision Co., Ltd."
-  if vid==1214: return "Tappan Wire and Cable"
-  if vid==1215: return "Heinzmann GmbH & Co. KG"
-  if vid==1216: return "Process Automation International Ltd."
-  if vid==1217: return "Secure Crossing"
-  if vid==1218: return "SMA Railway Technology GmbH"
-  if vid==1219: return "FMS Force Measuring Systems AG"
-  if vid==1220: return "ABT Endustri Enerji Sistemleri Sanayi Tic. Ltd. Sti."
-  if vid==1221: return "MagneMotion Inc."
-  if vid==1222: return "STS Co., Ltd."
-  if vid==1223: return "MERAK SIC, SA"
-  if vid==1224: return "ABOUNDI, Inc."
-  if vid==1225: return "Rosemount Inc."
-  if vid==1226: return "GEA FES, Inc."
-  if vid==1227: return "TMG Technologie und Engineering GmbH"
-  if vid==1228: return "embeX GmbH"
-  if vid==1229: return "GH Electrotermia, S.A."
-  if vid==1230: return "Tolomatic"
-  if vid==1231: return "Dukane"
-  if vid==1232: return "Elco (Tian Jin) Electronics Co., Ltd."
-  if vid==1233: return "Jacobs Automation"
-  if vid==1234: return "Noda Radio Frequency Technologies Co., Ltd."
-  if vid==1235: return "MSC Tuttlingen GmbH"
-  if vid==1236: return "Hitachi Cable Manchester"
-  if vid==1237: return "ACOREL SAS"
-  if vid==1238: return "Global Engineering Solutions Co., Ltd."
-  if vid==1239: return "ALTE Transportation, S.L."
-  if vid==1240: return "Penko Engineering B.V."
+def VendorNames():
+	vid={0: 'Reserved',
+		1: 'Rockwell Automation/Allen-Bradley',
+		2: 'Namco Controls Corp.',
+		3: 'Honeywell Inc.',
+		4: 'Parker Hannifin Corp. (Veriflo Division)',
+		5: 'Rockwell Automation/Reliance Elec.',
+		6: 'Reserved',
+		7: 'SMC Corporation',
+		8: 'Molex Incorporated',
+		9: 'Western Reserve Controls Corp.',
+		10: 'Advanced Micro Controls Inc. (AMCI)',
+		11: 'ASCO Pneumatic Controls',
+		12: 'Banner Engineering Corp.',
+		13: 'Belden Wire & Cable Company',
+		14: 'Cooper Interconnect',
+		15: 'Reserved',
+		16: 'Daniel Woodhead Co. (Woodhead Connectivity)',
+		17: 'Dearborn Group Inc.',
+		18: 'Reserved',
+		19: 'Helm Instrument Company',
+		20: 'Huron Net Works',
+		21: 'Lumberg, Inc.',
+		22: 'Online Development Inc.(Automation Value)',
+		23: 'Vorne Industries, Inc.',
+		24: 'ODVA Special Reserve',
+		25: 'Reserved',
+		26: 'Festo Corporation',
+		27: 'Reserved',
+		28: 'Reserved',
+		29: 'Reserved',
+		30: 'Unico, Inc.',
+		31: 'Ross Controls',
+		32: 'Reserved',
+		33: 'Reserved',
+		34: 'Hohner Corp.',
+		35: 'Micro Mo Electronics, Inc.',
+		36: 'MKS Instruments, Inc.',
+		37: 'Yaskawa Electric America formerly Magnetek Drives',
+		38: 'Reserved',
+		39: 'AVG Automation (Uticor)',
+		40: 'Wago Corporation',
+		41: 'Kinetics (Unit Instruments)',
+		42: 'IMI Norgren Limited',
+		43: 'BALLUFF, Inc.',
+		44: 'Yaskawa Electric America, Inc.',
+		45: 'Eurotherm Controls Inc',
+		46: 'ABB Industrial Systems',
+		47: 'Omron Corporation',
+		48: 'TURCk, Inc.',
+		49: 'Grayhill Inc.',
+		50: 'Real Time Automation (C&ID)',
+		51: 'Reserved',
+		52: 'Numatics, Inc.',
+		53: 'Lutze, Inc.',
+		54: 'Reserved',
+		55: 'Reserved',
+		56: 'Softing GmbH',
+		57: 'Pepperl + Fuchs',
+		58: 'Spectrum Controls, Inc.',
+		59: 'D.I.P. Inc. MKS Inst.',
+		60: 'Applied Motion Products, Inc.',
+		61: 'Sencon Inc.',
+		62: 'High Country Tek',
+		63: 'SWAC Automation Consult GmbH',
+		64: 'Clippard Instrument Laboratory',
+		65: 'Reserved',
+		66: 'Reserved',
+		67: 'Reserved',
+		68: 'Eaton Electrical',
+		69: 'Reserved',
+		70: 'Reserved',
+		71: 'Toshiba International Corp.',
+		72: 'Control Technology Incorporated',
+		73: 'TCS (NZ) Ltd.',
+		74: 'Hitachi, Ltd.',
+		75: 'ABB Robotics Products AB',
+		76: 'NKE Corporation',
+		77: 'Rockwell Software, Inc.',
+		78: 'Escort Memory Systems (A Datalogic Group Co.)',
+		79: 'Reserved',
+		80: 'Industrial Devices Corporation',
+		81: 'IXXAT Automation GmbH',
+		82: 'Mitsubishi Electric Automation, Inc.',
+		83: 'OPTO-22',
+		84: 'Reserved',
+		85: 'Reserved',
+		86: 'Horner Electric',
+		87: 'Burkert Werke GmbH & Co. KG',
+		88: 'Reserved',
+		89: 'Industrial Indexing Systems, Inc.',
+		90: 'HMS Industrial Networks AB',
+		91: 'Robicon',
+		92: 'Helix Technology (Granville-Phillips)',
+		93: 'Arlington Laboratory',
+		94: 'Advantech Co. Ltd.',
+		95: 'Square D Company',
+		96: 'Digital Electronics Corp.',
+		97: 'Danfoss',
+		98: 'Reserved',
+		99: 'Reserved',
+		100: 'Bosch Rexroth Corporation, Pneumatics',
+		101: 'Applied Materials, Inc.',
+		102: 'Showa Electric Wire & Cable Co.',
+		103: 'Pacific Scientific (API Controls Inc.)',
+		104: 'Sharp Manufacturing Systems Corp.',
+		105: 'Olflex Wire & Cable, Inc.',
+		106: 'Reserved',
+		107: 'Unitrode',
+		108: 'Beckhoff Automation GmbH',
+		109: 'National Instruments',
+		110: 'Mykrolis Corporations (Millipore)',
+		111: 'International Motion Controls Corp.',
+		112: 'Reserved',
+		113: 'SEG Kempen GmbH',
+		114: 'Reserved',
+		115: 'Reserved',
+		116: 'MTS Systems Corp.',
+		117: 'Krones, Inc',
+		118: 'Reserved',
+		119: 'EXOR Electronic R & D',
+		120: 'SIEI S.p.A.',
+		121: 'KUKA Roboter GmbH',
+		122: 'Reserved',
+		123: 'SEC (Samsung Electronics Co., Ltd)',
+		124: 'Binary Electronics Ltd',
+		125: 'Flexible Machine Controls',
+		126: 'Reserved',
+		127: 'ABB Inc. (Entrelec)',
+		128: 'MAC Valves, Inc.',
+		129: 'Auma Actuators Inc',
+		130: 'Toyoda Machine Works, Ltd',
+		131: 'Reserved',
+		132: 'Reserved',
+		133: 'Balogh T.A.G., Corporation',
+		134: 'TR Systemtechnik GmbH',
+		135: 'UNIPULSE Corporation',
+		136: 'Reserved',
+		137: 'Reserved',
+		138: 'Conxall Corporation Inc.',
+		139: 'Reserved',
+		140: 'Reserved',
+		141: 'Kuramo Electric Co., Ltd.',
+		142: 'Creative Micro Designs',
+		143: 'GE Industrial Systems',
+		144: 'Leybold Vacuum GmbH',
+		145: 'Siemens Energy & Automation/Drives',
+		146: 'Kodensha Ltd',
+		147: 'Motion Engineering, Inc.',
+		148: 'Honda Engineering Co., Ltd',
+		149: 'EIM Valve Controls',
+		150: 'Melec Inc.',
+		151: 'Sony Manufacturing Systems Corporation',
+		152: 'North American Mfg.',
+		153: 'WATLOW',
+		154: 'Japan Radio Co., Ltd',
+		155: 'NADEX Co., Ltd',
+		156: 'Ametek Automation & Process Technologies',
+		157: 'Reserved',
+		158: 'KVASER AB',
+		159: 'IDEC IZUMI Corporation',
+		160: 'Mitsubishi Heavy Industries Ltd',
+		161: 'Mitsubishi Electric Corporation',
+		162: 'Horiba-STEC Inc.',
+		163: 'esd electronic system design gmbh',
+		164: 'DAIHEN Corporation',
+		165: 'Tyco Valves & Controls/Keystone',
+		166: 'EBARA Corporation',
+		167: 'Reserved',
+		168: 'Reserved',
+		169: 'Hokuyo Electric Co. Ltd',
+		170: 'Pyramid Solutions, Inc.',
+		171: 'Denso Wave Incorporated',
+		172: 'HLS Hard-Line Solutions Inc',
+		173: 'Caterpillar, Inc.',
+		174: 'PDL Electronics Ltd.',
+		175: 'Reserved',
+		176: 'Red Lion Controls',
+		177: 'ANELVA Corporation',
+		178: 'Toyo Denki Seizo KK',
+		179: 'Sanyo Denki Co., Ltd',
+		180: 'Advanced Energy Japan K.K. (Aera Japan)',
+		181: 'Pilz GmbH & Co',
+		182: 'Marsh Bellofram-Bellofram PCD Division',
+		183: 'Reserved',
+		184: 'M-SYSTEM Co. Ltd',
+		185: 'Nissin Electric Co., Ltd',
+		186: 'Hitachi Metals Ltd.',
+		187: 'Oriental Motor Company',
+		188: 'A&D Co., Ltd',
+		189: 'Phasetronics, Inc.',
+		190: 'Cummins Engine Company',
+		191: 'Deltron Inc.',
+		192: 'Geneer Corporation',
+		193: 'Anatol Automation, Inc.',
+		194: 'Reserved',
+		195: 'Reserved',
+		196: 'Medar, Inc.',
+		197: 'Comdel Inc.',
+		198: 'Advanced Energy Industries, Inc',
+		199: 'Reserved',
+		200: 'DAIDEN Co., Ltd',
+		201: 'CKD Corporation',
+		202: 'Toyo Electric Corporation',
+		203: 'Reserved',
+		204: 'AuCom Electronics Ltd',
+		205: 'Shinko Electric Co., Ltd',
+		206: 'Vector Informatik GmbH',
+		207: 'Reserved',
+		208: 'Moog Inc.',
+		209: 'Contemporary Controls',
+		210: 'Tokyo Sokki Kenkyujo Co., Ltd',
+		211: 'Schenck-AccuRate, Inc.',
+		212: 'The Oilgear Company',
+		213: 'Reserved',
+		214: 'ASM Japan K.K.',
+		215: 'HIRATA Corp.',
+		216: 'SUNX Limited',
+		217: 'Meidensha Corp.',
+		218: 'NIDEC SANKYO CORPORATION (Sankyo Seiki Mfg. Co., Ltd)',
+		219: 'KAMRO Corp.',
+		220: 'Nippon System Development Co., Ltd',
+		221: 'EBARA Technologies Inc.',
+		222: 'Reserved',
+		223: 'Reserved',
+		224: 'SG Co., Ltd',
+		225: 'Vaasa Institute of Technology',
+		226: 'MKS Instruments (ENI Technology)',
+		227: 'Tateyama System Laboratory Co., Ltd.',
+		228: 'QLOG Corporation',
+		229: 'Matric Limited Inc.',
+		230: 'NSD Corporation',
+		231: 'Reserved',
+		232: 'Sumitomo Wiring Systems, Ltd',
+		233: 'Group 3 Technology Ltd',
+		234: 'CTI Cryogenics',
+		235: 'POLSYS CORP',
+		236: 'Ampere Inc.',
+		237: 'Reserved',
+		238: 'Simplatroll Ltd',
+		239: 'Reserved',
+		240: 'Reserved',
+		241: 'Leading Edge Design',
+		242: 'Humphrey Products',
+		243: 'Schneider Automation, Inc.',
+		244: 'Westlock Controls Corp.',
+		245: 'Nihon Weidmuller Co., Ltd',
+		246: 'Brooks Instrument (Div. of Emerson)',
+		247: 'Reserved',
+		248: ' Moeller GmbH',
+		249: 'Varian Vacuum Products',
+		250: 'Yokogawa Electric Corporation',
+		251: 'Electrical Design Daiyu Co., Ltd',
+		252: 'Omron Software Co., Ltd',
+		253: 'BOC Edwards',
+		254: 'Control Technology Corporation',
+		255: 'Bosch Rexroth',
+		256: 'Turck',
+		257: 'Control Techniques PLC',
+		258: 'Hardy Instruments, Inc.',
+		259: 'LS Industrial Systems',
+		260: 'E.O.A. Systems Inc.',
+		261: 'Reserved',
+		262: 'New Cosmos Electric Co., Ltd.',
+		263: 'Sense Eletronica LTDA',
+		264: 'Xycom, Inc.',
+		265: 'Baldor Electric',
+		266: 'Reserved',
+		267: 'Patlite Corporation',
+		268: 'Reserved',
+		269: 'Mogami Wire & Cable Corporation',
+		270: 'Welding Technology Corporation (WTC)',
+		271: 'Reserved',
+		272: 'Deutschmann Automation GmbH',
+		273: 'ICP Panel-Tec Inc.',
+		274: 'Bray Controls USA',
+		275: 'Reserved',
+		276: 'Status Technologies',
+		277: 'Trio Motion Technology Ltd',
+		278: 'Sherrex Systems Ltd',
+		279: 'Adept Technology, Inc.',
+		280: 'Spang Power Electronics',
+		281: 'Reserved',
+		282: 'Acrosser Technology Co., Ltd',
+		283: 'Hilscher GmbH',
+		284: 'IMAX Corporation',
+		285: 'Electronic Innovation, Inc. (Falter Engineering)',
+		286: 'Netlogic Inc.',
+		287: 'Bosch Rexroth Corporation, Indramat',
+		288: 'Reserved',
+		289: 'Reserved',
+		290: 'Murata	Machinery Ltd.',
+		291: 'MTT Company Ltd.',
+		292: 'Kanematsu Semiconductor Corp.',
+		293: 'Takebishi Electric Sales Co.',
+		294: 'Tokyo Electron Device Ltd',
+		295: 'PFU Limited',
+		296: 'Hakko Automation Co., Ltd.',
+		297: 'Advanet Inc.',
+		298: 'Tokyo Electron Software Technologies Ltd.',
+		299: 'Reserved',
+		300: 'Shinagawa Electric Wire Co., Ltd.',
+		301: 'Yokogawa M&C Corporation',
+		302: 'KONAN Electric Co., Ltd.',
+		303: 'Binar Elektronik AB',
+		304: 'Furukawa Electric Co.',
+		305: 'Cooper Energy Services',
+		306: 'Schleicher GmbH & Co.',
+		307: 'Hirose Electric Co., Ltd',
+		308: 'Western Servo Design Inc.',
+		309: 'Prosoft Technology',
+		310: 'Reserved',
+		311: 'Towa Shoko Co., Ltd',
+		312: 'Kyopal Co., Ltd',
+		313: 'Extron Co.',
+		314: 'Wieland Electric GmbH',
+		315: 'SEW Eurodrive GmbH',
+		316: 'Aera Corporation',
+		317: 'STA Reutlingen',
+		318: 'Reserved',
+		319: 'Fuji Electric Co., Ltd.',
+		320: 'Reserved',
+		321: 'Reserved',
+		322: 'ifm efector, inc.',
+		323: 'Reserved',
+		324: 'IDEACOD-Hohner Automation S.A.',
+		325: 'CommScope Inc.',
+		326: 'GE Fanuc Automation North America, Inc.',
+		327: 'Matsushita Electric Industrial Co., Ltd',
+		328: 'Okaya Electronics Corporation',
+		329: 'KASHIYAMA Industries, Ltd',
+		330: 'JVC',
+		331: 'Interface Corporation',
+		332: 'Grape Systems Inc.',
+		333: 'Reserved',
+		334: 'Reserved',
+		335: 'Toshiba IT & Control Systems Corporation',
+		336: 'Sanyo Machine Works, Ltd.',
+		337: 'Vansco Electronics Ltd.',
+		338: 'Dart Container Corp.',
+		339: 'Livingston & Co., Inc.',
+		340: 'Alfa Laval LKM as',
+		341: 'BF ENTRON Ltd. (British Federal)',
+		342: 'Bekaert Engineering NV',
+		343: 'Ferran	Scientific Inc.',
+		344: 'KEBA AG',
+		345: 'Endress + Hauser',
+		346: 'Reserved',
+		347: 'ABB ALSTOM Power UK Ltd. (EGT)',
+		348: 'Berger Lahr GmbH',
+		349: 'Reserved',
+		350: 'Federal Signal Corp.',
+		351: 'Kawasaki Robotics (USA), Inc.',
+		352: 'Bently Nevada Corporation',
+		353: 'Reserved',
+		354: 'FRABA Posital GmbH',
+		355: 'Elsag Bailey, Inc.',
+		356: 'Fanuc Robotics America',
+		357: 'Reserved',
+		358: 'Surface Combustion, Inc.',
+		359: 'Reserved',
+		360: 'AILES Electronics Ind. Co., Ltd.',
+		361: 'Wonderware Corporation',
+		362: 'Particle Measuring Systems, Inc.',
+		363: 'Reserved',
+		364: 'Reserved',
+		365: 'BITS Co., Ltd',
+		366: 'Japan Aviation Electronics Industry Ltd',
+		367: 'Keyence Corporation',
+		368: 'Kuroda Precision Industries Ltd.',
+		369: 'Mitsubishi Electric Semiconductor Application',
+		370: 'Nippon Seisen Cable, Ltd.',
+		371: 'Omron ASO Co., Ltd',
+		372: 'Seiko Seiki Co., Ltd.',
+		373: 'Sumitomo Heavy Industries, Ltd.',
+		374: 'Tango Computer Service Corporation',
+		375: 'Technology Service, Inc.',
+		376: 'Toshiba Information Systems (Japan) Corporation',
+		377: 'TOSHIBA Schneider Inverter Corporation',
+		378: 'Toyooki Kogyo Co., Ltd.',
+		379: 'XEBEC',
+		380: 'Madison Cable Corporation',
+		381: 'Hitati Engineering & Services Co., Ltd',
+		382: 'TEM-TECH Lab Co., Ltd',
+		383: 'International Laboratory Corporation',
+		384: 'Dyadic Systems Co., Ltd.',
+		385: 'SETO Electronics Industry Co., Ltd',
+		386: 'Tokyo Electron Kyushu Limited',
+		387: 'KEI System Co., Ltd',
+		388: 'Reserved',
+		389: 'Asahi Engineering Co., Ltd',
+		390: 'Contrex Inc.',
+		391: 'Paradigm Controls Ltd.',
+		392: 'Reserved',
+		393: 'Ohm Electric Co., Ltd.',
+		394: 'RKC Instrument Inc.',
+		395: 'Suzuki Motor Corporation',
+		396: 'Custom Servo Motors Inc.',
+		397: 'PACE Control Systems',
+		398: 'Reserved',
+		399: 'Reserved',
+		400: 'LINTEC Co., Ltd.',
+		401: 'Hitachi Cable Ltd.',
+		402: 'BUSWARE Direct',
+		403: 'Eaton Electric B.V. (former Holec Holland N.V.)',
+		404: 'VAT Vakuumventile AG',
+		405: 'Scientific Technologies Incorporated',
+		406: 'Alfa Instrumentos Eletronicos Ltda',
+		407: 'TWK Elektronik GmbH',
+		408: 'ABB Welding Systems AB',
+		409: 'BYSTRONIC Maschinen AG',
+		410: 'Kimura Electric Co., Ltd',
+		411: 'Nissei Plastic Industrial Co., Ltd',
+		412: 'Reserved',
+		413: 'Kistler-Morse Corporation',
+		414: 'Proteous Industries Inc.',
+		415: 'IDC Corporation',
+		416: 'Nordson Corporation',
+		417: 'Rapistan Systems',
+		418: 'LP-Elektronik GmbH',
+		419: 'GERBI & FASE S.p.A.(Fase Saldatura)',
+		420: 'Phoenix Digital Corporation',
+		421: 'Z-World Engineering',
+		422: 'Honda R&D Co., Ltd.',
+		423: 'Bionics Instrument Co., Ltd.',
+		424: 'Teknic, Inc.',
+		425: 'R.Stahl, Inc.',
+		426: 'Reserved',
+		427: 'Ryco Graphic Manufacturing Inc.',
+		428: 'Giddings & Lewis, Inc.',
+		429: 'Koganei Corporation',
+		430: 'Reserved',
+		431: 'Nichigoh Communication Electric Wire Co., Ltd.',
+		432: 'Reserved',
+		433: 'Fujikura Ltd.',
+		434: 'AD Link Technology Inc.',
+		435: 'StoneL Corporation',
+		436: 'Computer Optical Products, Inc.',
+		437: 'CONOS Inc.',
+		438: 'Erhardt + Leimer GmbH',
+		439: 'UNIQUE Co. Ltd',
+		440: 'Roboticsware, Inc.',
+		441: 'Nachi Fujikoshi Corporation',
+		442: 'Hengstler GmbH',
+		443: 'Reserved',
+		444: 'SUNNY GIKEN Inc.',
+		445: 'Lenze Drive Systems GmbH',
+		446: 'CD Systems B.V.',
+		447: 'FMT/Aircraft Gate Support Systems AB',
+		448: 'Axiomatic Technologies Corp',
+		449: 'Embedded System Products, Inc.',
+		450: 'Reserved',
+		451: 'Mencom Corporation',
+		452: 'Reserved',
+		453: 'Matsushita Welding Systems Co., Ltd.',
+		454: 'Dengensha Mfg. Co. Ltd.',
+		455: 'Quinn Systems Ltd.',
+		456: 'Tellima Technology Ltd',
+		457: 'MDT, Software',
+		458: 'Taiwan Keiso Co., Ltd',
+		459: 'Pinnacle Systems',
+		460: 'Ascom Hasler Mailing Sys',
+		461: 'INSTRUMAR Limited',
+		462: 'Reserved',
+		463: 'Navistar International Transportation Corp',
+		464: 'Huettinger Elektronik GmbH + Co. KG',
+		465: 'OCM Technology Inc.',
+		466: 'Professional Supply Inc.',
+		467: 'Control Solutions',
+		468: 'Baumer IVO GmbH & Co. KG',
+		469: 'Worcester Controls Corporation',
+		470: 'Pyramid Technical Consultants, Inc.',
+		471: 'Reserved',
+		472: 'Apollo Fire Detectors Limited',
+		473: 'Avtron Manufacturing, Inc.',
+		474: 'Reserved',
+		475: 'Tokyo Keiso Co., Ltd.',
+		476: 'Daishowa Swiki Co., Ltd.',
+		477: 'Kojima Instruments Inc.',
+		478: 'Shimadzu Corporation',
+		479: 'Tatsuta Electric Wire & Cable Co., Ltd.',
+		480: 'MECS Corporation',
+		481: 'Tahara Electric',
+		482: 'Koyo Electronics',
+		483: 'Clever Devices',
+		484: 'GCD Hardware & Software GmbH',
+		485: 'Reserved',
+		486: 'Miller Electric Mfg Co.',
+		487: 'GEA Tuchenhagen GmbH',
+		488: 'Riken Keiki Co., LTD',
+		489: 'Keisokugiken Corporation',
+		490: 'Fuji Machine Mfg. Co., Ltd',
+		491: 'Reserved',
+		492: 'Nidec-Shimpo Corp.',
+		493: 'UTEC Corporation',
+		494: 'Sanyo Electric Co. Ltd.',
+		495: 'Reserved',
+		496: 'Reserved',
+		497: 'Okano Electric Wire Co. Ltd',
+		498: 'Shimaden Co. Ltd.',
+		499: 'Teddington Controls Ltd',
+		500: 'Reserved',
+		501: 'VIPA GmbH',
+		502: 'Warwick Manufacturing Group',
+		503: 'Danaher Controls',
+		504: 'Reserved',
+		505: 'Reserved',
+		506: 'American Science & Engineering',
+		507: 'Accutron Controls International Inc.',
+		508: 'Norcott Technologies Ltd',
+		509: 'TB Woods, Inc',
+		510: 'Proportion-Air, Inc.',
+		511: 'SICK Stegmann GmbH',
+		512: 'Reserved',
+		513: 'Edwards Signaling',
+		514: 'Sumitomo Metal Industries, Ltd',
+		515: 'Cosmo Instruments Co., Ltd.',
+		516: 'Denshosha Co., Ltd.',
+		517: 'Kaijo Corp.',
+		518: 'Michiproducts Co., Ltd.',
+		519: 'Miura Corporation',
+		520: 'TG Information Network Co., Ltd.',
+		521: 'Fujikin , Inc.',
+		522: 'Estic Corp.',
+		523: 'GS Hydraulic Sales',
+		524: 'Reserved',
+		525: 'MTE Limited',
+		526: 'Hyde Park Electronics, Inc.',
+		527: 'Pfeiffer Vacuum GmbH',
+		528: 'Cyberlogic Technologies',
+		529: 'OKUMA Corporation FA Systems Division',
+		530: 'Reserved',
+		531: 'Hitachi Kokusai Electric Co., Ltd.',
+		532: 'SHINKO TECHNOS Co., Ltd.',
+		533: 'Itoh Electric Co., Ltd.',
+		534: 'Colorado Flow Tech Inc.',
+		535: 'Love Controls Division/Dwyer Inst.',
+		536: 'Alstom Drives and Controls',
+		537: 'The Foxboro Company',
+		538: 'Tescom Corporation',
+		539: 'Reserved',
+		540: 'Atlas Copco Controls UK',
+		541: 'Reserved',
+		542: 'Autojet Technologies',
+		543: 'Prima Electronics S.p.A.',
+		544: 'PMA GmbH',
+		545: 'Shimafuji Electric Co., Ltd',
+		546: 'Oki Electric Industry Co., Ltd',
+		547: 'Kyushu Matsushita Electric Co., Ltd',
+		548: 'Nihon Electric Wire & Cable Co., Ltd',
+		549: 'Tsuken Electric Ind Co., Ltd',
+		550: 'Tamadic Co.',
+		551: 'MAATEL SA',
+		552: 'OKUMA America',
+		553: 'Control Techniques PLC-NA',
+		554: 'TPC Wire & Cable',
+		555: 'ATI Industrial Automation',
+		556: 'Microcontrol (Australia) Pty Ltd',
+		557: 'Serra Soldadura, S.A.',
+		558: 'Southwest Research Institute',
+		559: 'Cabinplant International',
+		560: 'Sartorius Mechatronics T&H GmbH',
+		561: 'Comau S.p.A. Robotics & Final Assembly Division',
+		562: 'Phoenix Contact',
+		563: 'Yokogawa MAT Corporation',
+		564: 'asahi sangyo co., ltd.',
+		565: 'Reserved',
+		566: 'Akita Myotoku Ltd.',
+		567: 'OBARA Corp.',
+		568: 'Suetron Electronic GmbH',
+		569: 'Reserved',
+		570: 'Serck Controls Limited',
+		571: 'Fairchild Industrial Products Company',
+		572: 'ARO S.A.',
+		573: 'M2C GmbH',
+		574: 'Shin Caterpillar Mitsubishi Ltd.',
+		575: 'Santest Co., Ltd.',
+		576: 'Cosmotechs Co., Ltd.',
+		577: 'Hitachi Electric Systems',
+		578: 'Smartscan Ltd',
+		579: 'Woodhead Software & Electronics France',
+		580: 'Athena Controls, Inc.',
+		581: 'Syron Engineering & Manufacturing, Inc.',
+		582: 'Asahi Optical Co., Ltd.',
+		583: 'Sansha Electric Mfg. Co., Ltd.',
+		584: 'Nikki Denso Co., Ltd.',
+		585: 'Star Micronics, Co., Ltd.',
+		586: 'Ecotecnia Socirtat Corp.',
+		587: 'AC Technology Corp.',
+		588: 'West Instruments Limited',
+		589: 'NTI Limited',
+		590: 'Delta Computer Systems, Inc.',
+		591: 'FANUC Ltd.',
+		592: 'Hearn-Gu Lee',
+		593: 'ABB Automation Products',
+		594: 'Orion Machinery Co., Ltd.',
+		595: 'Reserved',
+		596: 'Wire-Pro, Inc.',
+		597: 'Beijing Huakong Technology Co. Ltd.',
+		598: 'Yokoyama Shokai Co., Ltd.',
+		599: 'Toyogiken Co., Ltd.',
+		600: 'Coester Equipamentos Eletronicos Ltda.',
+		601: 'Reserved',
+		602: 'Electroplating Engineers of Japan Ltd.',
+		603: 'ROBOX S.p.A.',
+		604: 'Spraying Systems Company',
+		605: 'Benshaw Inc.',
+		606: 'ZPA-DP A.S.',
+		607: 'Wired Rite Systems',
+		608: 'Tandis Research, Inc.',
+		609: 'SSD Drives GmbH',
+		610: 'ULVAC Japan Ltd.',
+		611: 'DYNAX Corporation',
+		612: 'Nor-Cal Products, Inc.',
+		613: 'Aros Electronics AB',
+		614: 'Jun-Tech Co., Ltd.',
+		615: 'HAN-MI Co. Ltd.',
+		616: 'uniNtech (formerly SungGi Internet)',
+		617: 'Hae Pyung Electronics Reserch Institute',
+		618: 'Milwaukee Electronics',
+		619: 'OBERG Industries',
+		620: 'Parker Hannifin/Compumotor Division',
+		621: 'TECHNO DIGITAL CORPORATION',
+		622: 'Network Supply Co., Ltd.',
+		623: 'Union Electronics Co., Ltd.',
+		624: 'Tritronics Services PM Ltd.',
+		625: 'Rockwell Automation-Sprecher+Schuh',
+		626: 'Matsushita Electric Industrial Co., Ltd/Motor Co.',
+		627: 'Rolls-Royce Energy Systems, Inc.',
+		628: 'JEONGIL INTERCOM CO., LTD',
+		629: 'Interroll Corp.',
+		630: 'Hubbell Wiring Device-Kellems (Delaware)',
+		631: 'Intelligent Motion Systems',
+		632: 'Reserved',
+		633: 'INFICON AG',
+		634: 'Hirschmann, Inc.',
+		635: 'The Siemon Company',
+		636: 'YAMAHA Motor Co. Ltd.',
+		637: 'aska corporation',
+		638: 'Woodhead Connectivity',
+		639: 'Trimble AB',
+		640: 'Murrelektronik GmbH',
+		641: 'Creatrix Labs, Inc.',
+		642: 'TopWorx',
+		643: 'Kumho Industrial Co., Ltd.',
+		644: 'Wind River Systems, Inc.',
+		645: 'Bihl & Wiedemann GmbH',
+		646: 'Harmonic Drive Systems Inc.',
+		647: 'Rikei Corporation',
+		648: 'BL Autotec, Ltd.',
+		649: 'Hana Information & Technology Co., Ltd.',
+		650: 'Seoil Electric Co., Ltd.',
+		651: 'Fife Corporation',
+		652: 'Shanghai Electrical Apparatus Research Institute',
+		653: 'Reserved',
+		654: 'Parasense Development Centre',
+		655: 'Reserved',
+		656: 'Reserved',
+		657: 'Six Tau S.p.A.',
+		658: 'Aucos GmbH',
+		659: 'Rotork Controls',
+		660: 'Automationdirect.com',
+		661: 'Thermo BLH',
+		662: 'System Controls, Ltd.',
+		663: 'Univer S.p.A.',
+		664: 'MKS-Tenta Technology',
+		665: 'Lika Electronic SNC',
+		666: 'Mettler-Toledo, Inc.',
+		667: 'DXL USA Inc.',
+		668: 'Rockwell Automation/Entek IRD Intl.',
+		669: 'Nippon Otis Elevator Company',
+		670: 'Sinano Electric, Co., Ltd.',
+		671: 'Sony Manufacturing Systems',
+		672: 'Reserved',
+		673: 'Contec Co., Ltd.',
+		674: 'Automated Solutions',
+		675: 'Controlweigh',
+		676: 'Reserved',
+		677: 'Fincor Electronics',
+		678: 'Cognex Corporation',
+		679: 'Qualiflow',
+		680: 'Weidmuller, Inc.',
+		681: 'Morinaga Milk Industry Co., Ltd.',
+		682: 'Takagi Industrial Co., Ltd.',
+		683: 'Wittenstein AG',
+		684: 'Sena Technologies, Inc.',
+		685: 'Reserved',
+		686: 'APV Products Unna',
+		687: 'Creator Teknisk Utvedkling AB',
+		688: 'Reserved',
+		689: 'Mibu Denki Industrial Co., Ltd.',
+		690: 'Takamastsu Machineer Section',
+		691: 'Startco Engineering Ltd.',
+		692: 'Reserved',
+		693: 'Holjeron',
+		694: 'ALCATEL High Vacuum Technology',
+		695: 'Taesan LCD Co., Ltd.',
+		696: 'POSCON',
+		697: 'VMIC',
+		698: 'Matsushita Electric Works, Ltd.',
+		699: 'IAI Corporation',
+		700: 'Horst GmbH',
+		701: 'MicroControl GmbH & Co.',
+		702: 'Leine & Linde AB',
+		703: 'Reserved',
+		704: 'EC Elettronica Srl',
+		705: 'VIT Software HB',
+		706: 'Bronkhorst High-Tech B.V.',
+		707: 'Optex Co., Ltd.',
+		708: 'Yosio Electronic Co.',
+		709: 'Terasaki Electric Co., Ltd.',
+		710: 'Sodick Co., Ltd.',
+		711: 'MTS Systems Corporation-Automation Division',
+		712: 'Mesa Systemtechnik',
+		713: 'SHIN HO SYSTEM Co., Ltd.',
+		714: 'Goyo Electronics Co, Ltd.',
+		715: 'Loreme',
+		716: 'SAB Brockskes GmbH & Co. KG',
+		717: 'Trumpf Laser GmbH + Co. KG',
+		718: 'Niigata Electronic Instruments Co., Ltd.',
+		719: 'Yokogawa Digital Computer Corporation',
+		720: 'O.N. Electronic Co., Ltd.',
+		721: 'Industrial Control	Communication, Inc.',
+		722: 'ABB, Inc.',
+		723: 'ElectroWave USA, Inc.',
+		724: 'Industrial Network Controls, LLC',
+		725: 'KDT Systems Co., Ltd.',
+		726: 'SEFA Technology Inc.',
+		727: 'Nippon POP Rivets and Fasteners Ltd.',
+		728: 'Yamato Scale Co., Ltd.',
+		729: 'Zener Electric',
+		730: 'GSE Scale Systems',
+		731: 'ISAS (Integrated Switchgear & Sys. Pty Ltd)',
+		732: 'Beta LaserMike Limited',
+		733: 'TOEI Electric Co., Ltd.',
+		734: 'Hakko Electronics Co., Ltd',
+		735: 'Reserved',
+		736: 'RFID, Inc.',
+		737: 'Adwin Corporation',
+		738: 'Osaka Vacuum, Ltd.',
+		739: 'A-Kyung Motion, Inc.',
+		740: 'Camozzi S.P. A.',
+		741: 'Crevis Co., LTD',
+		742: 'Rice Lake Weighing Systems',
+		743: 'Linux Network Services',
+		744: 'KEB Antriebstechnik GmbH',
+		745: 'Hagiwara Electric Co., Ltd.',
+		746: 'Glass Inc. International',
+		747: 'Reserved',
+		748: 'DVT Corporation',
+		749: 'Woodward Governor',
+		750: 'Mosaic Systems, Inc.',
+		751: 'Laserline GmbH',
+		752: 'COM-TEC, Inc.',
+		753: 'Weed Instrument',
+		754: 'Prof-face European Technology Center',
+		755: 'Fuji Automation Co., Ltd.',
+		756: 'Matsutame Co., Ltd.',
+		757: 'Hitachi Via Mechanics, Ltd.',
+		758: 'Dainippon Screen Mfg. Co. Ltd.',
+		759: 'FLS Automation A/S',
+		760: 'ABB Stotz Kontakt GmbH',
+		761: 'Technical Marine Service',
+		762: 'Advanced Automation Associates, Inc.',
+		763: 'Baumer Ident GmbH',
+		764: 'Tsubakimoto Chain Co.',
+		765: 'Reserved',
+		766: 'Furukawa Co., Ltd.',
+		767: 'Active Power',
+		768: 'CSIRO Mining Automation',
+		769: 'Matrix Integrated Systems',
+		770: 'Digitronic Automationsanlagen GmbH',
+		771: 'SICK STEGMANN Inc.',
+		772: 'TAE-Antriebstechnik GmbH',
+		773: 'Electronic Solutions',
+		774: 'Rocon L.L.C.',
+		775: 'Dijitized Communications Inc.',
+		776: 'Asahi Organic Chemicals Industry Co., Ltd.',
+		777: 'Hodensha',
+		778: 'Harting, Inc. NA',
+		779: 'Kubler GmbH',
+		780: 'Yamatake Corporation',
+		781: 'JEOL',
+		782: 'Yamatake Industrial Systems Co., Ltd.',
+		783: 'HAEHNE Elektronische Messgerate GmbH',
+		784: 'Ci Technologies Pty Ltd (for Pelamos Industries)',
+		785: 'N. SCHLUMBERGER & CIE',
+		786: 'Teijin Seiki Co., Ltd.',
+		787: 'DAIKIN Industries, Ltd',
+		788: 'RyuSyo Industrial Co., Ltd.',
+		789: 'SAGINOMIYA SEISAKUSHO, INC.',
+		790: 'Seishin Engineering Co., Ltd.',
+		791: 'Japan Support System Ltd.',
+		792: 'Decsys',
+		793: 'Metronix Messgerate u. Elektronik GmbH',
+		794: 'Reserved',
+		795: 'Vaccon Company, Inc.',
+		796: 'Siemens Energy & Automation, Inc.',
+		797: 'Ten X Technology, Inc.',
+		798: 'Tyco Electronics',
+		799: 'Delta Power Electronics Center',
+		800: 'Denker',
+		801: 'Autonics Corporation',
+		802: 'JFE Electronic Engineering Pty. Ltd.',
+		803: 'Reserved',
+		804: 'Electro-Sensors, Inc.',
+		805: 'Digi International, Inc.',
+		806: 'Texas Instruments',
+		807: 'ADTEC Plasma Technology Co., Ltd',
+		808: 'SICK AG',
+		809: 'Ethernet Peripherals, Inc.',
+		810: 'Animatics Corporation',
+		811: 'Reserved',
+		812: 'Process Control Corporation',
+		813: 'SystemV. Inc.',
+		814: 'Danaher Motion SRL',
+		815: 'SHINKAWA Sensor Technology, Inc.',
+		816: 'Tesch GmbH & Co. KG',
+		817: 'Reserved',
+		818: 'Trend Controls Systems Ltd.',
+		819: 'Guangzhou ZHIYUAN Electronic Co., Ltd.',
+		820: 'Mykrolis Corporation',
+		821: 'Bethlehem Steel Corporation',
+		822: 'KK ICP',
+		823: 'Takemoto Denki Corporation',
+		824: 'The Montalvo Corporation',
+		825: 'Reserved',
+		826: 'LEONI Special Cables GmbH',
+		827: 'Reserved',
+		828: 'ONO SOKKI CO.,LTD.',
+		829: 'Rockwell Samsung Automation',
+		830: 'SHINDENGEN ELECTRIC MFG. CO. LTD',
+		831: 'Origin Electric Co. Ltd.',
+		832: 'Quest Technical Solutions, Inc.',
+		833: 'LS Cable, Ltd.',
+		834: 'Enercon-Nord Electronic GmbH',
+		835: 'Northwire Inc.',
+		836: 'Engel Elektroantriebe GmbH',
+		837: 'The Stanley Works',
+		838: 'Celesco Transducer Products, Inc.',
+		839: 'Chugoku Electric Wire and Cable Co.',
+		840: 'Kongsberg Simrad AS',
+		841: 'Panduit Corporation',
+		842: 'Spellman High Voltage Electronics Corp.',
+		843: 'Kokusai Electric Alpha Co., Ltd.',
+		844: 'Brooks Automation, Inc.',
+		845: 'ANYWIRE CORPORATION',
+		846: 'Honda Electronics Co. Ltd',
+		847: 'REO Elektronik AG',
+		848: 'Fusion UV Systems, Inc.',
+		849: 'ASI Advanced Semiconductor Instruments GmbH',
+		850: 'Datalogic, Inc.',
+		851: 'SoftPLC Corporation',
+		852: 'Dynisco Instruments LLC',
+		853: 'WEG Industrias SA',
+		854: 'Frontline Test Equipment, Inc.',
+		855: 'Tamagawa Seiki Co., Ltd.',
+		856: 'Multi Computing Co., Ltd.',
+		857: 'RVSI',
+		858: 'Commercial Timesharing Inc.',
+		859: 'Tennessee Rand Automation LLC',
+		860: 'Wacogiken Co., Ltd',
+		861: 'Reflex Integration Inc.',
+		862: 'Siemens AG, A&D PI Flow Instruments',
+		863: 'G. Bachmann Electronic GmbH',
+		864: 'NT International',
+		865: 'Schweitzer Engineering Laboratories',
+		866: 'ATR Industrie-Elektronik GmbH Co.',
+		867: 'PLASMATECH Co., Ltd',
+		868: 'Reserved',
+		869: 'GEMU GmbH & Co. KG',
+		870: 'Alcorn McBride Inc.',
+		871: 'MORI SEIKI CO., LTD',
+		872: 'NodeTech Systems Ltd',
+		873: 'Emhart Teknologies',
+		874: 'Cervis, Inc.',
+		875: 'FieldServer Technologies (Div Sierra Monitor Corp)',
+		876: 'NEDAP Power Supplies',
+		877: 'Nippon Sanso Corporation',
+		878: 'Mitomi Giken Co., Ltd.',
+		879: 'PULS GmbH',
+		880: 'Reserved',
+		881: 'Japan Control Engineering Ltd',
+		882: 'Embedded Systems Korea (Former Zues Emtek Co Ltd.)',
+		883: 'Automa SRL',
+		884: 'Harms+Wende GmbH & Co KG',
+		885: 'SAE-STAHL GmbH',
+		886: 'Microwave Data Systems',
+		887: 'Bernecker + Rainer Industrie-Elektronik GmbH',
+		888: 'Hiprom Technologies',
+		889: 'Reserved',
+		890: 'Nitta Corporation',
+		891: 'Kontron Modular Computers GmbH',
+		892: 'Marlin Controls',
+		893: 'ELCIS s.r.l.',
+		894: 'Acromag, Inc.',
+		895: 'Avery Weigh-Tronix',
+		896: 'Reserved',
+		897: 'Reserved',
+		898: 'Reserved',
+		899: 'Practicon Ltd',
+		900: 'Schunk GmbH & Co. KG',
+		901: 'MYNAH Technologies',
+		902: 'Defontaine Groupe',
+		903: 'Emerson Process Management Power & Water Solutions',
+		904: 'F.A. Elec',
+		905: 'Hottinger Baldwin Messtechnik GmbH',
+		906: 'Coreco Imaging, Inc.',
+		907: 'London Electronics Ltd.',
+		908: 'HSD SpA',
+		909: 'Comtrol Corporation',
+		910: 'TEAM, S.A. (Tecnica Electronica de Automatismo Y Medida)',
+		911: 'MAN B&W Diesel Ltd. Regulateurs Europa',
+		912: 'Reserved',
+		913: 'Reserved',
+		914: 'Micro Motion, Inc.',
+		915: 'Eckelmann AG',
+		916: 'Hanyoung Nux',
+		917: 'Ransburg Industrial Finishing KK',
+		918: 'Kun Hung Electric Co. Ltd.',
+		919: 'Brimos wegbebakening b.v.',
+		920: 'Nitto Seiki Co., Ltd',
+		921: 'PPT Vision, Inc.',
+		922: 'Yamazaki Machinery Works',
+		923: 'SCHMIDT Technology GmbH',
+		924: 'Parker Hannifin SpA (SBC Division)',
+		925: 'HIMA Paul Hildebrandt GmbH',
+		926: 'RivaTek, Inc.',
+		927: 'Misumi Corporation',
+		928: 'GE Multilin',
+		929: 'Measurement Computing Corporation',
+		930: 'Jetter AG',
+		931: 'Tokyo Electronics Systems Corporation',
+		932: 'Togami Electric Mfg. Co., Ltd.',
+		933: 'HK Systems',
+		934: 'CDA Systems Ltd.',
+		935: 'Aerotech Inc.',
+		936: 'JVL Industrie Elektronik A/S',
+		937: 'NovaTech Process Solutions LLC',
+		938: 'Reserved',
+		939: 'Cisco Systems',
+		940: 'Grid Connect',
+		941: 'ITW Automotive Finishing',
+		942: 'HanYang System',
+		943: 'ABB K.K. Technical Center',
+		944: 'Taiyo Electric Wire & Cable Co., Ltd.',
+		945: 'Reserved',
+		946: 'SEREN IPS INC',
+		947: 'Belden CDT Electronics Division',
+		948: 'ControlNet International',
+		949: 'Gefran S.P.A.',
+		950: 'Jokab Safety AB',
+		951: 'SUMITA OPTICAL GLASS, INC.',
+		952: 'Biffi Italia srl',
+		953: 'Beck IPC GmbH',
+		954: 'Copley Controls Corporation',
+		955: 'Fagor Automation S. Coop.',
+		956: 'DARCOM',
+		957: 'Frick Controls (div. of York International)',
+		958: 'SymCom, Inc.',
+		959: 'Infranor',
+		960: 'Kyosan Cable, Ltd.',
+		961: 'Varian Vacuum Technologies',
+		962: 'Messung Systems',
+		963: 'Xantrex Technology, Inc.',
+		964: 'StarThis Inc.',
+		965: 'Chiyoda Co., Ltd.',
+		966: 'Flowserve Corporation',
+		967: 'Spyder Controls Corp.',
+		968: 'IBA AG',
+		969: 'SHIMOHIRA ELECTRIC MFG.CO.,LTD',
+		970: 'Reserved',
+		971: 'Siemens L&A',
+		972: 'Micro Innovations AG',
+		973: 'Switchgear & Instrumentation',
+		974: 'PRE-TECH CO., LTD.',
+		975: 'National Semiconductor',
+		976: 'Invensys Process Systems',
+		977: 'Ametek HDR Power Systems',
+		978: 'Reserved',
+		979: 'TETRA-K Corporation',
+		980: 'C & M Corporation',
+		981: 'Siempelkamp Maschinen',
+		982: 'Reserved',
+		983: 'Daifuku America Corporation',
+		984: 'Electro-Matic Products Inc.',
+		985: 'BUSSAN MICROELECTRONICS CORP.',
+		986: 'ELAU AG',
+		987: 'Hetronic USA',
+		988: 'NIIGATA POWER SYSTEMS Co., Ltd.',
+		989: 'Software Horizons Inc.',
+		990: 'B3 Systems, Inc.',
+		991: 'Moxa Networking Co., Ltd.',
+		992: 'Reserved',
+		993: 'S4 Integration',
+		994: 'Elettro Stemi S.R.L.',
+		995: 'AquaSensors',
+		996: 'Ifak System GmbH',
+		997: 'SANKEI MANUFACTURING Co.,LTD.',
+		998: 'Emerson Network Power Co., Ltd.',
+		999: 'Fairmount Automation, Inc.',
+		1000: 'Bird Electronic Corporation',
+		1001: 'Nabtesco Corporation',
+		1002: 'AGM Electronics, Inc.',
+		1003: 'ARCX Inc.',
+		1004: 'DELTA I/O Co.',
+		1005: 'Chun IL Electric Ind. Co.',
+		1006: 'N-Tron',
+		1007: 'Nippon Pneumatics/Fludics System CO.,LTD.',
+		1008: 'DDK Ltd.',
+		1009: 'Seiko Epson Corporation',
+		1010: 'Halstrup-Walcher GmbH',
+		1011: 'ITT',
+		1012: 'Ground Fault Systems bv',
+		1013: 'Scolari Engineering S.p.A.',
+		1014: 'Vialis Traffic bv',
+		1015: 'Weidmueller Interface GmbH & Co. KG',
+		1016: 'Shanghai Sibotech Automation Co. Ltd',
+		1017: 'AEG Power Supply Systems GmbH',
+		1018: 'Komatsu Electronics Inc.',
+		1019: 'Souriau',
+		1020: 'Baumuller Chicago Corp.',
+		1021: 'J. Schmalz GmbH',
+		1022: 'SEN Corporation',
+		1023: 'Korenix Technology Co. Ltd',
+		1024: 'Cooper Power Tools',
+		1025: 'INNOBIS',
+		1026: 'Shinho System',
+		1027: 'Xm Services Ltd.',
+		1028: 'KVC Co., Ltd.',
+		1029: 'Sanyu Seiki Co., Ltd.',
+		1030: 'TuxPLC',
+		1031: 'Northern Network Solutions',
+		1032: 'Converteam GmbH',
+		1033: 'Symbol Technologies',
+		1034: 'S-TEAM Lab',
+		1035: 'Maguire Products, Inc.',
+		1036: 'AC&T',
+		1037: 'MITSUBISHI HEAVY INDUSTRIES, LTD. KOBE SHIPYARD & MACHINERY WORKS',
+		1038: 'Hurletron Inc.',
+		1039: 'Chunichi Denshi Co., Ltd',
+		1040: 'Cardinal Scale Mfg. Co.',
+		1041: 'BTR NETCOM via RIA Connect, Inc.',
+		1042: 'Base2',
+		1043: 'ASRC Aerospace',
+		1044: 'Beijing Stone Automation',
+		1045: 'Changshu Switchgear Manufacture Ltd.',
+		1046: 'METRONIX Corp.',
+		1047: 'WIT',
+		1048: 'ORMEC Systems Corp.',
+		1049: 'ASATech (China) Inc.',
+		1050: 'Controlled Systems Limited',
+		1051: 'Mitsubishi Heavy Ind. Digital System Co., Ltd. (M.H.I.)',
+		1052: 'Electrogrip',
+		1053: 'TDS Automation',
+		1054: 'T&C Power Conversion, Inc.',
+		1055: 'Robostar Co., Ltd',
+		1056: 'Scancon A/S',
+		1057: 'Haas Automation, Inc.',
+		1058: 'Eshed Technology',
+		1059: 'Delta Electronic Inc.',
+		1060: 'Innovasic Semiconductor',
+		1061: 'SoftDEL Systems Limited',
+		1062: 'FiberFin, Inc.',
+		1063: 'Nicollet Technologies Corp.',
+		1064: 'B.F. Systems',
+		1065: 'Empire Wire and Supply LLC',
+		1066: 'Reserved',
+		1067: 'Elmo Motion Control LTD',
+		1068: 'Reserved',
+		1069: 'Asahi Keiki Co., Ltd.',
+		1070: 'Joy Mining Machinery',
+		1071: 'MPM Engineering Ltd',
+		1072: 'Wolke Inks & Printers GmbH',
+		1073: 'Mitsubishi Electric Engineering Co., Ltd.',
+		1074: 'COMET AG',
+		1075: 'Real Time Objects & Systems, LLC',
+		1076: 'MISCO Refractometer',
+		1077: 'JT Engineering Inc.',
+		1078: 'Automated Packing Systems',
+		1079: 'Niobrara R&D Corp.',
+		1080: 'Garmin Ltd.',
+		1081: 'Japan Mobile Platform Co., Ltd',
+		1082: 'Advosol Inc.',
+		1083: 'ABB Global Services Limited',
+		1084: 'Sciemetric Instruments Inc.',
+		1085: 'Tata Elxsi Ltd.',
+		1086: 'TPC Mechatronics, Co., Ltd.',
+		1087: 'Cooper Bussmann',
+		1088: 'Trinite Automatisering B.V.',
+		1089: 'Peek Traffic B.V.',
+		1090: 'Acrison, Inc',
+		1091: 'Applied Robotics, Inc.',
+		1092: 'FireBus Systems, Inc.',
+		1093: 'Beijing Sevenstar Huachuang Electronics',
+		1094: 'Magnetek',
+		1095: 'Microscan',
+		1096: 'Air Water Inc.',
+		1097: 'Sensopart Industriesensorik GmbH',
+		1098: 'Tiefenbach Control Systems GmbH',
+		1099: 'INOXPA S.A',
+		1100: 'Zurich University of Applied Sciences',
+		1101: 'Ethernet Direct',
+		1102: 'GSI-Micro-E Systems',
+		1103: 'S-Net Automation Co., Ltd.',
+		1104: 'Power Electronics S.L.',
+		1105: 'Renesas Technology Corp.',
+		1106: 'NSWCCD-SSES',
+		1107: 'Porter Engineering Ltd.',
+		1108: 'Meggitt Airdynamics, Inc.',
+		1109: 'Inductive Automation',
+		1110: 'Neural ID',
+		1111: 'EEPod LLC',
+		1112: 'Hitachi Industrial Equipment Systems Co., Ltd.',
+		1113: 'Salem Automation',
+		1114: 'port GmbH',
+		1115: 'B & PLUS',
+		1116: 'Graco Inc.',
+		1117: 'Altera Corporation',
+		1118: 'Technology Brewing Corporation',
+		1121: 'CSE Servelec',
+		1124: 'Fluke Networks',
+		1125: 'Tetra Pak Packaging Solutions SPA',
+		1126: 'Racine Federated, Inc.',
+		1127: 'Pureron Japan Co., Ltd.',
+		1130: 'Brother Industries, Ltd.',
+		1132: 'Leroy Automation',
+		1134: 'THK CO., LTD.',
+		1137: 'TR-Electronic GmbH',
+		1138: 'ASCON S.p.A.',
+		1139: 'Toledo do Brasil Industria de Balancas Ltda.',
+		1140: 'Bucyrus DBT Europe GmbH',
+		1141: 'Emerson Process Management Valve Automation',
+		1142: 'Alstom Transport',
+		1144: 'Matrox Electronic Systems',
+		1145: 'Littelfuse',
+		1146: 'PLASMART, Inc.',
+		1147: 'Miyachi Corporation',
+		1150: 'Promess Incorporated',
+		1151: 'COPA-DATA GmbH',
+		1152: 'Precision Engine Controls Corporation',
+		1153: 'Alga Automacao e controle LTDA',
+		1154: 'U.I. Lapp GmbH',
+		1155: 'ICES',
+		1156: 'Philips Lighting bv',
+		1157: 'Aseptomag AG',
+		1158: 'ARC Informatique',
+		1159: 'Hesmor GmbH',
+		1160: 'Kobe Steel, Ltd.',
+		1161: 'FLIR Systems',
+		1162: 'Simcon A/S',
+		1163: 'COPALP',
+		1164: 'Zypcom, Inc.',
+		1165: 'Swagelok',
+		1166: 'Elspec',
+		1167: 'ITT Water & Wastewater AB',
+		1168: 'Kunbus GmbH Industrial Communication',
+		1170: 'Performance Controls, Inc.',
+		1171: 'ACS Motion Control, Ltd.',
+		1173: 'IStar Technology Limited',
+		1174: 'Alicat Scientific, Inc.',
+		1176: 'ADFweb.com SRL',
+		1177: 'Tata Consultancy Services Limited',
+		1178: 'CXR Ltd.',
+		1179: 'Vishay Nobel AB',
+		1181: 'SolaHD',
+		1182: 'Endress+Hauser',
+		1183: 'Bartec GmbH',
+		1185: 'AccuSentry, Inc.',
+		1186: 'Exlar Corporation',
+		1187: 'ILS Technology',
+		1188: 'Control Concepts Inc.',
+		1190: 'Procon Engineering Limited',
+		1191: 'Hermary Opto Electronics Inc.',
+		1192: 'Q-Lambda',
+		1194: 'VAMP Ltd',
+		1195: 'FlexLink',
+		1196: 'Office FA.com Co., Ltd.',
+		1197: 'SPMC (Changzhou) Co. Ltd.',
+		1198: 'Anton Paar GmbH',
+		1199: 'Zhuzhou CSR Times Electric Co., Ltd.',
+		1200: 'DeStaCo',
+		1201: 'Synrad, Inc',
+		1202: 'Bonfiglioli Vectron GmbH',
+		1203: 'Pivotal Systems',
+		1204: 'TKSCT',
+		1205: 'Randy Nuernberger',
+		1206: 'CENTRALP',
+		1207: 'Tengen Group',
+		1208: 'OES, Inc.',
+		1209: 'Actel Corporation',
+		1210: 'Monaghan Engineering, Inc.',
+		1211: 'wenglor sensoric gmbh',
+		1212: 'HSA Systems',
+		1213: 'MK Precision Co., Ltd.',
+		1214: 'Tappan Wire and Cable',
+		1215: 'Heinzmann GmbH & Co. KG',
+		1216: 'Process Automation International Ltd.',
+		1217: 'Secure Crossing',
+		1218: 'SMA Railway Technology GmbH',
+		1219: 'FMS Force Measuring Systems AG',
+		1220: 'ABT Endustri Enerji Sistemleri Sanayi Tic. Ltd. Sti.',
+		1221: 'MagneMotion Inc.',
+		1222: 'STS Co., Ltd.',
+		1223: 'MERAK SIC, SA',
+		1224: 'ABOUNDI, Inc.',
+		1225: 'Rosemount Inc.',
+		1226: 'GEA FES, Inc.',
+		1227: 'TMG Technologie und Engineering GmbH',
+		1228: 'embeX GmbH',
+		1229: 'GH Electrotermia, S.A.',
+		1230: 'Tolomatic',
+		1231: 'Dukane',
+		1232: 'Elco (Tian Jin) Electronics Co., Ltd.',
+		1233: 'Jacobs Automation',
+		1234: 'Noda Radio Frequency Technologies Co., Ltd.',
+		1235: 'MSC Tuttlingen GmbH',
+		1236: 'Hitachi Cable Manchester',
+		1237: 'ACOREL SAS',
+		1238: 'Global Engineering Solutions Co., Ltd.',
+		1239: 'ALTE Transportation, S.L.',
+		1240: 'Penko Engineering B.V.'}
+	return vid	
+	
