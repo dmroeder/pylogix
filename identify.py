@@ -92,7 +92,7 @@ def ListIdentity():
   
   # get available ip addresses
   addresses = socket.getaddrinfo(socket.gethostname(), None)
-  #print addresses
+
   # we're going to send a request for all available ipv4
   # addresses and build a list of all the devices that reply
   for ip in addresses:
@@ -113,6 +113,23 @@ def ListIdentity():
 	  except:
 		  do="Nothing"
 		  
+  # added this because looping through addresses above doesn't work on
+  # linux so this is a "just in case".  If we don't get results with the 
+  # above code, try one more time without binding to an address
+  if len(devices)==0:
+    	  s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	  s.settimeout(0.5)
+	  s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+	  s.sendto(request, ('255.255.255.255', 44818))
+	  try:
+	    while(1):
+	      ret=s.recv(1024)
+	      context=unpack_from('<Q', ret, 14)[0]
+	      if context==0x65696c796168:
+		# the data came from our request
+		devices.append(Identify().ParseResponse(ret))
+	  except:
+	    do="Nothing"
   return devices
 
 

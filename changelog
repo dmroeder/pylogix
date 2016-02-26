@@ -1,5 +1,6 @@
 02/25/16
   -more mods to identify.py, made it more pythonic with JordanCClark's suggestions
+  -try without binding if looping through ipv4 addreses doesn't return anything
 
 02/22/16
   -identify.py now sends packet out each network adapter
