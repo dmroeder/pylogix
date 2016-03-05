@@ -412,7 +412,7 @@ def _buildCIPTag(isBoolArray):
 	    BaseTagLenWords=BaseTagLenBytes/2			# figure out the words for this segment
 	    RequestPathSize+=BaseTagLenWords			# add it to our request size
 	    
-	    if i<len(s)-1:
+	    if i<len(s):
 		if isinstance(index, list)==False:
 		    if index<256:					# if index is 1 byte...
 			RequestPathSize+=1				# add word for array index
