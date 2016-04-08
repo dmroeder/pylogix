@@ -1,3 +1,6 @@
+04/07/16
+  -Modified identify.py to get rid of the functions for the lists
+
 03/04/16
   -Fixed issue reading array only returning first element
   
