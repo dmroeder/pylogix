@@ -1,72 +1,30 @@
-USAGE:
+****************************************
+USAGE
+****************************************
 
-1) import the EIP file: import eip as PLC
+1) from eip import PLC
 
-2) init:  PLC.__init__()
+2) test = PLC()
 
-3) Set the IP Address property: PLC.IPAddress("192.168.1.10")
+3) Set the IP Address: test.IPAddress = "192.168.1.0"
 
-4) If your processor is in a slot other than 0, set that: PLC.ProcessorSlot(n)
+4) If your processor is in a slot other than 0, set that: test.ProcessorSlot = 1
 
 5) Do one of the following:
 
-    Read a value:  value = PLC.Read("tagname")
-	ex: value = PLC.Read("MyTimer.ACC")
+    Read a value:  value = test.Read("tagname")
+	ex: value = test.Read("MyTimer.ACC")
 		    print value
 	
-    Read an array: value = PLC.Read("tagname", length)
-	ex: value = PLC.Read("MyDINT", 10)
+    Read an array: value = test.Read("tagname", length)
+	ex: value = test.Read("MyDINT", 10)
 		    print value(3)
 		    
-    Multi-read values = PLC.MultiRead("Tag1", "Tag2", "Tag3")
-			print values
-			
-    Write a value: PLC.Write("tagname", value)
-	ex: PLC.Write("MyTimer.PRE", 100")
-	
-    Get a list of the controller tags:  taglist = PLC.GetTagList()
-	taglist will be an object with the following properties:
-	    .TagName
-	    .Offset
-	    .DataType
-	if you want to know how many tags: print len(taglist)
-	access one:  print taglist[4].TagName
-	
-    Get the PLC Clock time: time=PLC.GetPLCTime()
-	ex: time=PLC.GetPLCTime()
-	    print time
-	
 	
 So a complete script to read a tag would look like this:
 
-import eip as PLC
-PLC.__init__()
-PLC.IPAddress("192.168.1.10")
-value = PLC.Read("MyTimer.ACC")
+from eip import PLC
+test = PLC()
+test.IPAddress = "192.168.1.64"
+value = test.Read("MyTimer.ACC")
 print value
-
-
-*************************************************************************
-Added identify.py.  If you call the ListIdentity() function, it will send out a
-UDP packet which will request that all listening devices respond with some
-information about each device.  It will be returned to you in a list.
-
-Usage would look like this:
-
-from identify import *
-devices=ListIdentity()
-for i in xrange(len(devices)):
-  print devices[i].Address, devices[i].ProductName
-  
-The complete data structure returned is:
-  .Address
-  .VendorID
-  .Vendor
-  .DeviceID
-  .DeviceType
-  .ProductCode
-  .Revision
-  .Status
-  .SerialNumber
-  .ProductName
-  .State

@@ -1,3 +1,6 @@
+06/07/16
+  -Rewrite eip.py.  Trying to make it easier to use, only Read functions work for now
+
 04/07/16
   -Modified identify.py to get rid of the functions for the lists
 
