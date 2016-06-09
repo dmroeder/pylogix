@@ -20,6 +20,10 @@ USAGE
 	ex: value = test.Read("MyDINT", 10)
 		    print value(3)
 		    
+    Read multiple tags at once: test.MultiRead("tag1", "tag2", "tag3")
+	ex: values = test.MultiRead("MyDINT", "MyTimer.ACC", "AnotherDINT")
+	    print values
+		    
     Write a value: test.Write("tagname", value)
 	ex: test.Write("MyDINT", 1337)
 		    

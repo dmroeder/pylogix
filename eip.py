@@ -1,13 +1,9 @@
 '''
 Initially created by Burt Peterson
 Updated and maintained by Dustin Roeder (dmroeder@gmail.com)
-'''
 
-from random import randrange
-import socket
-from struct import *
 
-'''
+
 Several things take place when making a connection to a PLC.
 
 1) Standard TCP connection
@@ -44,6 +40,11 @@ In order to perform a typical read/write, the data type needs to be known, or
     do the normal read/write (0x4C/0x4D/0x4E).  
 '''
 
+from datetime import datetime, timedelta
+from random import randrange
+import socket
+from struct import *
+
 class PLC():
 
     def __init__(self):
@@ -67,7 +68,7 @@ class PLC():
         self.SequenceCounter = 1
         self.Offset = 0
         self.KnownTags = {}
-        self.StructIdentifier=0x0fCE
+        self.StructIdentifier = 0x0fCE
         self.CIPTypes = {160:(0 ,"STRUCT", 'B'),
                          193:(1, "BOOL", '?'),
                          194:(1, "SINT", 'b'),
@@ -103,14 +104,26 @@ class PLC():
 	else:
             return "You provided too many arguments, not sure what you want to do"
 
+    def MultiRead(self, *args):
+        '''
+        Read multiple tags in one request
+        '''
+        return _multiRead(self, args)
+
+    def GetPLCTime(self):
+        '''
+        Get the PLC's clock time
+        '''
+        return _getPLCTime(self)
+        
 def _readTag(self, tag, elements):
-    
-    if not self.SocketConnected:
-        _openConnection(self)
+    '''
+    processes the read request
+    '''
+    if not self.SocketConnected: _openConnection(self)
 
     t,b,i = TagNameParser(tag, 0)
-    if b not in self.KnownTags:
-        InitialRead(self, t, b)
+    if b not in self.KnownTags: InitialRead(self, t, b)
 
     if self.KnownTags[b][0] == 211:
         tagData = _buildTagIOI(self, tag, isBoolArray=True)
@@ -125,12 +138,13 @@ def _readTag(self, tag, elements):
         
 
 def _writeTag(self, tag, value, elements):
-    if not self.SocketConnected:
-        _openConnection(self)
+    '''
+    Processes the write request
+    '''
+    if not self.SocketConnected: _openConnection(self)
     
     t,b,i = TagNameParser(tag, 0)
-    if b not in self.KnownTags:
-        InitialRead(self, t, b)
+    if b not in self.KnownTags: InitialRead(self, t, b)
 
     dataType = self.KnownTags[b][0]
     self.Offset = 0
@@ -165,7 +179,92 @@ def _writeTag(self, tag, value, elements):
     self.Socket.send(eipHeader)
     retData = self.Socket.recv(1024)
     
-	
+def _multiRead(self, args):
+    '''
+    Processes the multiple read request
+    '''
+    serviceSegments = []
+    segments = ""
+    tagCount = len(args)
+    if not self.SocketConnected: _openConnection(self)
+
+    for i in xrange(tagCount):
+	t,b,i = TagNameParser(args[i], 0)
+	if b not in self.KnownTags: InitialRead(self, t, b)
+	    
+        tagIOI = _buildTagIOI(self, t, isBoolArray=False)
+        readIOI = _addReadIOI(self, tagIOI, 1)
+        serviceSegments.append(readIOI)
+
+    header = _buildMultiServiceHeader()
+    segmentCount = pack('<H', tagCount)
+        
+    temp = len(header)
+    if tagCount > 2:
+        temp += (tagCount-2)*2
+    offsets = pack('<H', temp)
+
+    # assemble all the segments
+    for i in xrange(tagCount):
+	segments += serviceSegments[i]
+
+    for i in xrange(tagCount-1):	
+	temp += len(serviceSegments[i])
+	offsets += pack('<H', temp)
+
+    readRequest = header+segmentCount+offsets+segments
+    eipHeader = _buildEIPHeader(self, readRequest)
+    self.Socket.send(eipHeader)
+    retData = self.Socket.recv(1024)
+
+    return MultiParser(self, retData)
+
+def _getPLCTime(self):
+    # If not connected to PLC, abandon ship!
+    if not self.SocketConnected: _openConnection(self)
+		
+    AttributeService = 0x03
+    AttributeSize = 0x02
+    AttributeClassType = 0x20
+    AttributeClass = 0x8B
+    AttributeInstanceType = 0x24
+    AttributeInstance = 0x01
+    AttributeCount = 0x04
+    Attributes=(0x06, 0x08, 0x09, 0x0A)
+    
+    AttributePacket = pack('<BBBBBBH4H',
+                           AttributeService,
+			   AttributeSize,
+			   AttributeClassType,
+			   AttributeClass,
+			   AttributeInstanceType,
+			   AttributeInstance,
+			   AttributeCount,
+			   Attributes[0],
+			   Attributes[1],
+			   Attributes[2],
+			   Attributes[3])
+    
+    #self.CIPRequest=AttributePacket
+    eipHeader = _buildEIPHeader(self, AttributePacket)
+    
+    self.Socket.send(eipHeader)
+    retData = self.Socket.recv(1024)
+    # get the time from the packet
+    plcTime = unpack_from('<Q', retData, 56)[0]
+    # get the timezone offset from the packet (this will include sign)
+    timezoneOffset = int(retData[75:78])
+    # get daylight savings setting from packet (at the end)
+    dst = unpack_from('<B', retData, len(retData)-1)[0]
+    # factor in daylight savings time
+    timezoneOffset += dst
+    # offset our by the timezone (big number=1 hour in microseconds)
+    timezoneOffset = timezoneOffset*3600000000
+    # convert it to human readable format
+    humanTime = datetime(1970, 1, 1)+timedelta(microseconds=plcTime+timezoneOffset)
+
+    return humanTime 
+    
 def _openConnection(self):
     '''
     Open our initial connection to the PLC
@@ -379,12 +478,14 @@ def _buildTagIOI(self, tagName, isBoolArray):
 			    RequestTagData += pack('<BBH', 0x29, 0x00, index[i])  # add 2 words to packet		    
 	
 	else:
-	    # for non-array segment of tag
-	    # the try might be a stupid way of doing this.  If the portion of the tag
-	    # 	can be converted to an integer successfully then we must be just looking
-	    #	for a bit from a word rather than a UDT.  So we then don't want to assemble
-	    #	the read request as a UDT, just read the value of the DINT.  We'll figure out
-	    #	the individual bit in the read function.
+            '''
+	    for non-array segment of tag
+	    the try might be a stupid way of doing this.  If the portion of the tag
+                can be converted to an integer successfully then we must be just looking
+	    	for a bit from a word rather than a UDT.  So we then don't want to assemble
+	    	the read request as a UDT, just read the value of the DINT.  We'll figure out
+	    	the individual bit in the read function.
+	    '''
 	    try:
 		if int(tagArray[i]) <= 31:
 		    pass
@@ -531,6 +632,26 @@ def _buildEIPHeader(self, tagIOI):
     
     return EIPHeaderFrame+tagIOI
 
+def _buildMultiServiceHeader():
+    '''
+    Service header for making a multiple tag request
+    '''
+    MultiService = 0X0A
+    MultiPathSize = 0x02
+    MutliClassType = 0x20
+    MultiClassSegment = 0x02
+    MultiInstanceType = 0x24
+    MultiInstanceSegment = 0x01
+    
+    return pack('<BBBBBB',
+		MultiService,
+		MultiPathSize,
+		MutliClassType,
+		MultiClassSegment,
+		MultiInstanceType,
+		MultiInstanceSegment)
+
+
 def _whatsInThis(self, tag, elements, data):
     '''
     Take the received packet data on a read and
@@ -636,6 +757,9 @@ def _getBitOfWord(split_tag, value):
     return returnvalue
     
 def _getSingleString(data):
+    '''
+    extracts the value from a string read
+    '''
     # get STRING
     NameLength = unpack_from('<L', data, 54)[0]
     stringLen = unpack_from('<H', data, 2)[0]
@@ -687,6 +811,32 @@ def TagNameParser(tag, offset):
 	return tag, bt, ind    
     except:
 	return tag, bt, 0
+
+def MultiParser(self, data):
+    '''
+    Takes multi read reply data and returns an array of the values
+    '''
+    # remove the beginning of the packet because we just don't care about it
+    stripped = data[50:]
+    tagCount = unpack_from('<H', stripped, 0)[0]
+    
+    # get the offset values for each of the tags in the packet
+    reply = []
+    for i in xrange(tagCount):
+	loc = 2+(i*2)					# pointer to offset
+	offset = unpack_from('<H', stripped, loc)[0]	# get offset
+	replyStatus = unpack_from('<b', stripped, offset+2)[0]
+	replyExtended = unpack_from('<b', stripped, offset+3)[0]
+
+	# successful reply, add the value to our list
+	if replyStatus == 0 and replyExtended == 0:
+	    dataTypeValue = unpack_from('<B', stripped, offset+4)[0]	# data type
+	    dataTypeFormat = self.CIPTypes[dataTypeValue][2]     	# number of bytes for datatype	  
+	    reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
+	else:
+	    reply.append("Error")
+	    
+    return reply
 
 def BitofWord(tag):
     '''

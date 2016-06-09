@@ -1,3 +1,6 @@
+06/09/16
+  -Added multi-read function back in, also GetPLCTime
+
 06/08/16
   -Fixed multi-dim read's, array reads.  Write functions now working
 
