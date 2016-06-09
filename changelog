@@ -1,3 +1,6 @@
+06/08/16
+  -Fixed multi-dim read's, array reads.  Write functions now working
+
 06/07/16
   -Rewrite eip.py.  Trying to make it easier to use, only Read functions work for now
 

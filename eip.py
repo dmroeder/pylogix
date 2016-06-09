@@ -1,18 +1,63 @@
+'''
+Initially created by Burt Peterson
+Updated and maintained by Dustin Roeder (dmroeder@gmail.com)
+'''
+
 from random import randrange
 import socket
 from struct import *
 
+'''
+Several things take place when making a connection to a PLC.
+
+1) Standard TCP connection
+2) Session Registration, PLC will respond with a Session Handle
+3) Forward Open.  Using the Session Handle, this establishes
+        the parameters for connection
+4) Command (read/write/etc) and payload
+
+The initial connections (TCP, Session Registration, Forward Open)
+    only need to be made once, after that, we can exchange data
+    until the connection is closed or lost.
+
+A number events that take place on the command end, they should
+    be invisible to the user, but it's good to know (and a reminder for me).
+    The user can be reading/writing simple tags, UDT's arrays, bits of a word,
+    bools out of atomic arrays, custom length strings, array reads that
+    won't fit in a single reply and so on.  Each has to be handled in a
+    different way.
+
+    It basically happens like this:  Figure out if its a single tag to be
+    read/written or an array.  Open the connection to the PLC (1,2,3 above),
+    parse the tag name, add the command (read/write), send the data to the PLC,
+    handle the reply
+
+In order to perform a typical read/write, the data type needs to be known, or
+    more specifically, the number of bytes the tag is.  It would be pretty
+    annoying for the user to have to specify this each time, so to get around
+    this, we have the InitialRead function.  This is called on any data exchange
+    where the tag name has never been read/written before.  It uses a different
+    CIP command than a typical read (0x52 vs 0x4C) which will respond with the
+    data type.  This helps us in two ways:  First, the user won't need to specify
+    the data type.  Second, we can keep track of this information so the next
+    time the particular tag is called, we already know it's type so we can just
+    do the normal read/write (0x4C/0x4D/0x4E).  
+'''
+
 class PLC():
 
     def __init__(self):
+        '''
+        Initialize our parameters
+        '''
         self.IPAddress = ""
         self.ProcessorSlot = 0
         self.Port = 44818
         self.VendorID = 0x1337
         self.Context = 0x00
         self.ContextPointer = 0
-        
         self.Socket = socket.socket()
+        self.Socket.settimeout(0.5)
         self.SocketConnected = False
         self.OTNetworkConnectionID=None
         self.SessionHandle = 0x0000
@@ -20,10 +65,9 @@ class PLC():
         self.SerialNumber = randrange(65000)
         self.OriginatorSerialNumber = 42
         self.SequenceCounter = 1
-
         self.Offset = 0
-
         self.KnownTags = {}
+        self.StructIdentifier=0x0fCE
         self.CIPTypes = {160:(0 ,"STRUCT", 'B'),
                          193:(1, "BOOL", '?'),
                          194:(1, "SINT", 'b'),
@@ -36,18 +80,30 @@ class PLC():
     def Read(self, *args):
         '''
         We have two options for reading depending on
-        on the arguments, read a single tag, or read an array
+        the arguments, read a single tag, or read an array
         '''
         if not args:
             return "You must provide a tag name"
         elif len(args) == 1:
-            return _readSingle(self, args[0], 1)
+            return _readTag(self, args[0], 1)
         elif len(args) == 2:
-            return _readSingle(self, args[0], args[1])
+            return _readTag(self, args[0], args[1])
         else:
             return "You provided too many arguments for a read"
+	  
+    def Write(self, *args):
+	'''
+	We have two options for writing depending on
+	the arguments, write a single tag, or write an array
+	'''
+	if not args or args == 1:
+	    return "You must provide a tag name and value"
+	elif len(args) == 2:
+	    _writeTag(self, args[0], args[1], 1)
+	else:
+            return "You provided too many arguments, not sure what you want to do"
 
-def _readSingle(self, tag, elements):
+def _readTag(self, tag, elements):
     
     if not self.SocketConnected:
         _openConnection(self)
@@ -60,34 +116,60 @@ def _readSingle(self, tag, elements):
         tagData = _buildTagIOI(self, tag, isBoolArray=True)
     else:
         tagData = _buildTagIOI(self, tag, isBoolArray=False)
+        
     readRequest = _addReadIOI(self, tagData, elements)
     eipHeader = _buildEIPHeader(self, readRequest)
-
     self.Socket.send(eipHeader)
     retData = self.Socket.recv(1024)
-    #if elements == 1:
     return _whatsInThis(self, tag, elements, retData)
-    #else:
-    #return _whatsInThis(self, tag, elements, retData, readArray=True)
         
-##def _readArray(self, tag, length):
-##    #return "Reading Array:", tag, length
-##    if not self.SocketConnected:
-##        _openConnection(self)
-##
-##    t,b,i = TagNameParser(tag, 0)
-##    if b not in self.KnownTags:
-##        InitialRead(self, t, b)
-##
-##    tagData = _buildTagIOI(self, tag, isBoolArray=False)
-##    readRequest = _addReadIOI(self, tagData, 1)
-##    eipHeader = _buildEIPHeader(self, readRequest)
-##
-##    self.Socket.send(eipHeader)
-##    retData = self.Socket.recv(1024)
-        
-def _openConnection(self):
+
+def _writeTag(self, tag, value, elements):
+    if not self.SocketConnected:
+        _openConnection(self)
     
+    t,b,i = TagNameParser(tag, 0)
+    if b not in self.KnownTags:
+        InitialRead(self, t, b)
+
+    dataType = self.KnownTags[b][0]
+    self.Offset = 0
+    writeData = []
+
+    if elements == 1:
+	if dataType == 202:
+	    writeData.append(float(value))
+	elif dataType == 160:
+	    writeData = MakeString(value)
+	else:
+	    writeData.append(int(value))
+    elif elements > 1:
+	for i in xrange(elements):
+	    writeData.append(int(value[i]))  
+    else:
+	print "Fix this"
+
+     # write a bit of a word, or everything else
+    if BitofWord(tag):
+	tagData = _buildTagIOI(self, tag, isBoolArray=False)
+	writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
+    else:
+	if dataType == 211:
+	   tagData = _buildTagIOI(self, tag, isBoolArray=False)
+	   writeRequest = _addCIPWriteDWORDData()
+	else:
+	    tagData = _buildTagIOI(self, tag, isBoolArray=False)
+	    writeRequest = _addWriteIOI(self, tagData, writeData, dataType, 1)
+	   
+    eipHeader = _buildEIPHeader(self, writeRequest)
+    self.Socket.send(eipHeader)
+    retData = self.Socket.recv(1024)
+    
+	
+def _openConnection(self):
+    '''
+    Open our initial connection to the PLC
+    '''
     self.SocketConnected = False
     try:
         self.Socket.connect((self.IPAddress, self.Port))
@@ -110,6 +192,9 @@ def _openConnection(self):
         self.OTNetworkConnectionID = tempID[0]       
         
 def _buildRegisterSession(self):
+    '''
+    Register our CIP connection
+    '''
     EIPCommand = 0x0065                       #(H)Register Session Command   (Vol 2 2-3.2)
     EIPLength = 0x0004                        #(H)Lenght of Payload          (2-3.3)
     EIPSessionHandle = self.SessionHandle     #(I)Session Handle             (2-3.4)
@@ -131,11 +216,18 @@ def _buildRegisterSession(self):
                 EIPOptionFlag)
 
 def _buildForwardOpenPacket(self):
+    '''
+    Assemble the forward open packet
+    '''
     forwardOpen = _buildCIPForwardOpen(self)
     rrDataHeader = _buildEIPSendRRDataHeader(self, len(forwardOpen))
     return rrDataHeader+forwardOpen
 
 def _buildCIPForwardOpen(self):
+    '''
+    Forward Open happens after a connection is made,
+    this will sequp the CIP connection parameters
+    '''
     CIPService = 0x54                                    #(B) CIP OpenForward        Vol 3 (3-5.5.2)(3-5.5)
     CIPPathSize = 0x02                                   #(B) Request Path zize              (2-4.1)
     CIPClassType = 0x20                                  #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
@@ -157,13 +249,13 @@ def _buildCIPForwardOpen(self):
     CIPOTNetworkConnectionParameters = 0x43f4            #(H) O->T connection Parameters    (3-5.5.1.1)
 						         # Non-Redundant,Point to Point,[reserved],Low Priority,Variable,[500 bytes] 
 						         # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
-    CIPTORPI=0x00204001                                  #(I) RPI just over 2 seconds       (3-5.5.1.2)
-    CIPTONetworkConnectionParameters=0x43f4              #(H) T-O connection Parameters    (3-5.5.1.1)
+    CIPTORPI = 0x00204001                                #(I) RPI just over 2 seconds       (3-5.5.1.2)
+    CIPTONetworkConnectionParameters = 0x43f4            #(H) T-O connection Parameters    (3-5.5.1.1)
                                                          # Non-Redundant,Point to Point,[reserved],Low Priority,Variable,[500 bytes] 
                                                          # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
-    CIPTransportTrigger=0xA3                             #(B)                                   (3-5.5.1.12)
-    CIPConnectionPathSize=0x03                           #(B)                                   (3-5.5.1.9)
-    CIPConnectionPath=(0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
+    CIPTransportTrigger = 0xA3                           #(B)                                   (3-5.5.1.12)
+    CIPConnectionPathSize = 0x03                         #(B)                                   (3-5.5.1.9)
+    CIPConnectionPath = (0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
     """
     Port Identifier [BackPlane]
     Link adress .SetProcessorSlot (default=0x00)
@@ -231,6 +323,20 @@ def _buildEIPSendRRDataHeader(self, frameLen):
                 EIPItem2Length)
 
 def _buildTagIOI(self, tagName, isBoolArray):
+    '''
+    The tag IOI is basically the tag name assembled into
+    an array of bytes structured in a way that the PLC will
+    understand.  It's a little crazy, but we have to consider the
+    many variations that a tag can be:
+
+    TagName (DINT)
+    TagName.1 (Bit of DINT)
+    TagName.Thing (UDT)
+    TagName[4].Thing[2].Length (more complex UDT)
+
+    We also might be reading arrays, a bool from arrays (atomic), strings.
+        Oh and multi-dim arrays, program scope tags...
+    '''
     RequestPathSize = 0		# define path size
     RequestTagData = ""		# define tag data
     tagArray = tagName.split(".")
@@ -257,7 +363,7 @@ def _buildTagIOI(self, tagName, isBoolArray):
 	    
 	    if i < len(tagArray):
 		if not isinstance(index, list):
-		    if index < 256:					# if index is 1 byte...
+		    if index < 256:				        # if index is 1 byte...
 			RequestPathSize += 1				# add word for array index
 			RequestTagData += pack('<BB', 0x28, index)	# add one word to packet
 		    if index > 255:					# if index is more than 1 byte...
@@ -295,7 +401,9 @@ def _buildTagIOI(self, tagName, isBoolArray):
     return RequestTagData
 
 def _addReadIOI(self, tagIOI, elements):
-    # do the read related stuff if we are reading
+    '''
+    Add the read service to the tagIOI
+    '''
     RequestService = 0x4C		#CIP Read_TAG_Service (PM020 Page 17)
     RequestPathSize = len(tagIOI)/2
     readIOI = pack('<BB', RequestService, RequestPathSize)  # beginning of our req packet
@@ -304,7 +412,9 @@ def _addReadIOI(self, tagIOI, elements):
     return readIOI
 
 def _addPartialReadIOI(self, tagIOI, elements):
-    # do the read related stuff if we are reading
+    '''
+    Add the partial read service to the tag IOI
+    '''
     RequestService=0x52
     RequestPathSize=len(tagIOI)/2
     readIOI = pack('<BB', RequestService, RequestPathSize)  # beginning of our req packet
@@ -314,8 +424,69 @@ def _addPartialReadIOI(self, tagIOI, elements):
     readIOI += pack('<H', 0x0000)
     return readIOI
 
+def _addWriteIOI(self, tagIOI, writeData, dataType, elements):
+    '''
+    Add the write command stuff to the tagIOI
+    '''
+    elementSize = self.CIPTypes[dataType][0]     	#Dints are 4 bytes each
+    dataLen = len(writeData)            		#list of elements to write
+    NumberOfBytes = elementSize*dataLen
+    RequestNumberOfElements = dataLen
+    RequestPathSize = len(tagIOI)/2
+    if dataType == 160:  #Strings are special
+	RequestNumberOfElements = self.StructIdentifier
+	TypeCodeLen = 0x02
+    else:
+	TypeCodeLen = 0x00
+    RequestService = 0x4D			#CIP Write_TAG_Service (PM020 Page 17)
+    CIPWriteRequest = pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    CIPWriteRequest += tagIOI					# Tag portion of packet 
+
+    CIPWriteRequest += pack('<BBH', dataType, TypeCodeLen, RequestNumberOfElements)
+
+    for i in xrange(len(writeData)):
+	el = writeData[i]
+	CIPWriteRequest += pack(self.CIPTypes[dataType][2],el)
+    return CIPWriteRequest    
+
+def _addWriteBitIOI(self, tag, tagIOI, writeData, dataType):
+    '''
+    This will add the bit level request to the tagIOI
+    Writing to a bit is handled in a different way than
+    other writes
+    '''
+    elementSize = self.CIPTypes[dataType][0]     	#Dints are 4 bytes each
+    dataLen = len(writeData)            		#list of elements to write
+    NumberOfBytes = elementSize*dataLen
+    RequestNumberOfElements = dataLen
+    RequestPathSize = len(tagIOI)/2
+    RequestService = 0x4E			#CIP Write (special)
+    writeIOI = pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    writeIOI += tagIOI
+
+    fmt = self.CIPTypes[dataType][2]		# get the pack format ('b')
+    fmt = fmt.upper()				# convert it to unsigned ('B')
+    s = tag.split('.')			        # split by decimal to get bit
+    bit = s[len(s)-1]				# get the bit number we're writing to
+    bit = int(bit)				# convert it to integer
+	    
+    writeIOI += pack('<h', NumberOfBytes)	# pack the number of bytes
+    byte = 2**(NumberOfBytes*8)-1			
+    bits = 2**bit
+    if writeData[0]:
+	writeIOI += pack(fmt, bits)
+	writeIOI += pack(fmt, byte)
+    else:
+	writeIOI += pack(fmt, 0x00)
+	writeIOI += pack(fmt, (byte-bits))
+    return writeIOI
+
 def _buildEIPHeader(self, tagIOI):
-    
+    '''
+    The EIP Header contains the tagIOI and the
+    commands to perform the read or write.  This request
+    will be followed by the reply containing the data
+    '''
     if self.ContextPointer == 155: self.ContextPointer = 0
     
     EIPPayloadLength = 22+len(tagIOI)           #22 bytes of command specific data + the size of the CIP Payload
@@ -361,7 +532,13 @@ def _buildEIPHeader(self, tagIOI):
     return EIPHeaderFrame+tagIOI
 
 def _whatsInThis(self, tag, elements, data):
-
+    '''
+    Take the received packet data on a read and
+    extract the value out of it.  This is a little
+    crazy because different data types (DINT/STRING/REAL)
+    and different types of reads (Single/Array/Partial) all
+    have to be handled differently
+    '''
     status = unpack_from('<h', data, 46)[0]
     extendedStatus = unpack_from('<h', data, 48)[0]
 
@@ -395,12 +572,11 @@ def _whatsInThis(self, tag, elements, data):
 	    else:
 		dataSize = self.CIPTypes[datatype][0]
 	    
-	    numbytes = len(data)-dataSize	# total number of bytes in packet
+	    numbytes = len(data)-dataSize	        # total number of bytes in packet
 	    counter = 0					# counter for indexing through packet
 	    self.Offset = 0				# offset for next packet request
-	    stringLen = self.KnownTags[basetag][1]-30	      	# get the stored length (only for string)
+	    stringLen = self.KnownTags[basetag][1]-30	# get the stored length (only for string)
 	    for i in xrange(elements):	
-		
 		index = 52+(counter*dataSize)		# location of data in packet
 		self.Offset += dataSize
 		
@@ -421,13 +597,13 @@ def _whatsInThis(self, tag, elements, data):
 		    index = 0
 		    counter = 0
 
-		    _buildCIPTag(isBoolArray=False)
-		    _addCIPReadPartial()
-		    _buildEIPHeader()
+		    tagIOI = _buildTagIOI(self, tag, isBoolArray=False)
+		    readIOI = _addPartialReadIOI(self, tagIOI, elements)
+		    eipHeader = _buildEIPHeader(self, readIOI)
     
-		    self.Socket.send(PLC.EIPFrame)
-		    retData = PLC.Socket.recv(1024)
-		    extendedStatus = unpack_from('<h', retData, 48)[0]
+		    self.Socket.send(eipHeader)
+		    data = self.Socket.recv(1024)
+		    extendedStatus = unpack_from('<h', data, 48)[0]
 		    numbytes = len(data)-dataSize
 		    
 	    return Array
@@ -467,9 +643,10 @@ def _getSingleString(data):
     return data[-stringLen:(-stringLen+NameLength)]
 
 def InitialRead(self, tag, baseTag):
-    # Store each unique tag read in a dict so that we can retreive the
-    # data type or data length (for STRING) later
-    #self.NumberOfElements = 1
+    '''
+    Store each unique tag read in a dict so that we can retreive the
+    data type or data length (for STRING) later
+    '''
     tagData = _buildTagIOI(self, baseTag, isBoolArray=False)
     readRequest = _addPartialReadIOI(self, tagData, 1)
     eipHeader = _buildEIPHeader(self, readRequest)
@@ -484,20 +661,19 @@ def InitialRead(self, tag, baseTag):
 
 def TagNameParser(tag, offset):
     '''
-    Take a tag and return
+    parse the packet to get the base tag name
+    the offset is so that we can increment the array pointer if need be
     '''
-    # parse the packet to get the base tag name
-    # the offset is so that we can increment the array pointer if need be
     bt = tag
     ind = 0
     try:
         if tag.endswith(']'):
-            pos = (len(tag)-tag.rindex("["))    # find position of [
+            pos = (len(tag)-tag.rindex("["))# find position of [
             bt = tag[:-pos]		    # remove [x]: result=SuperDuper
             temp = tag[-pos:]		    # remove tag: result=[x]
             ind = temp[1:-1]		    # strip the []: result=x
             s = ind.split(',')		    # split so we can check for multi dimensin array
-            if len(s):
+            if len(s) == 1:
                 ind = int(ind)
                 newTagName = bt+'['+str(ind+offset)+']'
             else:
@@ -513,20 +689,27 @@ def TagNameParser(tag, offset):
 	return tag, bt, 0
 
 def BitofWord(tag):
-    s=tag.split('.')
+    '''
+    Test if the user is trying to write to a bit of a word
+    ex. Tag.1 returns True (Tag = DINT)
+    '''
+    s = tag.split('.')
     if s[len(s)-1].isdigit():
 	return True
     else:
 	return False
 
 def BitValue(value, bitno):
-    # return whether the specific bit in a value is true or false
+    '''
+    Returns the specific bit of a words value
+    '''
     mask = 1 << bitno
     if (value & mask):
 	return True
     else:
 	return False
-    
+
+# Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,
         1: 0x6f6e,
         2: 0x676e61727473,

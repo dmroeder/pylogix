@@ -20,6 +20,9 @@ USAGE
 	ex: value = test.Read("MyDINT", 10)
 		    print value(3)
 		    
+    Write a value: test.Write("tagname", value)
+	ex: test.Write("MyDINT", 1337)
+		    
 	
 So a complete script to read a tag would look like this:
 
