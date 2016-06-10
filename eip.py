@@ -838,6 +838,19 @@ def MultiParser(self, data):
 	    
     return reply
 
+def MakeString(string):
+    work = []
+    work.append(0x01)
+    work.append(0x00)
+    temp = pack('<I',len(string))
+    for char in temp:
+        work.append(ord(char))
+    for char in string:
+        work.append(ord(char))
+    for x in xrange(len(string),84):
+        work.append(0x00)
+    return work
+
 def BitofWord(tag):
     '''
     Test if the user is trying to write to a bit of a word
