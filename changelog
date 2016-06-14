@@ -1,5 +1,8 @@
+06/14/16
+  -Added Discover() to query all of the Ethernet I/P devices on the network.
+
 06/09/16
-  -Added multi-read function back in, also GetPLCTime
+  -Added multi-read function back in, also GetPLCTime()
   -Fixed writing strings
 
 06/08/16

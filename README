@@ -26,6 +26,10 @@ USAGE
 		    
     Write a value: test.Write("tagname", value)
 	ex: test.Write("MyDINT", 1337)
+	
+    Get all Ethernet I/P devices on the network test.Discover()
+	ex:  stuff = test.Discover()
+	     print stuff(1).Address # prints the first devices IP Address
 		    
 	
 So a complete script to read a tag would look like this:

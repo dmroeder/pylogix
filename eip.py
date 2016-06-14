@@ -41,6 +41,7 @@ In order to perform a typical read/write, the data type needs to be known, or
 '''
 
 from datetime import datetime, timedelta
+from lgxDevice import *
 from random import randrange
 import socket
 from struct import *
@@ -115,7 +116,13 @@ class PLC():
         Get the PLC's clock time
         '''
         return _getPLCTime(self)
-        
+
+    def Discover(self):
+        '''
+        Query all the Ethernet I/P devices on the network
+        '''
+        return _discover()
+
 def _readTag(self, tag, elements):
     '''
     processes the read request
@@ -264,6 +271,53 @@ def _getPLCTime(self):
     humanTime = datetime(1970, 1, 1)+timedelta(microseconds=plcTime+timezoneOffset)
 
     return humanTime 
+
+def _discover():
+  devices = []
+  request = _buildListIdentity()
+  
+  # get available ip addresses
+  addresses = socket.getaddrinfo(socket.gethostname(), None)
+
+  # we're going to send a request for all available ipv4
+  # addresses and build a list of all the devices that reply
+  for ip in addresses:
+        if ip[0] == 2:  # IP v4
+          # create a socket
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.settimeout(0.5)
+          s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+          s.bind((ip[4][0], 0))
+          s.sendto(request, ('255.255.255.255', 44818))
+          try:
+                while(1):
+                  ret = s.recv(1024)
+                  context = unpack_from('<Q', ret, 14)[0]
+                  if context == 0x65696c796168:
+                        # the data came from our request
+                        devices.append(_parseIdentityResponse(ret))
+          except:
+              pass
+                  
+  # added this because looping through addresses above doesn't work on
+  # linux so this is a "just in case".  If we don't get results with the 
+  # above code, try one more time without binding to an address
+  if len(devices) == 0:
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.settimeout(0.5)
+          s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+          s.sendto(request, ('255.255.255.255', 44818))
+          try:
+            while(1):
+              ret = s.recv(1024)
+              context = unpack_from('<Q', ret, 14)[0]
+              if context == 0x65696c796168:
+                # the data came from our request
+                devices.append(_parseIdentityResponse(ret))
+          except:
+              pass
+  return devices 
+
     
 def _openConnection(self):
     '''
@@ -394,6 +448,7 @@ def _buildEIPSendRRDataHeader(self, frameLen):
     EIPCommand = 0x6F                               #(H)EIP SendRRData  (Vol2 2-4.7)
     EIPLength = 16+frameLen                         #(H)
     EIPSessionHandle = self.SessionHandle           #(I)
+    #EIPSessionHandle = 0x11020300
     EIPStatus = 0x00                                #(I)
     EIPContext = self.Context                       #(Q)
     EIPOptions = 0x00                               #(I)
@@ -872,6 +927,64 @@ def BitValue(value, bitno):
     else:
 	return False
 
+def _buildListIdentity():
+    ListService = 0x63
+    ListLength = 0x00
+    ListSessionHandle = 0x00
+    ListStatus = 0x00
+    ListResponse = 0x00
+    ListContext1 = 0x6168
+    ListContext2 = 0x6c79
+    ListContext3 = 0x6569
+    ListOptions = 0x00
+  
+    return pack("<HHIIHHHHI",
+                ListService,
+		ListLength,
+		ListSessionHandle,
+		ListStatus,
+		ListResponse,
+		ListContext1,
+		ListContext2,
+		ListContext3,
+		ListOptions)
+
+def _parseIdentityResponse(data):
+    # we're going to take the packet and parse all
+    #  the data that is in it.
+
+    resp = LGXDevice()
+    resp.Length = unpack_from('<H', data, 28)[0]
+    resp.EncapsulationVersion = unpack_from('<H', data, 30)[0]
+     
+    longIP = unpack_from('<I', data, 36)[0]
+    resp.Address = socket.inet_ntoa(pack('<L', longIP))
+    
+    resp.VendorID = unpack_from('<H', data, 48)[0]
+    if resp.VendorID in vendors.keys():
+      resp.Vendor = vendors[resp.VendorID]
+    else:
+      resp.Vendor = "Unknown Vendor"
+                  
+    resp.DeviceID = unpack_from('<H', data, 50)[0]
+    if resp.DeviceID in devices.keys():
+      resp.DeviceType = devices[resp.DeviceID]
+    else:
+      resp.DeviceType = "Unknown Device Type"
+            
+    resp.ProductCode = unpack_from('<H', data, 52)[0]
+    major = unpack_from('<B', data, 54)[0]
+    minor = unpack_from('<B', data, 55)[0]
+    resp.Revision = str(major) + '.' + str(minor)
+          
+    resp.Status=unpack_from('<H', data, 56)[0]
+    resp.SerialNumber=hex(unpack_from('<I', data, 58)[0])
+    resp.ProductNameLength=unpack_from('<B', data, 62)[0]
+    resp.ProductName=data[63:63+resp.ProductNameLength]
+    resp.State=unpack_from('<B', data, resp.Length+resp.ProductNameLength)[0]
+ 
+    return resp
+    
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,
         1: 0x6f6e,
