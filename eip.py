@@ -45,6 +45,9 @@ from lgxDevice import *
 from random import randrange
 import socket
 from struct import *
+import time
+
+taglist = []
 
 class PLC():
 
@@ -117,17 +120,31 @@ class PLC():
         '''
         return _getPLCTime(self)
 
+    def GetTagList(self):
+        '''
+        Retrieves the tag list from the PLC
+        '''
+        return _getTagList(self)
+
     def Discover(self):
         '''
-        Query all the Ethernet I/P devices on the network
+        Query all the EIP devices on the network
         '''
         return _discover()
+
+
+class LGXTag():
+    
+    def __init__(self):
+        self.TagName = ""
+        self.Offset = 0
+        self.DataType = ""
 
 def _readTag(self, tag, elements):
     '''
     processes the read request
     '''
-    if not self.SocketConnected: _openConnection(self)
+    if not self.SocketConnected: _connect(self)
 
     t,b,i = TagNameParser(tag, 0)
     if b not in self.KnownTags: InitialRead(self, t, b)
@@ -141,14 +158,14 @@ def _readTag(self, tag, elements):
     eipHeader = _buildEIPHeader(self, readRequest)
     self.Socket.send(eipHeader)
     retData = self.Socket.recv(1024)
-    return _whatsInThis(self, tag, elements, retData)
+    return _parseReply(self, tag, elements, retData)
         
 
 def _writeTag(self, tag, value, elements):
     '''
     Processes the write request
     '''
-    if not self.SocketConnected: _openConnection(self)
+    if not self.SocketConnected: _connect(self)
     
     t,b,i = TagNameParser(tag, 0)
     if b not in self.KnownTags: InitialRead(self, t, b)
@@ -193,7 +210,7 @@ def _multiRead(self, args):
     serviceSegments = []
     segments = ""
     tagCount = len(args)
-    if not self.SocketConnected: _openConnection(self)
+    if not self.SocketConnected: _connect(self)
 
     for i in xrange(tagCount):
 	t,b,i = TagNameParser(args[i], 0)
@@ -228,7 +245,7 @@ def _multiRead(self, args):
 
 def _getPLCTime(self):
     # If not connected to PLC, abandon ship!
-    if not self.SocketConnected: _openConnection(self)
+    if not self.SocketConnected: _connect(self)
 		
     AttributeService = 0x03
     AttributeSize = 0x02
@@ -237,7 +254,7 @@ def _getPLCTime(self):
     AttributeInstanceType = 0x24
     AttributeInstance = 0x01
     AttributeCount = 0x04
-    Attributes=(0x06, 0x08, 0x09, 0x0A)
+    Attributes = (0x06, 0x08, 0x09, 0x0A)
     
     AttributePacket = pack('<BBBBBBH4H',
                            AttributeService,
@@ -272,6 +289,29 @@ def _getPLCTime(self):
 
     return humanTime 
 
+def _getTagList(self):
+    # The packet has to be assembled a little different in the event
+    # that all of the tags don't fit in a single packet
+
+    if not self.SocketConnected: _connect(self)
+    
+    forwardOpenFrame = _buildTagRequestPacket(self, partial=False)
+
+    self.Socket.send(forwardOpenFrame)
+    ret = self.Socket.recv(1024)
+    status = unpack_from('<h', ret, 42)[0]
+    extractTagPacket(self, ret)
+
+    while status == 6:
+        forwardOpenFrame = _buildTagRequestPacket(self, partial=True)
+        self.Socket.send(forwardOpenFrame)
+        ret = self.Socket.recv(1024)
+        extractTagPacket(self, ret)
+        status = unpack_from('<h', ret, 42)[0]
+        time.sleep(0.25)
+
+    return taglist
+    
 def _discover():
   devices = []
   request = _buildListIdentity()
@@ -290,7 +330,7 @@ def _discover():
           s.bind((ip[4][0], 0))
           s.sendto(request, ('255.255.255.255', 44818))
           try:
-                while(1):
+              while(1):
                   ret = s.recv(1024)
                   context = unpack_from('<Q', ret, 14)[0]
                   if context == 0x65696c796168:
@@ -312,14 +352,13 @@ def _discover():
               ret = s.recv(1024)
               context = unpack_from('<Q', ret, 14)[0]
               if context == 0x65696c796168:
-                # the data came from our request
-                devices.append(_parseIdentityResponse(ret))
+                  # the data came from our request
+                  devices.append(_parseIdentityResponse(ret))
           except:
               pass
   return devices 
 
-    
-def _openConnection(self):
+def _connect(self):
     '''
     Open our initial connection to the PLC
     '''
@@ -448,7 +487,6 @@ def _buildEIPSendRRDataHeader(self, frameLen):
     EIPCommand = 0x6F                               #(H)EIP SendRRData  (Vol2 2-4.7)
     EIPLength = 16+frameLen                         #(H)
     EIPSessionHandle = self.SessionHandle           #(I)
-    #EIPSessionHandle = 0x11020300
     EIPStatus = 0x00                                #(I)
     EIPContext = self.Context                       #(Q)
     EIPOptions = 0x00                               #(I)
@@ -476,6 +514,46 @@ def _buildEIPSendRRDataHeader(self, frameLen):
                 EIPItem2Type,
                 EIPItem2Length)
 
+def _buildTagRequestPacket(self, partial):
+    '''
+    Builds the entire packet for requesting the tag database
+    '''
+    request = _buildTagListRequest(self, partial)
+    cipSend = _buildCIPUnconnectedSend(partial)
+    forwardOpenFrame = cipSend + request
+    eipRRHeader = _buildEIPSendRRDataHeader(self, len(forwardOpenFrame))
+    return eipRRHeader + forwardOpenFrame    
+
+def _buildCIPUnconnectedSend(partial):
+    '''
+    build unconnected send to request tag database
+    '''
+    CIPService = 0x52                           #(B) CIP Unconnected Send           Vol 3 (3-5.5.2)(3-5.5)
+    CIPPathSize = 0x02               		#(B) Request Path zize              (2-4.1)
+    CIPClassType = 0x20                         #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
+                                                #[Logical Segment][Class ID][8 bit addressing]
+    CIPClass = 0x06                             #(B) Connection Manager Object      (3-5)
+    CIPInstanceType = 0x24                      #(B) Instance type                  (C-1.1)
+                                                #[Logical Segment][Instance ID][8 bit addressing]
+    CIPInstance = 0x01                          #(B) Instance
+    CIPPriority = 0x0A                          #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
+    CIPTimeoutTicks = 0x0e                      #(B) Timeout Info                   (3-5.5.1.3)
+    if partial:                                 #(H) Message Request Size
+        MRServiceSize = 0x12
+    else:
+        MRServiceSize = 0x10
+    
+    return pack('<BBBBBBBBH',
+                CIPService,
+                CIPPathSize,
+                CIPClassType,
+                CIPClass,
+                CIPInstanceType,
+                CIPInstance,
+                CIPPriority,
+                CIPTimeoutTicks,
+                MRServiceSize)
+
 def _buildTagIOI(self, tagName, isBoolArray):
     '''
     The tag IOI is basically the tag name assembled into
@@ -497,7 +575,6 @@ def _buildTagIOI(self, tagName, isBoolArray):
 
     # this loop figures out the packet length and builds our packet
     for i in xrange(len(tagArray)):
-    
 	if tagArray[i].endswith("]"):
 	    RequestPathSize += 1				# add a word for 0x91 and len
 	    tag, basetag, index = TagNameParser(tagArray[i], 0)
@@ -652,8 +729,6 @@ def _buildEIPHeader(self, tagIOI):
     EIPLength = 22+len(tagIOI)                  #(H) Length of encapsulated command
     EIPSessionHandle = self.SessionHandle       #(I)Setup when session crated
     EIPStatus = 0x00                            #(I)Always 0x00
-    #EIPContext = self.Context                  #(Q) String echoed back
-    #EIPContext=context.value(self.ContextPointer)
     EIPContext=context_dict[self.ContextPointer]
     self.ContextPointer+=1                      #Here down is command specific data
                                                 #For our purposes it is always 22 bytes
@@ -706,8 +781,40 @@ def _buildMultiServiceHeader():
 		MultiInstanceType,
 		MultiInstanceSegment)
 
+def _buildTagListRequest(self, partial):
+    '''
+    Build the request to get the tag list from the PLC
+    '''
+    TLService = 0x55
+    if partial:
+        TLServiceSize = 0x03
+    else:
+        TLServiceSize = 0x02
+    TLSegment = 0x6B20
+    TLRequest = pack('<BBH', TLService, TLServiceSize, TLSegment)
 
-def _whatsInThis(self, tag, elements, data):
+    if partial:
+        TLRequest += pack('<HH', 0x0025, self.Offset+1)
+    else:
+        TLRequest += pack('<BB', 0x24, self.Offset)
+
+    TLStuff = (0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
+    TLPathSize = 0x01
+    TLReserved = 0x00
+    TLPort = 0x01
+    TLSlot = self.ProcessorSlot
+
+    TLRequest += pack('<10BBBBB',
+                      TLStuff[0], TLStuff[1], TLStuff[2], TLStuff[3], TLStuff[4],
+                      TLStuff[5], TLStuff[6], TLStuff[7], TLStuff[8], TLStuff[9],
+                      TLPathSize,
+                      TLReserved,
+                      TLPort,
+                      TLSlot)
+
+    return TLRequest
+     
+def _parseReply(self, tag, elements, data):
     '''
     Take the received packet data on a read and
     extract the value out of it.  This is a little
@@ -737,7 +844,7 @@ def _whatsInThis(self, tag, elements, data):
 	    s = tag.split(".")
 	    doo = s[len(s)-1]
 	    if doo.isdigit():
-		returnvalue=_getBitOfWord(s, returnvalue)
+		returnvalue = _getBitOfWord(s, returnvalue)
  
 	    return returnvalue
 	  
@@ -806,7 +913,7 @@ def _getBitOfWord(split_tag, value):
     bitPos = int(bitPos)
     try:
 	if int(bitPos)<=31:
-	    returnvalue=BitValue(value, bitPos)
+	    returnvalue = BitValue(value, bitPos)
     except:
 	pass  
     return returnvalue
@@ -928,6 +1035,10 @@ def BitValue(value, bitno):
 	return False
 
 def _buildListIdentity():
+    '''
+    Build the list identity request for discovering Ethernet I/P
+    devices on the network
+    '''
     ListService = 0x63
     ListLength = 0x00
     ListSessionHandle = 0x00
@@ -977,168 +1088,196 @@ def _parseIdentityResponse(data):
     minor = unpack_from('<B', data, 55)[0]
     resp.Revision = str(major) + '.' + str(minor)
           
-    resp.Status=unpack_from('<H', data, 56)[0]
-    resp.SerialNumber=hex(unpack_from('<I', data, 58)[0])
-    resp.ProductNameLength=unpack_from('<B', data, 62)[0]
-    resp.ProductName=data[63:63+resp.ProductNameLength]
-    resp.State=unpack_from('<B', data, resp.Length+resp.ProductNameLength)[0]
+    resp.Status = unpack_from('<H', data, 56)[0]
+    resp.SerialNumber = hex(unpack_from('<I', data, 58)[0])
+    resp.ProductNameLength = unpack_from('<B', data, 62)[0]
+    resp.ProductName = data[63:63+resp.ProductNameLength]
+    resp.State = unpack_from('<B', data, resp.Length+resp.ProductNameLength)[0]
  
     return resp
-    
+
+def extractTagPacket(self, data):
+  # the first tag in a packet starts at byte 44
+  packetStart = 44
+  
+  while packetStart < len(data):
+    # get the length of the tag name
+    tagLen = unpack_from('<H', data, packetStart+20)[0]
+    # get a single tag from the packet
+    packet = data[packetStart:packetStart+tagLen+22]
+    # extract the offset
+    self.Offset = unpack_from('<H', packet, 0)[0]
+    # add the tag to our tag list
+    tag = parseLgxTag(packet)
+    # filter out garbage
+    if "__DEFVAL_" not in tag.TagName:
+	taglist.append(tag)
+    # increment ot the next tag in the packet
+    packetStart = packetStart+tagLen+22
+
+def parseLgxTag(packet):
+    tag = LGXTag()
+    length = unpack_from('<H', packet, 20)[0]
+    tag.TagName = packet[22:length+22]
+    tag.Offset = unpack_from('<H', packet, 0)[0]
+    tag.DataType = unpack_from('<B', packet, 4)[0]
+
+    return tag
+
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,
-        1: 0x6f6e,
-        2: 0x676e61727473,
-        3: 0x737265,
-        4: 0x6f74,
-        5: 0x65766f6c,
-        6: 0x756f59,
-        7: 0x776f6e6b,
-        8: 0x656874,
-        9: 0x73656c7572,
-        10: 0x646e61,
-        11: 0x6f73,
-        12: 0x6f64,
-        13: 0x49,
-        14: 0x41,
-        15: 0x6c6c7566,
-        16: 0x74696d6d6f63,
-        17: 0x7327746e656d,
-        18: 0x74616877,
-        19: 0x6d2749,
-        20: 0x6b6e696874,
-        21: 0x676e69,
-        22: 0x666f,
-        23: 0x756f59,
-        24: 0x746e646c756f77,
-        25: 0x746567,
-        26: 0x73696874,
-        27: 0x6d6f7266,
-        28: 0x796e61,
-        29: 0x726568746f,
-        30: 0x797567,
-        31: 0x49,
-        32: 0x7473756a,
-        33: 0x616e6e6177,
-        34: 0x6c6c6574,
-        35: 0x756f79,
-        36: 0x776f68,
-        37: 0x6d2749,
-        38: 0x676e696c656566,
-        39: 0x6174746f47,
-        40: 0x656b616d,
-        41: 0x756f79,
-        42: 0x7265646e75,
-        43: 0x646e617473,
-        44: 0x726576654e,
-        45: 0x616e6e6f67,
-        46: 0x65766967,
-        47: 0x756f79,
-        48: 0x7075,
-        49: 0x726576654e,
-        50: 0x616e6e6f67,
-        51: 0x74656c,
-        52: 0x756f79,
-        53: 0x6e776f64,
-        54: 0x726576654e,
-        55: 0x616e6e6f67,
-        56: 0x6e7572,
-        57: 0x646e756f7261,
-        58: 0x646e61,
-        59: 0x747265736564,
-        60: 0x756f79,
-        61: 0x726576654e,
-        62: 0x616e6e6f67,
-        63: 0x656b616d,
-        64: 0x756f79,
-        65: 0x797263,
-        66: 0x726576654e,
-        67: 0x616e6e6f67,
-        68: 0x796173,
-        69: 0x657962646f6f67,
-        70: 0x726576654e,
-        71: 0x616e6e6f67,
-        72: 0x6c6c6574,
-        73: 0x61,
-        74: 0x65696c,
-        75: 0x646e61,
-        76: 0x74727568,
-        77: 0x756f79,
-        78: 0x6576276557,
-        79: 0x6e776f6e6b,
-        80: 0x68636165,
-        81: 0x726568746f,
-        82: 0x726f66,
-        83: 0x6f73,
-        84: 0x676e6f6c,
-        85: 0x72756f59,
-        86: 0x73277472616568,
-        87: 0x6e656562,
-        88: 0x676e69686361,
-        89: 0x747562,
-        90: 0x657227756f59,
-        91: 0x6f6f74,
-        92: 0x796873,
-        93: 0x6f74,
-        94: 0x796173,
-        95: 0x7469,
-        96: 0x656469736e49,
-        97: 0x6577,
-        98: 0x68746f62,
-        99: 0x776f6e6b,
-        100: 0x732774616877,
-        101: 0x6e656562,
-        102: 0x676e696f67,
-        103: 0x6e6f,
-        104: 0x6557,
-        105: 0x776f6e6b,
-        106: 0x656874,
-        107: 0x656d6167,
-        108: 0x646e61,
-        109: 0x6572276577,
-        110: 0x616e6e6f67,
-        111: 0x79616c70,
-        112: 0x7469,
-        113: 0x646e41,
-        114: 0x6669,
-        115: 0x756f79,
-        116: 0x6b7361,
-        117: 0x656d,
-        118: 0x776f68,
-        119: 0x6d2749,
-        120: 0x676e696c656566,
-        121: 0x74276e6f44,
-        122: 0x6c6c6574,
-        123: 0x656d,
-        124: 0x657227756f79,
-        125: 0x6f6f74,
-        126: 0x646e696c62,
-        127: 0x6f74,
-        128: 0x656573,
-        129: 0x726576654e,
-        130: 0x616e6e6f67,
-        131: 0x65766967,
-        132: 0x756f79,
-        133: 0x7075,
-        134: 0x726576654e,
-        135: 0x616e6e6f67,
-        136: 0x74656c,
-        137: 0x756f79,
-        138: 0x6e776f64,
-        139: 0x726576654e,
-        140: 0x6e7572,
-        141: 0x646e756f7261,
-        142: 0x646e61,
-        143: 0x747265736564,
-        144: 0x756f79,
-        145: 0x726576654e,
-        146: 0x616e6e6f67,
-        147: 0x656b616d,
-        148: 0x756f79,
-        149: 0x797263,
-        150: 0x726576654e,
-        151: 0x616e6e6f67,
-        152: 0x796173,
-        153: 0x657962646f6f67,
-        154: 0x726576654e,
-        155: 0xa680e2616e6e6f67}
+                1: 0x6f6e,
+                2: 0x676e61727473,
+                3: 0x737265,
+                4: 0x6f74,
+                5: 0x65766f6c,
+                6: 0x756f59,
+                7: 0x776f6e6b,
+                8: 0x656874,
+                9: 0x73656c7572,
+                10: 0x646e61,
+                11: 0x6f73,
+                12: 0x6f64,
+                13: 0x49,
+                14: 0x41,
+                15: 0x6c6c7566,
+                16: 0x74696d6d6f63,
+                17: 0x7327746e656d,
+                18: 0x74616877,
+                19: 0x6d2749,
+                20: 0x6b6e696874,
+                21: 0x676e69,
+                22: 0x666f,
+                23: 0x756f59,
+                24: 0x746e646c756f77,
+                25: 0x746567,
+                26: 0x73696874,
+                27: 0x6d6f7266,
+                28: 0x796e61,
+                29: 0x726568746f,
+                30: 0x797567,
+                31: 0x49,
+                32: 0x7473756a,
+                33: 0x616e6e6177,
+                34: 0x6c6c6574,
+                35: 0x756f79,
+                36: 0x776f68,
+                37: 0x6d2749,
+                38: 0x676e696c656566,
+                39: 0x6174746f47,
+                40: 0x656b616d,
+                41: 0x756f79,
+                42: 0x7265646e75,
+                43: 0x646e617473,
+                44: 0x726576654e,
+                45: 0x616e6e6f67,
+                46: 0x65766967,
+                47: 0x756f79,
+                48: 0x7075,
+                49: 0x726576654e,
+                50: 0x616e6e6f67,
+                51: 0x74656c,
+                52: 0x756f79,
+                53: 0x6e776f64,
+                54: 0x726576654e,
+                55: 0x616e6e6f67,
+                56: 0x6e7572,
+                57: 0x646e756f7261,
+                58: 0x646e61,
+                59: 0x747265736564,
+                60: 0x756f79,
+                61: 0x726576654e,
+                62: 0x616e6e6f67,
+                63: 0x656b616d,
+                64: 0x756f79,
+                65: 0x797263,
+                66: 0x726576654e,
+                67: 0x616e6e6f67,
+                68: 0x796173,
+                69: 0x657962646f6f67,
+                70: 0x726576654e,
+                71: 0x616e6e6f67,
+                72: 0x6c6c6574,
+                73: 0x61,
+                74: 0x65696c,
+                75: 0x646e61,
+                76: 0x74727568,
+                77: 0x756f79,
+                78: 0x6576276557,
+                79: 0x6e776f6e6b,
+                80: 0x68636165,
+                81: 0x726568746f,
+                82: 0x726f66,
+                83: 0x6f73,
+                84: 0x676e6f6c,
+                85: 0x72756f59,
+                86: 0x73277472616568,
+                87: 0x6e656562,
+                88: 0x676e69686361,
+                89: 0x747562,
+                90: 0x657227756f59,
+                91: 0x6f6f74,
+                92: 0x796873,
+                93: 0x6f74,
+                94: 0x796173,
+                95: 0x7469,
+                96: 0x656469736e49,
+                97: 0x6577,
+                98: 0x68746f62,
+                99: 0x776f6e6b,
+                100: 0x732774616877,
+                101: 0x6e656562,
+                102: 0x676e696f67,
+                103: 0x6e6f,
+                104: 0x6557,
+                105: 0x776f6e6b,
+                106: 0x656874,
+                107: 0x656d6167,
+                108: 0x646e61,
+                109: 0x6572276577,
+                110: 0x616e6e6f67,
+                111: 0x79616c70,
+                112: 0x7469,
+                113: 0x646e41,
+                114: 0x6669,
+                115: 0x756f79,
+                116: 0x6b7361,
+                117: 0x656d,
+                118: 0x776f68,
+                119: 0x6d2749,
+                120: 0x676e696c656566,
+                121: 0x74276e6f44,
+                122: 0x6c6c6574,
+                123: 0x656d,
+                124: 0x657227756f79,
+                125: 0x6f6f74,
+                126: 0x646e696c62,
+                127: 0x6f74,
+                128: 0x656573,
+                129: 0x726576654e,
+                130: 0x616e6e6f67,
+                131: 0x65766967,
+                132: 0x756f79,
+                133: 0x7075,
+                134: 0x726576654e,
+                135: 0x616e6e6f67,
+                136: 0x74656c,
+                137: 0x756f79,
+                138: 0x6e776f64,
+                139: 0x726576654e,
+                140: 0x6e7572,
+                141: 0x646e756f7261,
+                142: 0x646e61,
+                143: 0x747265736564,
+                144: 0x756f79,
+                145: 0x726576654e,
+                146: 0x616e6e6f67,
+                147: 0x656b616d,
+                148: 0x756f79,
+                149: 0x797263,
+                150: 0x726576654e,
+                151: 0x616e6e6f67,
+                152: 0x796173,
+                153: 0x657962646f6f67,
+                154: 0x726576654e,
+                155: 0xa680e2616e6e6f67}

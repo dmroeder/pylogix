@@ -1,3 +1,6 @@
+06/15/16
+  -Added GetTagList() to retreive the controller scope tags
+
 06/14/16
   -Added Discover() to query all of the Ethernet I/P devices on the network.
 

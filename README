@@ -27,6 +27,10 @@ USAGE
     Write a value: test.Write("tagname", value)
 	ex: test.Write("MyDINT", 1337)
 	
+    Get the controller scoped tags
+	ex: tags = test.GetTagList()
+	    (returns a structure of .TagName, .DataType and .Offset)
+	
     Get all Ethernet I/P devices on the network test.Discover()
 	ex:  stuff = test.Discover()
 	     print stuff(1).Address # prints the first devices IP Address
