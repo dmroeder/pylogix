@@ -334,8 +334,9 @@ def _discover():
                   ret = s.recv(1024)
                   context = unpack_from('<Q', ret, 14)[0]
                   if context == 0x65696c796168:
-                        # the data came from our request
-                        devices.append(_parseIdentityResponse(ret))
+		      device = _parseIdentityResponse(ret)
+		      if device.IPAddress:
+			  devices.append(device)
           except:
               pass
                   
@@ -352,10 +353,12 @@ def _discover():
               ret = s.recv(1024)
               context = unpack_from('<Q', ret, 14)[0]
               if context == 0x65696c796168:
-                  # the data came from our request
-                  devices.append(_parseIdentityResponse(ret))
+		  device = _parseIdentityResponse(ret)
+		  if device.IPAddress:
+		      devices.append(device)
           except:
               pass
+	    
   return devices 
 
 def _connect(self):
