@@ -1070,18 +1070,12 @@ def _parseIdentityResponse(data):
      
     longIP = unpack_from('<I', data, 36)[0]
     resp.IPAddress = socket.inet_ntoa(pack('<L', longIP))
-    
+
     resp.VendorID = unpack_from('<H', data, 48)[0]
-    if resp.VendorID in vendors.keys():
-      resp.Vendor = vendors[resp.VendorID]
-    else:
-      resp.Vendor = "Unknown Vendor"
+    resp.Vendor = GetVendor(resp.VendorID)
                   
     resp.DeviceID = unpack_from('<H', data, 50)[0]
-    if resp.DeviceID in devices.keys():
-      resp.DeviceType = devices[resp.DeviceID]
-    else:
-      resp.DeviceType = "Unknown Device Type"
+    resp.Device = GetDevice(resp.DeviceID)
             
     resp.ProductCode = unpack_from('<H', data, 52)[0]
     major = unpack_from('<B', data, 54)[0]

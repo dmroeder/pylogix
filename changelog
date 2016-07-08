@@ -1,5 +1,6 @@
 07/07/16
   -.discover() returns .IPAddress instead of .Address
+  -Moved some code from _parseIdentityResponse() to lgxDevice.py to simplify function
 
 06/15/16
   -Added GetTagList() to retreive the controller scope tags

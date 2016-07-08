@@ -17,6 +17,18 @@ class LGXDevice():
 	self.ProductName=""
 	self.State=None
 
+def GetDevice(deviceID):
+    if deviceID in devices.keys():
+        return devices[deviceID]
+    else:
+        return "Unknown"
+
+def GetVendor(vendorID):
+    if vendorID in vendors.keys():
+        return vendors[vendorID]
+    else:
+        return "Unknown"
+
 # List originally came from Wireshark /epan/dissectors/packet-cip.c
 devices = {0x00: 'Generic Device (deprecated)',
 		0x02: 'AC Drive',
