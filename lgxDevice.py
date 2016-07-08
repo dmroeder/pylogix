@@ -4,7 +4,7 @@ class LGXDevice():
         # structure of a logix device
 	self.Length=None
 	self.EncapsulationVersion=None
-	self.Address=None
+	self.IPAddress=None
 	self.VendorID=None
 	self.Vendor=None
 	self.DeviceID=None

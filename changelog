@@ -1,3 +1,6 @@
+07/07/16
+  -.discover() returns .IPAddress instead of .Address
+
 06/15/16
   -Added GetTagList() to retreive the controller scope tags
 

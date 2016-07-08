@@ -1069,7 +1069,7 @@ def _parseIdentityResponse(data):
     resp.EncapsulationVersion = unpack_from('<H', data, 30)[0]
      
     longIP = unpack_from('<I', data, 36)[0]
-    resp.Address = socket.inet_ntoa(pack('<L', longIP))
+    resp.IPAddress = socket.inet_ntoa(pack('<L', longIP))
     
     resp.VendorID = unpack_from('<H', data, 48)[0]
     if resp.VendorID in vendors.keys():
