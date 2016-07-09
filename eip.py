@@ -825,15 +825,15 @@ def _parseReply(self, tag, elements, data):
     and different types of reads (Single/Array/Partial) all
     have to be handled differently
     '''
-    status = unpack_from('<h', data, 46)[0]
-    extendedStatus = unpack_from('<h', data, 48)[0]
-
-    # parse the tag
-    tagName, basetag, index = TagNameParser(tag, 0)
-    datatype = self.KnownTags[basetag][0]
-    CIPFormat = self.CIPTypes[datatype][2]
+    status = unpack_from('<B', data, 48)[0]
+    extendedStatus = unpack_from('<B', data, 49)[0]
     
-    if (status == 204 or status == 210) and (extendedStatus == 0 or extendedStatus == 6): # nailed it!
+    if status == 0 or status == 6:
+	# parse the tag
+	tagName, basetag, index = TagNameParser(tag, 0)
+	datatype = self.KnownTags[basetag][0]
+	CIPFormat = self.CIPTypes[datatype][2]
+	
 	if elements == 1:
 	    # Do different stuff based on the returned data type
 	    if datatype == 211:
@@ -879,7 +879,7 @@ def _parseReply(self, tag, elements, data):
 		counter += 1
 		# with large arrays, the data takes multiple packets so at the end of
 		# a packet, we need to send a new request
-		if index == numbytes and extendedStatus == 6:
+		if index == numbytes and status == 6:
 		    index = 0
 		    counter = 0
 
@@ -889,13 +889,16 @@ def _parseReply(self, tag, elements, data):
     
 		    self.Socket.send(eipHeader)
 		    data = self.Socket.recv(1024)
-		    extendedStatus = unpack_from('<h', data, 48)[0]
+		    status = unpack_from('<h', data, 48)[0]
 		    numbytes = len(data)-dataSize
 		    
 	    return Array
     else: # didn't nail it
-	print "Did not nail it, read fail", tag
-	print "Status:", status, "Extended Status:", extendedStatus    
+        if status in cipErrorCodes.keys():
+            err = cipErrorCodes[status]
+        else:
+            err = 'Unknown error'
+	return "Failed to read tag: " + tag + ' - ' + err   
 
 def _getAtomicArrayValue(CIPFormat, tag, data):
     '''
@@ -1122,6 +1125,52 @@ def parseLgxTag(packet):
     tag.DataType = unpack_from('<B', packet, 4)[0]
 
     return tag
+
+cipErrorCodes = {0x00: 'Success',
+                 0x01: 'Connection failure',
+                 0x02: 'Resource unavailable',
+                 0x03: 'Invalid parameter value',
+                 0x04: 'Path segment error',
+                 0x05: 'Path destination unknown',
+                 0x06: 'Partial transfer',
+                 0x07: 'Connection lost',
+                 0x08: 'Service not supported',
+                 0x09: 'Invalid Attribute',
+                 0x0A: 'Attribute list error',
+                 0x0B: 'Already in requested mode/state',
+                 0x0C: 'Object state conflict',
+                 0x0D: 'Object already exists',
+                 0x0E: 'Attribute not settable',
+                 0x0F: 'Privilege violation',
+                 0x10: 'Device state conflict',
+                 0x11: 'Reply data too large',
+                 0x12: 'Fragmentation of a premitive value',
+                 0x13: 'Not enough data',
+                 0x14: 'Attribute not supported',
+                 0x15: 'Too much data',
+                 0x16: 'Object does not exist',
+                 0x17: 'Service fragmentation sequence not in progress',
+                 0x18: 'No stored attribute data',
+                 0x19: 'Store operation failure',
+                 0x1A: 'Routing failure, request packet too large',
+                 0x1B: 'Routing failure, response packet too large',
+                 0x1C: 'Missing attribute list entry data',
+                 0x1D: 'Invalid attribute value list',
+                 0x1E: 'Embedded service error',
+                 0x1F: 'Vendor specific',
+                 0x20: 'Invalid Parameter',
+                 0x21: 'Write once value or medium already written',
+                 0x22: 'Invalid reply received',
+                 0x23: 'Buffer overflow',
+                 0x24: 'Invalid message format',
+                 0x25: 'Key failure in path',
+                 0x26: 'Path size invalid',
+                 0x27: 'Unexpected attribute in list',
+                 0x28: 'Invalid member ID',
+                 0x29: 'Member not settable',
+                 0x2A: 'Group 2 only server general failure',
+                 0x2B: 'Unknown Modbus error',
+                 0x2C: 'Attribute not gettable'}
 
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,

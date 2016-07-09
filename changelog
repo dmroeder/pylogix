@@ -1,3 +1,6 @@
+07/09/16
+  -Added CIP error messages, fixed looking at wrong byte for error
+
 07/07/16
   -.discover() returns .IPAddress instead of .Address
   -Moved some code from _parseIdentityResponse() to lgxDevice.py to simplify function
