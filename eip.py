@@ -45,6 +45,7 @@ from lgxDevice import *
 from random import randrange
 import socket
 from struct import *
+import sys
 import time
 
 taglist = []
@@ -124,7 +125,7 @@ class PLC():
         '''
         Retrieves the tag list from the PLC
         '''
-        return _getTagList(self)
+        return _getTagList(sel_connectf)
 
     def Discover(self):
         '''
@@ -240,7 +241,7 @@ def _multiRead(self, args):
     return MultiParser(self, retData)
 
 def _getPLCTime(self):
-    # If not connected to PLC, abandon ship!
+    # Connect to the PLC
     if not self.SocketConnected: _connect(self)
 		
     AttributeService = 0x03
@@ -368,6 +369,7 @@ def _connect(self):
     except:
         self.SocketConnected = False
         print "Failed to connect to", self.IPAddress, ". Abandoning Ship!"
+        sys.exit(0)
 
     if self.SocketConnected:
         # If our connection was successful, register session
