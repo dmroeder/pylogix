@@ -6,7 +6,7 @@ USAGE
 
 2) test = PLC()
 
-3) Set the IP Address: test.IPAddress = "192.168.1.0"
+3) Set the IP Address: test.IPAddress = "192.168.1.10"
 
 4) If your processor is in a slot other than 0, set that: test.ProcessorSlot = 1
 
@@ -43,3 +43,45 @@ test = PLC()
 test.IPAddress = "192.168.1.64"
 value = test.Read("MyTimer.ACC")
 print value
+
+
+
+
+****************************************
+NOTES
+****************************************
+
+Several things take place when making a connection to a PLC.
+
+1) Standard TCP connection
+2) Session Registration, PLC will respond with a Session Handle
+3) Forward Open.  Using the Session Handle, this establishes
+        the parameters for connection
+4) Command (read/write/etc) and payload
+
+The initial connections (TCP, Session Registration, Forward Open)
+    only need to be made once, after that, we can exchange data
+    until the connection is closed or lost.
+
+A number events that take place on the command end, they should
+    be invisible to the user, but it's good to know (and a reminder for me).
+    The user can be reading/writing simple tags, UDT's arrays, bits of a word,
+    bools out of atomic arrays, custom length strings, array reads that
+    won't fit in a single reply and so on.  Each has to be handled in a
+    different way.
+
+    It basically happens like this:  Figure out if its a single tag to be
+    read/written or an array.  Open the connection to the PLC (1,2,3 above),
+    parse the tag name, add the command (read/write), send the data to the PLC,
+    handle the reply
+
+In order to perform a typical read/write, the data type needs to be known, or
+    more specifically, the number of bytes the tag is.  It would be pretty
+    annoying for the user to have to specify this each time, so to get around
+    this, we have the InitialRead function.  This is called on any data exchange
+    where the tag name has never been read/written before.  It uses a different
+    CIP command than a typical read (0x52 vs 0x4C) which will respond with the
+    data type.  This helps us in two ways:  First, the user won't need to specify
+    the data type.  Second, we can keep track of this information so the next
+    time the particular tag is called, we already know it's type so we can just
+    do the normal read/write (0x4C/0x4D/0x4E).
