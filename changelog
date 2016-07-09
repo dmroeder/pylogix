@@ -1,5 +1,6 @@
 07/09/16
   -Added CIP error messages, fixed looking at wrong byte for error
+  -Fixed single bool from array write
 
 07/07/16
   -.discover() returns .IPAddress instead of .Address

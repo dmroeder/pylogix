@@ -188,16 +188,12 @@ def _writeTag(self, tag, value, elements):
 	print "Fix this"
 
      # write a bit of a word, or everything else
-    if BitofWord(tag):
+    if BitofWord(tag) or dataType == 211:
 	tagData = _buildTagIOI(self, tag, isBoolArray=False)
 	writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
     else:
-	if dataType == 211:
-	   tagData = _buildTagIOI(self, tag, isBoolArray=False)
-	   writeRequest = _addCIPWriteDWORDData()
-	else:
-	    tagData = _buildTagIOI(self, tag, isBoolArray=False)
-	    writeRequest = _addWriteIOI(self, tagData, writeData, dataType, 1)
+	tagData = _buildTagIOI(self, tag, isBoolArray=False)
+	writeRequest = _addWriteIOI(self, tagData, writeData, dataType, 1)
 	   
     eipHeader = _buildEIPHeader(self, writeRequest)
     self.Socket.send(eipHeader)
@@ -595,7 +591,7 @@ def _buildTagIOI(self, tagName, isBoolArray):
 	    BaseTagLenWords = BaseTagLenBytes/2			# figure out the words for this segment
 	    RequestPathSize += BaseTagLenWords			# add it to our request size
 	    
-	    if i < len(tagArray):
+	    if i < len(tagArray)-1:
 		if not isinstance(index, list):
 		    if index < 256:				        # if index is 1 byte...
 			RequestPathSize += 1				# add word for array index
@@ -703,8 +699,12 @@ def _addWriteBitIOI(self, tag, tagIOI, writeData, dataType):
     fmt = self.CIPTypes[dataType][2]		# get the pack format ('b')
     fmt = fmt.upper()				# convert it to unsigned ('B')
     s = tag.split('.')			        # split by decimal to get bit
-    bit = s[len(s)-1]				# get the bit number we're writing to
-    bit = int(bit)				# convert it to integer
+    if dataType == 211:
+        t = s[len(s)-1]
+	tag, basetag, bit = TagNameParser(t, 0)
+    else:
+	bit = s[len(s)-1]				# get the bit number we're writing to
+	bit = int(bit)				# convert it to integer
 	    
     writeIOI += pack('<h', NumberOfBytes)	# pack the number of bytes
     byte = 2**(NumberOfBytes*8)-1			
@@ -715,6 +715,7 @@ def _addWriteBitIOI(self, tag, tagIOI, writeData, dataType):
     else:
 	writeIOI += pack(fmt, 0x00)
 	writeIOI += pack(fmt, (byte-bits))
+	
     return writeIOI
 
 def _buildEIPHeader(self, tagIOI):
