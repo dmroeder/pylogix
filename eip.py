@@ -570,7 +570,7 @@ def _buildTagIOI(self, tagName, isBoolArray):
 	    BaseTagLenWords = BaseTagLenBytes/2			# figure out the words for this segment
 	    RequestPathSize += BaseTagLenWords			# add it to our request size
 	    
-	    if i < len(tagArray)-1:
+	    if i < len(tagArray):
 		if not isinstance(index, list):
 		    if index < 256:				        # if index is 1 byte...
 			RequestPathSize += 1				# add word for array index
