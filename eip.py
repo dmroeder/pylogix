@@ -165,9 +165,12 @@ def _writeTag(self, tag, value, elements):
     else:
 	print "Fix this"
 
-     # write a bit of a word, or everything else
-    if BitofWord(tag) or dataType == 211:
+     # write a bit of a word, boolean array or everything else
+    if BitofWord(tag):
 	tagData = _buildTagIOI(self, tag, isBoolArray=False)
+	writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
+    elif dataType == 211:
+	tagData = _buildTagIOI(self, tag, isBoolArray=True)
 	writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
     else:
 	tagData = _buildTagIOI(self, tag, isBoolArray=False)
@@ -681,6 +684,7 @@ def _addWriteBitIOI(self, tag, tagIOI, writeData, dataType):
     if dataType == 211:
         t = s[len(s)-1]
 	tag, basetag, bit = TagNameParser(t, 0)
+	bit %= 32
     else:
 	bit = s[len(s)-1]				# get the bit number we're writing to
 	bit = int(bit)				# convert it to integer
@@ -817,7 +821,7 @@ def _parseReply(self, tag, elements, data):
 	if elements == 1:
 	    # Do different stuff based on the returned data type
 	    if datatype == 211:
-		returnvalue = _getAtomicArrayValue(CIPFormat, tag, data)
+		returnvalue = _getBoolArrayValue(CIPFormat, tag, data)
 	    elif datatype == 160:
 		returnvalue = _getSingleString( data)
 	    else:
@@ -880,7 +884,7 @@ def _parseReply(self, tag, elements, data):
             err = 'Unknown error'
 	return "Failed to read tag: " + tag + ' - ' + err   
 
-def _getAtomicArrayValue(CIPFormat, tag, data):
+def _getBoolArrayValue(CIPFormat, tag, data):
     '''
     Gets the value from a single boolean array element
     '''

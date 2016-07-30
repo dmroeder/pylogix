@@ -1,3 +1,6 @@
+07/29/16
+  Fixed writing to boolean array
+
 07/27/16
   -Fixed defaulting to element zero when writing to an array value
 
