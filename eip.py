@@ -102,7 +102,7 @@ class PLC():
         '''
         Retrieves the tag list from the PLC
         '''
-        return _getTagList(sel_connectf)
+        return _getTagList(self)
 
     def Discover(self):
         '''

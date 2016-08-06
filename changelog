@@ -1,3 +1,6 @@
+08/05/16
+  Fixed derp with calling _getTagList
+
 07/29/16
   Fixed writing to boolean array
 
