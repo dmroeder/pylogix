@@ -550,46 +550,43 @@ def _buildTagIOI(self, tagName, isBoolArray):
     We also might be reading arrays, a bool from arrays (atomic), strings.
         Oh and multi-dim arrays, program scope tags...
     '''
-    RequestPathSize = 0		# define path size
     RequestTagData = ""		# define tag data
     tagArray = tagName.split(".")
 
     # this loop figures out the packet length and builds our packet
     for i in xrange(len(tagArray)):
 	if tagArray[i].endswith("]"):
-	    RequestPathSize += 1				# add a word for 0x91 and len
+
 	    tag, basetag, index = TagNameParser(tagArray[i], 0)
 
-	    BaseTagLenBytes = len(basetag)			# get number of bytes
+	    BaseTagLenBytes = len(basetag)				# get number of bytes
 	    if isBoolArray and i == len(tagArray)-1: index = index/32
 
 	    # Assemble the packet
-	    RequestTagData += pack('<BB', 0x91, BaseTagLenBytes)# add the req type and tag len to packet
-	    RequestTagData += basetag				# add the tag name
-	    if BaseTagLenBytes%2:				# check for odd bytes
-		BaseTagLenBytes += 1				# add another byte to make it even
-		RequestTagData += pack('<B', 0x00)		# add the byte to our packet
+	    RequestTagData += pack('<BB', 0x91, BaseTagLenBytes)	# add the req type and tag len to packet
+	    RequestTagData += basetag					# add the tag name
+	    if BaseTagLenBytes%2:					# check for odd bytes
+		BaseTagLenBytes += 1					# add another byte to make it even
+		RequestTagData += pack('<B', 0x00)			# add the byte to our packet
 	    
-	    BaseTagLenWords = BaseTagLenBytes/2			# figure out the words for this segment
-	    RequestPathSize += BaseTagLenWords			# add it to our request size
+	    BaseTagLenWords = BaseTagLenBytes/2				# figure out the words for this segment
 	    
 	    if i < len(tagArray):
 		if not isinstance(index, list):
-		    if index < 256:				        # if index is 1 byte...
-			RequestPathSize += 1				# add word for array index
-			RequestTagData += pack('<BB', 0x28, index)	# add one word to packet
-		    if index > 255:					# if index is more than 1 byte...
-			RequestPathSize += 2				# add 2 words for array for index
-			RequestTagData += pack('<BBH', 0x29, 0x00, index) # add 2 words to packet
+		    if index < 256:				        	# if index is 1 byte...
+			RequestTagData += pack('<BB', 0x28, index)		# add one word to packet
+		    if 65536 > index > 255:					# if index is more than 1 byte...
+			RequestTagData += pack('<HH', 0x29, index) 		# add 2 words to packet
+		    if index > 65535:
+			RequestTagData += pack('<HI', 0x2A, index)
 		else:
 		    for i in xrange(len(index)):
 			if index[i] < 256:					# if index is 1 byte...
-			    RequestPathSize += 1				# add word for array index
 			    RequestTagData += pack('<BB', 0x28, index[i])	# add one word to packet
-			if index[i] > 255:					# if index is more than 1 byte...
-			    RequestPathSize += 2				# add 2 words for array for index
-			    RequestTagData += pack('<BBH', 0x29, 0x00, index[i])  # add 2 words to packet		    
-	
+			if 65536 > index[i] > 255:				# if index is more than 1 byte...
+			    RequestTagData += pack('<HH', 0x29, index[i])  	# add 2 words to packet
+			if index[i] > 65535:					# if index is more than 4 bytes
+			    RequestTagData += pack('<HI', 0x2A, index[i])  	# add 2 words to packet
 	else:
             '''
 	    for non-array segment of tag
@@ -603,14 +600,12 @@ def _buildTagIOI(self, tagName, isBoolArray):
 		if int(tagArray[i]) <= 31:
 		    pass
 	    except:
-		RequestPathSize += 1				# add a word for 0x91 and len
 		BaseTagLenBytes = len(tagArray[i])		# store len of tag
 		RequestTagData += pack('<BB', 0x91, len(tagArray[i]))	# add to packet
 		RequestTagData += tagArray[i]			# add tag req type and len to packet
 		if BaseTagLenBytes%2:			        # if odd number of bytes
 		    BaseTagLenBytes += 1			# add byte to make it even
-		    RequestTagData += pack('<B', 0x00)		# also add to packet
-		RequestPathSize += BaseTagLenBytes/2		# add words to our path size    
+		    RequestTagData += pack('<B', 0x00)		# also add to packet  
 
     return RequestTagData
 
