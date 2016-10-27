@@ -134,10 +134,11 @@ def _readTag(self, tag, elements):
         
     readRequest = _addReadIOI(self, tagData, elements)
     eipHeader = _buildEIPHeader(self, readRequest)
-    self.Socket.send(eipHeader)
-    retData = self.Socket.recv(1024)
-    return _parseReply(self, tag, elements, retData)
-        
+    retData = _getBytes(self, eipHeader)
+    if retData:
+        return _parseReply(self, tag, elements, retData)
+    else:
+        return None        
 
 def _writeTag(self, tag, value, elements):
     '''
@@ -177,8 +178,7 @@ def _writeTag(self, tag, value, elements):
 	writeRequest = _addWriteIOI(self, tagData, writeData, dataType, 1)
 	   
     eipHeader = _buildEIPHeader(self, writeRequest)
-    self.Socket.send(eipHeader)
-    retData = self.Socket.recv(1024)
+    retData = _getBytes(self, eipHeader)
     
 def _multiRead(self, args):
     '''
@@ -215,10 +215,11 @@ def _multiRead(self, args):
 
     readRequest = header+segmentCount+offsets+segments
     eipHeader = _buildEIPHeader(self, readRequest)
-    self.Socket.send(eipHeader)
-    retData = self.Socket.recv(1024)
-
-    return MultiParser(self, retData)
+    retData = _getBytes(self, eipHeader)
+    if retData:
+        return MultiParser(self, retData)
+    else:
+        return None
 
 def _getPLCTime(self):
     # Connect to the PLC
@@ -249,8 +250,9 @@ def _getPLCTime(self):
     #self.CIPRequest=AttributePacket
     eipHeader = _buildEIPHeader(self, AttributePacket)
     
-    self.Socket.send(eipHeader)
-    retData = self.Socket.recv(1024)
+##    self.Socket.send(eipHeader)
+##    retData = self.Socket.recv(1024)
+    retData = _getBytes(self, eipHeader)
     # get the time from the packet
     plcTime = unpack_from('<Q', retData, 56)[0]
     # get the timezone offset from the packet (this will include sign)
@@ -273,18 +275,15 @@ def _getTagList(self):
     if not self.SocketConnected: _connect(self)
     
     forwardOpenFrame = _buildTagRequestPacket(self, partial=False)
-
-    self.Socket.send(forwardOpenFrame)
-    ret = self.Socket.recv(1024)
-    status = unpack_from('<h', ret, 42)[0]
-    extractTagPacket(self, ret)
+    retData = _getBytes(self, forwardOpenFrame)
+    status = unpack_from('<h', retData, 42)[0]
+    extractTagPacket(self, retData)
 
     while status == 6:
         forwardOpenFrame = _buildTagRequestPacket(self, partial=True)
-        self.Socket.send(forwardOpenFrame)
-        ret = self.Socket.recv(1024)
-        extractTagPacket(self, ret)
-        status = unpack_from('<h', ret, 42)[0]
+        retData = _getBytes(self, forwardOpenFrame)
+        extractTagPacket(self, retData)
+        status = unpack_from('<h', retData, 42)[0]
         time.sleep(0.25)
 
     return taglist
@@ -353,16 +352,36 @@ def _connect(self):
 
     if self.SocketConnected:
         # If our connection was successful, register session
-        self.Socket.send(_buildRegisterSession(self))
-        retData = self.Socket.recv(1024)
+        regSession = _buildRegisterSession(self)
+        retData = _getBytes(self, regSession)
         self.SessionHandle = unpack_from('<I', retData, 4)[0]
         self.SessionRegistered = True
 
         # Forward Open
-        self.Socket.send(_buildForwardOpenPacket(self))
-        retData = self.Socket.recv(1024)
+        fwdOpen = _buildForwardOpenPacket(self)
+        retData = _getBytes(self, fwdOpen)
         tempID = unpack_from('<I', retData, 44)
         self.OTNetworkConnectionID = tempID[0]       
+
+def _getBytes(self, data):
+    '''
+    Sends data and gets the return data
+    '''
+    try:
+        self.Socket.send(data)
+        retData = self.Socket.recv(1024)
+        if retData:
+            return retData
+        else:
+            return None
+    except socket.gaierror, e:
+	self.SocketConnected = False
+	print e
+        return None
+    except IOError, e:
+	self.SocketConnected = False
+	print e
+	return None
         
 def _buildRegisterSession(self):
     '''
