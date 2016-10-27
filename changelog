@@ -1,6 +1,7 @@
 10/27/16
   -Added .Close() to close the session with the PLC. Whenever a script is done
     .Close() should be called.
+  -Added __exit__() so PLC can be used in a with statement
 
 10/26/16
   -Added _getBytes() for sending/receiving data.  Should handle failure better

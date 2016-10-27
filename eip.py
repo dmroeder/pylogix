@@ -27,7 +27,7 @@ import time
 
 taglist = []
 
-class PLC():
+class PLC:
 
     def __init__(self):
         '''
@@ -59,6 +59,15 @@ class PLC():
                          202:(4, "REAL", 'f'),
                          211:(4, "DWORD", 'I'),
                          197:(8, "LINT", 'Q')}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        '''
+        Clean up on exit
+        '''
+        return _closeConnection(self)
 
     def Read(self, *args):
         '''

@@ -35,7 +35,7 @@ USAGE - Python 2.7.11
 	ex:  stuff = test.Discover()
 	     print stuff(1).IPAddress # prints the first devices IP Address
 		    
-5) Close the connection with test.Close()
+6) Close the connection with test.Close()
 		    
 So a complete script to read a tag would look like this:
 
@@ -45,6 +45,14 @@ test.IPAddress = "192.168.1.64"
 value = test.Read("MyTimer.ACC")
 print value
 test.Close()
+
+
+Another method is by using a with statement:
+
+from eip import PLC
+with PLC() as test:
+    test.IPAddress = "192.168.1.64"
+    print test.Read("MyTimer.ACC")
 
 
 
