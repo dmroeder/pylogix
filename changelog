@@ -1,15 +1,19 @@
+10/27/16
+  -Added .Close() to close the session with the PLC. Whenever a script is done
+    .Close() should be called.
+
 10/26/16
-  Added _getBytes() for sending/receiving data.  Should handle failure better
-  Rewrote _connect() to handle disconnect/reconnects better
+  -Added _getBytes() for sending/receiving data.  Should handle failure better
+  -Rewrote _connect() to handle disconnect/reconnects better
 
 08/17/16
-  Fixed tagIOI not dealing with greater than 4 byte tag index
+  -Fixed tagIOI not dealing with greater than 4 byte tag index
 
 08/05/16
-  Fixed derp with calling _getTagList
+  -Fixed derp with calling _getTagList
 
 07/29/16
-  Fixed writing to boolean array
+  -Fixed writing to boolean array
 
 07/27/16
   -Fixed defaulting to element zero when writing to an array value

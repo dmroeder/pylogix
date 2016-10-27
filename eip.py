@@ -110,6 +110,11 @@ class PLC():
         '''
         return _discover()
 
+    def Close(self):
+        '''
+        Close the connection to the PLC
+        '''
+        return _closeConnection(self)
 
 class LGXTag():
     
@@ -369,6 +374,19 @@ def _connect(self):
 	print "Forward Open Failed"
 	return
 
+def _closeConnection(self):
+    '''
+    Close the connection to the PLC (forward close, unregister session)
+    '''
+    closePacket = _buildForwardClosePacket(self)
+    unregPacket = _buildUnregisterSession(self)
+    retData = _getBytes(self, closePacket)
+    retData = _getBytes(self, unregPacket)
+    try:
+        self.Socket.close()
+    except:
+        pass 
+
 def _getBytes(self, data):
     '''
     Sends data and gets the return data
@@ -382,11 +400,9 @@ def _getBytes(self, data):
             return None
     except socket.gaierror, e:
 	self.SocketConnected = False
-	print e
         return None
     except IOError, e:
 	self.SocketConnected = False
-	print e
 	return None
         
 def _buildRegisterSession(self):
@@ -413,6 +429,22 @@ def _buildRegisterSession(self):
                 EIPProtocolVersion,
                 EIPOptionFlag)
 
+def _buildUnregisterSession(self):
+    EIPCommand = 0x66                       #(H)
+    EIPLength = 0x00                        #(H)
+    EIPSessionHandle = self.SessionHandle   #(I)
+    EIPStatus = 0x0000                      #(I)
+    EIPContext = self.Context               #(Q)
+    EIPOptions = 0x0000                     #(I)
+
+    return pack('<HHIIQI',
+                EIPCommand,
+                EIPLength,
+                EIPSessionHandle,
+                EIPStatus,
+                EIPContext,
+                EIPOptions)
+
 def _buildForwardOpenPacket(self):
     '''
     Assemble the forward open packet
@@ -420,6 +452,14 @@ def _buildForwardOpenPacket(self):
     forwardOpen = _buildCIPForwardOpen(self)
     rrDataHeader = _buildEIPSendRRDataHeader(self, len(forwardOpen))
     return rrDataHeader+forwardOpen
+
+def _buildForwardClosePacket(self):
+    '''
+    Assemble the forward close packet
+    '''
+    forwardClose = _buildForwardClose(self)
+    rrDataHeader = _buildEIPSendRRDataHeader(self, len(forwardClose))
+    return rrDataHeader + forwardClose
 
 def _buildCIPForwardOpen(self):
     '''
@@ -488,6 +528,41 @@ def _buildCIPForwardOpen(self):
                 CIPConnectionPathSize,
                 CIPConnectionPath[0],CIPConnectionPath[1],CIPConnectionPath[2],CIPConnectionPath[3],
                 CIPConnectionPath[4],CIPConnectionPath[5])
+
+def _buildForwardClose(self):
+    CIPService = 0x4E                                    #(B) CIP OpenForward        Vol 3 (3-5.5.2)(3-5.5)
+    CIPPathSize = 0x02                                   #(B) Request Path zize              (2-4.1)
+    CIPClassType = 0x20                                  #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
+                                                         #[Logical Segment][Class ID][8 bit addressing]
+    CIPClass = 0x06                                      #(B) Connection Manager Object      (3-5)
+    CIPInstanceType = 0x24                               #(B) Instance type                  (C-1.1)
+
+    CIPInstance = 0x01                                   #(B) Instance
+    CIPPriority = 0x0A                                   #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
+    CIPTimeoutTicks = 0x0e                               #(B) Timeout Info                   (3-5.5.1.3)
+    CIPConnectionSerialNumber = self.SerialNumber        #(H) Serial number for THIS connection (3-5.5.1.4)
+    CIPVendorID = self.VendorID                          #(H)
+    CIPOriginatorSerialNumber = self.OriginatorSerialNumber  #(I)
+    CIPConnectionPathSize = 0x03                         #(B)                                   (3-5.5.1.9)
+    CIPReserved = 0x00                                   #(B)
+    CIPConnectionPath = (0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01) #(6B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
+
+    return pack('<BBBBBBBBHHIBB6B', CIPService,
+                CIPPathSize,
+                CIPClassType,
+                CIPClass,
+                CIPInstanceType,
+                CIPInstance,
+                CIPPriority,
+                CIPTimeoutTicks,
+                CIPConnectionSerialNumber,
+                CIPVendorID,
+                CIPOriginatorSerialNumber,
+                CIPConnectionPathSize,
+                CIPReserved,
+                CIPConnectionPath[0], CIPConnectionPath[1],
+                CIPConnectionPath[2], CIPConnectionPath[3],
+                CIPConnectionPath[4], CIPConnectionPath[5])
                                   
 def _buildEIPSendRRDataHeader(self, frameLen):
     EIPCommand = 0x6F                               #(H)EIP SendRRData  (Vol2 2-4.7)
