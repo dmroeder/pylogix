@@ -1,5 +1,6 @@
 10/26/16
   Added _getBytes() for sending/receiving data.  Should handle failure better
+  Rewrote _connect() to handle disconnect/reconnects better
 
 08/17/16
   Fixed tagIOI not dealing with greater than 4 byte tag index

@@ -123,6 +123,7 @@ def _readTag(self, tag, elements):
     processes the read request
     '''
     if not self.SocketConnected: _connect(self)
+    if not self.SocketConnected: return None
 
     t,b,i = TagNameParser(tag, 0)
     if b not in self.KnownTags: InitialRead(self, t, b)
@@ -145,7 +146,8 @@ def _writeTag(self, tag, value, elements):
     Processes the write request
     '''
     if not self.SocketConnected: _connect(self)
-    
+    if not self.SocketConnected: return None
+
     t,b,i = TagNameParser(tag, 0)
     if b not in self.KnownTags: InitialRead(self, t, b)
 
@@ -188,6 +190,7 @@ def _multiRead(self, args):
     segments = ""
     tagCount = len(args)
     if not self.SocketConnected: _connect(self)
+    if not self.SocketConnected: return None
 
     for i in xrange(tagCount):
 	t,b,i = TagNameParser(args[i], 0)
@@ -223,7 +226,8 @@ def _multiRead(self, args):
 
 def _getPLCTime(self):
     # Connect to the PLC
-    if not self.SocketConnected: _connect(self)
+    if not self.SocketConnected: connect(self)
+    if not self.SocketConnected: return None
 		
     AttributeService = 0x03
     AttributeSize = 0x02
@@ -247,11 +251,7 @@ def _getPLCTime(self):
 			   Attributes[2],
 			   Attributes[3])
     
-    #self.CIPRequest=AttributePacket
     eipHeader = _buildEIPHeader(self, AttributePacket)
-    
-##    self.Socket.send(eipHeader)
-##    retData = self.Socket.recv(1024)
     retData = _getBytes(self, eipHeader)
     # get the time from the packet
     plcTime = unpack_from('<Q', retData, 56)[0]
@@ -273,6 +273,7 @@ def _getTagList(self):
     # that all of the tags don't fit in a single packet
 
     if not self.SocketConnected: _connect(self)
+    if not self.SocketConnected: return None
     
     forwardOpenFrame = _buildTagRequestPacket(self, partial=False)
     retData = _getBytes(self, forwardOpenFrame)
@@ -335,33 +336,38 @@ def _discover():
           except:
               pass
 	    
-  return devices 
+  return devices   
 
 def _connect(self):
     '''
-    Open our initial connection to the PLC
+    Open a connection to the PLC
     '''
-    self.SocketConnected = False
     try:
-        self.Socket.connect((self.IPAddress, self.Port))
-        self.SocketConnected = True
+	self.Socket = socket.socket()
+	self.Socket.settimeout(1.0)
+	self.Socket.connect((self.IPAddress, self.Port))
     except:
-        self.SocketConnected = False
-        print "Failed to connect to", self.IPAddress, ". Abandoning Ship!"
-        sys.exit(0)
+	self.SocketConnected = False
+	self.SequenceCounter = 1
+	self.Socket.close()
+	return
 
-    if self.SocketConnected:
-        # If our connection was successful, register session
-        regSession = _buildRegisterSession(self)
-        retData = _getBytes(self, regSession)
+    retData = _getBytes(self, _buildRegisterSession(self))
+    if retData:
         self.SessionHandle = unpack_from('<I', retData, 4)[0]
-        self.SessionRegistered = True
+    else:
+	self.SocketConnected = False
+	print "Failed to register session"
+	return        
 
-        # Forward Open
-        fwdOpen = _buildForwardOpenPacket(self)
-        retData = _getBytes(self, fwdOpen)
-        tempID = unpack_from('<I', retData, 44)
-        self.OTNetworkConnectionID = tempID[0]       
+    retData = _getBytes(self, _buildForwardOpenPacket(self))
+    if retData:
+        self.OTNetworkConnectionID = unpack_from('<I', retData, 44)[0]
+	self.SocketConnected = True
+    else:
+        self.SocketConnected = False
+	print "Forward Open Failed"
+	return
 
 def _getBytes(self, data):
     '''
