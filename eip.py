@@ -240,7 +240,7 @@ def _multiRead(self, args):
 
 def _getPLCTime(self):
     # Connect to the PLC
-    if not self.SocketConnected: connect(self)
+    if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
 		
     AttributeService = 0x03
