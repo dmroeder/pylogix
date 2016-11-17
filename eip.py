@@ -289,6 +289,8 @@ def _getTagList(self):
     if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
     
+    self.Offset = 0
+    
     forwardOpenFrame = _buildTagRequestPacket(self, partial=False)
     retData = _getBytes(self, forwardOpenFrame)
     status = unpack_from('<h', retData, 42)[0]
