@@ -25,6 +25,7 @@ from struct import *
 import sys
 import time
 
+programNames = []
 taglist = []
 
 class PLC:
@@ -288,22 +289,25 @@ def _getTagList(self):
 
     if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
-    
+
     self.Offset = 0
     
-    forwardOpenFrame = _buildTagRequestPacket(self, partial=False)
-    retData = _getBytes(self, forwardOpenFrame)
-    status = unpack_from('<h', retData, 42)[0]
+    request = _buildTagListRequest(self)
+    eipHeader = _buildEIPHeader(self, request)
+    retData = _getBytes(self, eipHeader)
+    status = unpack_from('<h', retData, 48)[0]
     extractTagPacket(self, retData)
 
     while status == 6:
-        forwardOpenFrame = _buildTagRequestPacket(self, partial=True)
-        retData = _getBytes(self, forwardOpenFrame)
+        self.Offset += 1
+        request = _buildTagListRequest(self)
+        eipHeader = _buildEIPHeader(self, request)
+        retData = _getBytes(self, eipHeader)
         extractTagPacket(self, retData)
-        status = unpack_from('<h', retData, 42)[0]
+        status = unpack_from('<h', retData, 48)[0]
         time.sleep(0.25)
 
-    return taglist
+    return taglist 
     
 def _discover():
   devices = []
@@ -604,47 +608,7 @@ def _buildEIPSendRRDataHeader(self, frameLen):
                 EIPItem1Type,
                 EIPItem1Length,
                 EIPItem2Type,
-                EIPItem2Length)
-
-def _buildTagRequestPacket(self, partial):
-    '''
-    Builds the entire packet for requesting the tag database
-    '''
-    request = _buildTagListRequest(self, partial)
-    cipSend = _buildCIPUnconnectedSend(partial)
-    forwardOpenFrame = cipSend + request
-    eipRRHeader = _buildEIPSendRRDataHeader(self, len(forwardOpenFrame))
-    return eipRRHeader + forwardOpenFrame    
-
-def _buildCIPUnconnectedSend(partial):
-    '''
-    build unconnected send to request tag database
-    '''
-    CIPService = 0x52                           #(B) CIP Unconnected Send           Vol 3 (3-5.5.2)(3-5.5)
-    CIPPathSize = 0x02               		#(B) Request Path zize              (2-4.1)
-    CIPClassType = 0x20                         #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
-                                                #[Logical Segment][Class ID][8 bit addressing]
-    CIPClass = 0x06                             #(B) Connection Manager Object      (3-5)
-    CIPInstanceType = 0x24                      #(B) Instance type                  (C-1.1)
-                                                #[Logical Segment][Instance ID][8 bit addressing]
-    CIPInstance = 0x01                          #(B) Instance
-    CIPPriority = 0x0A                          #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
-    CIPTimeoutTicks = 0x0e                      #(B) Timeout Info                   (3-5.5.1.3)
-    if partial:                                 #(H) Message Request Size
-        MRServiceSize = 0x12
-    else:
-        MRServiceSize = 0x10
-    
-    return pack('<BBBBBBBBH',
-                CIPService,
-                CIPPathSize,
-                CIPClassType,
-                CIPClass,
-                CIPInstanceType,
-                CIPInstance,
-                CIPPriority,
-                CIPTimeoutTicks,
-                MRServiceSize)
+                EIPItem2Length)   
 
 def _buildTagIOI(self, tagName, isBoolArray):
     '''
@@ -874,36 +838,32 @@ def _buildMultiServiceHeader():
 		MultiInstanceType,
 		MultiInstanceSegment)
 
-def _buildTagListRequest(self, partial):
+def _buildTagListRequest(self):
     '''
     Build the request to get the tag list from the PLC
     '''
-    TLService = 0x55
-    if partial:
-        TLServiceSize = 0x03
+    Service = 0x55
+    ClassID = 0x6B20
+
+    if self.Offset < 256:
+        ServiceSize = 0x02
+        InstanceType = 0x24
+        TLRequest = pack('<BBHBB', Service, ServiceSize, ClassID, InstanceType, self.Offset)
     else:
-        TLServiceSize = 0x02
-    TLSegment = 0x6B20
-    TLRequest = pack('<BBH', TLService, TLServiceSize, TLSegment)
+        ServiceSize = 0x03
+        InstanceType = 0x25
+        TLRequest = pack('<BBHHH', Service, ServiceSize, ClassID, InstanceType, self.Offset)
 
-    if partial:
-        TLRequest += pack('<HH', 0x0025, self.Offset+1)
-    else:
-        TLRequest += pack('<BB', 0x24, self.Offset)
+    AttributeCount = 0x03
+    SymbolType = 0x02
+    ByteCount = 0x07
+    SymbolName = 0x01
 
-    TLStuff = (0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00)
-    TLPathSize = 0x01
-    TLReserved = 0x00
-    TLPort = 0x01
-    TLSlot = self.ProcessorSlot
-
-    TLRequest += pack('<10BBBBB',
-                      TLStuff[0], TLStuff[1], TLStuff[2], TLStuff[3], TLStuff[4],
-                      TLStuff[5], TLStuff[6], TLStuff[7], TLStuff[8], TLStuff[9],
-                      TLPathSize,
-                      TLReserved,
-                      TLPort,
-                      TLSlot)
+    TLRequest += pack('<HHHH',
+                      AttributeCount,
+                      SymbolType,
+                      ByteCount,
+                      SymbolName)
 
     return TLRequest
      
@@ -1189,14 +1149,14 @@ def _parseIdentityResponse(data):
     return resp
 
 def extractTagPacket(self, data):
-  # the first tag in a packet starts at byte 44
-  packetStart = 44
-  
+  # the first tag in a packet starts at byte 50
+  packetStart = 50
+
   while packetStart < len(data):
     # get the length of the tag name
-    tagLen = unpack_from('<H', data, packetStart+20)[0]
+    tagLen = unpack_from('<H', data, packetStart+8)[0]
     # get a single tag from the packet
-    packet = data[packetStart:packetStart+tagLen+22]
+    packet = data[packetStart:packetStart+tagLen+10]
     # extract the offset
     self.Offset = unpack_from('<H', packet, 0)[0]
     # add the tag to our tag list
@@ -1204,13 +1164,15 @@ def extractTagPacket(self, data):
     # filter out garbage
     if "__DEFVAL_" not in tag.TagName:
 	taglist.append(tag)
+    if 'Program:' in tag.TagName:
+        programNames.append(tag.TagName)
     # increment ot the next tag in the packet
-    packetStart = packetStart+tagLen+22
+    packetStart = packetStart+tagLen+10
 
 def parseLgxTag(packet):
     tag = LGXTag()
-    length = unpack_from('<H', packet, 20)[0]
-    tag.TagName = packet[22:length+22]
+    length = unpack_from('<H', packet, 8)[0]
+    tag.TagName = packet[10:length+10]
     tag.Offset = unpack_from('<H', packet, 0)[0]
     tag.DataType = unpack_from('<B', packet, 4)[0]
 

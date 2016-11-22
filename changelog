@@ -1,3 +1,6 @@
+11/21/16
+  -Rewrote GetTagList() to be more efficient, uses connected send
+
 11/16/16
   -Fixed crash if GetTagList() was called twice
 
