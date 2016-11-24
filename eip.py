@@ -284,30 +284,54 @@ def _getPLCTime(self):
     return humanTime 
 
 def _getTagList(self):
-    # The packet has to be assembled a little different in the event
-    # that all of the tags don't fit in a single packet
+    '''
+    Requests the controller tag list and returns a list of LgxTag type
+    '''
 
     if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
 
     self.Offset = 0
     
-    request = _buildTagListRequest(self)
+    request = _buildTagListRequest(self, programName=None)
     eipHeader = _buildEIPHeader(self, request)
     retData = _getBytes(self, eipHeader)
     status = unpack_from('<h', retData, 48)[0]
-    extractTagPacket(self, retData)
+    extractTagPacket(self, retData, programName=None)
 
     while status == 6:
         self.Offset += 1
-        request = _buildTagListRequest(self)
+        request = _buildTagListRequest(self, programName=None)
         eipHeader = _buildEIPHeader(self, request)
         retData = _getBytes(self, eipHeader)
-        extractTagPacket(self, retData)
+        extractTagPacket(self, retData, programName=None)
         status = unpack_from('<h', retData, 48)[0]
         time.sleep(0.25)
 
-    return taglist 
+    '''
+    When we're done with the controller scoped tags,
+    request the program scoped tags
+    '''
+    for programName in programNames:
+
+        self.Offset = 0
+        
+        request = _buildTagListRequest(self, programName)
+        eipHeader = _buildEIPHeader(self, request)
+        retData = _getBytes(self, eipHeader)
+        status = unpack_from('<h', retData, 48)[0]
+        extractTagPacket(self, retData, programName)
+        
+        while status == 6:
+            self.Offset += 1
+            request = _buildTagListRequest(self, programName)
+            eipHeader = _buildEIPHeader(self, request)
+            retData = _getBytes(self, eipHeader)
+            extractTagPacket(self, retData, programName)
+            status = unpack_from('<h', retData, 48)[0]
+            time.sleep(0.25)
+    
+    return taglist
     
 def _discover():
   devices = []
@@ -838,34 +862,37 @@ def _buildMultiServiceHeader():
 		MultiInstanceType,
 		MultiInstanceSegment)
 
-def _buildTagListRequest(self):
+def _buildTagListRequest(self, programName):
     '''
-    Build the request to get the tag list from the PLC
+    Build the request for the PLC tags
+    Program scoped tags will pass the program name for the request
     '''
     Service = 0x55
-    ClassID = 0x6B20
+    PathSegment = ""
+    
+    #If we're dealing with program scoped tags...
+    if programName:
+        PathSegment = pack('<BB', 0x91, len(programName)) + programName
+        # if odd number of characters, need to add a byte to the end.
+        if len(programName) % 2: PathSegment += pack('<B', 0x00)
+  
+    PathSegment += pack('<H', 0x6B20)
 
     if self.Offset < 256:
-        ServiceSize = 0x02
-        InstanceType = 0x24
-        TLRequest = pack('<BBHBB', Service, ServiceSize, ClassID, InstanceType, self.Offset)
+        PathSegment += pack('<BB', 0x24, self.Offset)
     else:
-        ServiceSize = 0x03
-        InstanceType = 0x25
-        TLRequest = pack('<BBHHH', Service, ServiceSize, ClassID, InstanceType, self.Offset)
-
+        PathSegment += pack('<HH', 0x25, self.Offset)
+        
+    PathSegmentLen = len(PathSegment) / 2
     AttributeCount = 0x03
     SymbolType = 0x02
     ByteCount = 0x07
     SymbolName = 0x01
-
-    TLRequest += pack('<HHHH',
-                      AttributeCount,
-                      SymbolType,
-                      ByteCount,
-                      SymbolName)
-
-    return TLRequest
+    Attributes = pack('<HHHH', AttributeCount, SymbolType, ByteCount, SymbolName)
+    TagListRequest = pack('<BB', Service, PathSegmentLen)
+    TagListRequest += PathSegment + Attributes
+    
+    return TagListRequest
      
 def _parseReply(self, tag, elements, data):
     '''
@@ -1148,7 +1175,7 @@ def _parseIdentityResponse(data):
  
     return resp
 
-def extractTagPacket(self, data):
+def extractTagPacket(self, data, programName):
   # the first tag in a packet starts at byte 50
   packetStart = 50
 
@@ -1160,19 +1187,23 @@ def extractTagPacket(self, data):
     # extract the offset
     self.Offset = unpack_from('<H', packet, 0)[0]
     # add the tag to our tag list
-    tag = parseLgxTag(packet)
+    tag = parseLgxTag(packet, programName)
     # filter out garbage
-    if "__DEFVAL_" not in tag.TagName:
+    if "__DEFVAL_" and "Routine:" not in tag.TagName:
 	taglist.append(tag)
-    if 'Program:' in tag.TagName:
-        programNames.append(tag.TagName)
+    if not programName:
+        if 'Program:' in tag.TagName:
+            programNames.append(tag.TagName)
     # increment ot the next tag in the packet
     packetStart = packetStart+tagLen+10
 
-def parseLgxTag(packet):
+def parseLgxTag(packet, programName):
     tag = LGXTag()
     length = unpack_from('<H', packet, 8)[0]
-    tag.TagName = packet[10:length+10]
+    if programName:
+        tag.TagName = programName + '.' + packet[10:length+10]
+    else:
+        tag.TagName = packet[10:length+10]
     tag.Offset = unpack_from('<H', packet, 0)[0]
     tag.DataType = unpack_from('<B', packet, 4)[0]
 

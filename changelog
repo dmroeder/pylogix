@@ -1,3 +1,6 @@
+11/23/16
+  -GetTagList() now includes program scoped tags
+
 11/21/16
   -Rewrote GetTagList() to be more efficient, uses connected send
 
