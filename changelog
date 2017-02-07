@@ -1,5 +1,6 @@
 02/06/17
   -Use a different attribute in GetPLCTime()
+  -Added SetPLCTime() to set the PLC clock
 
 11/23/16
   -GetTagList() now includes program scoped tags

@@ -39,6 +39,12 @@ def ex_getPLCTime():
   '''
   ret = comm.GetPLCTime()
   print ret
+  
+def ex_setPLCTime():
+    '''
+    set the PLC's clock time to the workstations time
+    '''
+    comm.SetPLCTime()
 
 def ex_discover():
   '''
@@ -95,5 +101,6 @@ comm.IPAddress = '192.168.1.10'
 #ex_multiRead()
 #ex_write('ThisTag.Thingy', '107')
 #ex_getPLCTime()
+#ex_setPLCTime()
 #ex_discover()
 #ex_getTags()

@@ -108,6 +108,12 @@ class PLC:
         '''
         return _getPLCTime(self)
 
+    def SetPLCTime(self):
+        '''
+        Sets the PLC's clock time
+        '''
+        return _setPLCTime(self)
+
     def GetTagList(self):
         '''
         Retrieves the tag list from the PLC
@@ -272,6 +278,37 @@ def _getPLCTime(self):
     humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
     
     return humanTime
+
+def _setPLCTime(self):
+    '''
+    Requests the PLC clock time
+    ''' 
+    if not self.SocketConnected: _connect(self)
+    if not self.SocketConnected: return None
+		
+    AttributeService = 0x04
+    AttributeSize = 0x02
+    AttributeClassType = 0x20
+    AttributeClass = 0x8B
+    AttributeInstanceType = 0x24
+    AttributeInstance = 0x01
+    AttributeCount = 0x01
+    Attribute = 0x06
+    Time = time.time() * 1000000
+    AttributePacket = pack('<BBBBBBHHQ',
+                           AttributeService,
+                           AttributeSize,
+                           AttributeClassType,
+                           AttributeClass,
+                           AttributeInstanceType,
+                           AttributeInstance,
+                           AttributeCount,
+                           Attribute,
+                           Time)
+
+    eipHeader = _buildEIPHeader(self, AttributePacket)
+    retData = _getBytes(self, eipHeader)
+    return
 
 def _getTagList(self):
     '''

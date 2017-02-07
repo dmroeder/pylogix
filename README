@@ -34,6 +34,9 @@ USAGE - Python 2.7.11
     Get all Ethernet I/P devices on the network test.Discover()
 	ex:  stuff = test.Discover()
 	     print stuff(1).IPAddress # prints the first devices IP Address
+	     
+    Get or Set the PLC clock: test.GetPLCTime() or test.SetPLCTime()
+    Note:  SetPLCTime() will use your computers clock to set the PLC
 		    
 6) Close the connection with test.Close()
 		    
