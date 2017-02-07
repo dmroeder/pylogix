@@ -240,7 +240,9 @@ def _multiRead(self, args):
         return None
 
 def _getPLCTime(self):
-    # Connect to the PLC
+    '''
+    Requests the PLC clock time
+    ''' 
     if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
 		
@@ -250,38 +252,26 @@ def _getPLCTime(self):
     AttributeClass = 0x8B
     AttributeInstanceType = 0x24
     AttributeInstance = 0x01
-    AttributeCount = 0x04
-    Attributes = (0x06, 0x08, 0x09, 0x0A)
+    AttributeCount = 0x01
+    TimeAttribute = 0x0B
     
-    AttributePacket = pack('<BBBBBBH4H',
+    AttributePacket = pack('<BBBBBBH1H',
                            AttributeService,
-			   AttributeSize,
-			   AttributeClassType,
-			   AttributeClass,
-			   AttributeInstanceType,
-			   AttributeInstance,
-			   AttributeCount,
-			   Attributes[0],
-			   Attributes[1],
-			   Attributes[2],
-			   Attributes[3])
+                           AttributeSize,
+                           AttributeClassType,
+                           AttributeClass,
+                           AttributeInstanceType,
+                           AttributeInstance,
+                           AttributeCount,
+                           TimeAttribute)
     
     eipHeader = _buildEIPHeader(self, AttributePacket)
     retData = _getBytes(self, eipHeader)
     # get the time from the packet
     plcTime = unpack_from('<Q', retData, 56)[0]
-    # get the timezone offset from the packet (this will include sign)
-    timezoneOffset = int(retData[75:78])
-    # get daylight savings setting from packet (at the end)
-    dst = unpack_from('<B', retData, len(retData)-1)[0]
-    # factor in daylight savings time
-    timezoneOffset += dst
-    # offset our by the timezone (big number=1 hour in microseconds)
-    timezoneOffset = timezoneOffset*3600000000
-    # convert it to human readable format
-    humanTime = datetime(1970, 1, 1)+timedelta(microseconds=plcTime+timezoneOffset)
-
-    return humanTime 
+    humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
+    
+    return humanTime
 
 def _getTagList(self):
     '''
