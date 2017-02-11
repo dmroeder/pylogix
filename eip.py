@@ -59,7 +59,7 @@ class PLC:
                          196:(4, "DINT", 'i'),
                          202:(4, "REAL", 'f'),
                          211:(4, "DWORD", 'I'),
-                         197:(8, "LINT", 'Q')}
+                         197:(8, "LINT", 'q')}
 
     def __enter__(self):
         return self

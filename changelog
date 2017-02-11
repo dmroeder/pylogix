@@ -1,3 +1,6 @@
+02/11/17
+  -Fixed CIP type for LINT, changed to signed
+
 02/06/17
   -Use a different attribute in GetPLCTime()
   -Added SetPLCTime() to set the PLC clock
