@@ -143,6 +143,7 @@ def _readTag(self, tag, elements):
     '''
     processes the read request
     '''
+    self.Offset = 0
     if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
 
@@ -166,6 +167,9 @@ def _writeTag(self, tag, value, elements):
     '''
     Processes the write request
     '''
+    self.Offset = 0
+    writeData = []
+    
     if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
 
@@ -173,8 +177,6 @@ def _writeTag(self, tag, value, elements):
     if b not in self.KnownTags: InitialRead(self, t, b)
 
     dataType = self.KnownTags[b][0]
-    self.Offset = 0
-    writeData = []
 
     if elements == 1:
         if dataType == 202:
