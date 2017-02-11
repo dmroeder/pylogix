@@ -83,17 +83,17 @@ class PLC:
             return _readTag(self, args[0], args[1])
         else:
             return "You provided too many arguments for a read"
-	  
+    
     def Write(self, *args):
-	'''
-	We have two options for writing depending on
-	the arguments, write a single tag, or write an array
-	'''
-	if not args or args == 1:
-	    return "You must provide a tag name and value"
-	elif len(args) == 2:
-	    _writeTag(self, args[0], args[1], 1)
-	else:
+        '''
+        We have two options for writing depending on
+        the arguments, write a single tag, or write an array
+        '''
+        if not args or args == 1:
+            return "You must provide a tag name and value"
+        elif len(args) == 2:
+            _writeTag(self, args[0], args[1], 1)
+        else:
             return "You provided too many arguments, not sure what you want to do"
 
     def MultiRead(self, *args):
@@ -177,29 +177,29 @@ def _writeTag(self, tag, value, elements):
     writeData = []
 
     if elements == 1:
-	if dataType == 202:
-	    writeData.append(float(value))
-	elif dataType == 160:
-	    writeData = MakeString(value)
-	else:
-	    writeData.append(int(value))
+        if dataType == 202:
+            writeData.append(float(value))
+        elif dataType == 160:
+            writeData = MakeString(value)
+        else:
+            writeData.append(int(value))
     elif elements > 1:
-	for i in xrange(elements):
-	    writeData.append(int(value[i]))  
+        for i in xrange(elements):
+            writeData.append(int(value[i]))  
     else:
-	print "Fix this"
+        print "Fix this"
 
      # write a bit of a word, boolean array or everything else
     if BitofWord(tag):
-	tagData = _buildTagIOI(self, tag, isBoolArray=False)
-	writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
+        tagData = _buildTagIOI(self, tag, isBoolArray=False)
+        writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
     elif dataType == 211:
-	tagData = _buildTagIOI(self, tag, isBoolArray=True)
-	writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
+        tagData = _buildTagIOI(self, tag, isBoolArray=True)
+        writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
     else:
-	tagData = _buildTagIOI(self, tag, isBoolArray=False)
-	writeRequest = _addWriteIOI(self, tagData, writeData, dataType, 1)
-	   
+        tagData = _buildTagIOI(self, tag, isBoolArray=False)
+        writeRequest = _addWriteIOI(self, tagData, writeData, dataType, 1)
+    
     eipHeader = _buildEIPHeader(self, writeRequest)
     retData = _getBytes(self, eipHeader)
     
@@ -214,9 +214,9 @@ def _multiRead(self, args):
     if not self.SocketConnected: return None
 
     for i in xrange(tagCount):
-	t,b,i = TagNameParser(args[i], 0)
-	if b not in self.KnownTags: InitialRead(self, t, b)
-	    
+        t,b,i = TagNameParser(args[i], 0)
+        if b not in self.KnownTags: InitialRead(self, t, b)
+
         tagIOI = _buildTagIOI(self, t, isBoolArray=False)
         readIOI = _addReadIOI(self, tagIOI, 1)
         serviceSegments.append(readIOI)
@@ -231,11 +231,11 @@ def _multiRead(self, args):
 
     # assemble all the segments
     for i in xrange(tagCount):
-	segments += serviceSegments[i]
+        segments += serviceSegments[i]
 
     for i in xrange(tagCount-1):	
-	temp += len(serviceSegments[i])
-	offsets += pack('<H', temp)
+        temp += len(serviceSegments[i])
+        offsets += pack('<H', temp)
 
     readRequest = header+segmentCount+offsets+segments
     eipHeader = _buildEIPHeader(self, readRequest)
@@ -251,7 +251,7 @@ def _getPLCTime(self):
     ''' 
     if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
-		
+
     AttributeService = 0x03
     AttributeSize = 0x02
     AttributeClassType = 0x20
@@ -285,7 +285,7 @@ def _setPLCTime(self):
     ''' 
     if not self.SocketConnected: _connect(self)
     if not self.SocketConnected: return None
-		
+
     AttributeService = 0x04
     AttributeSize = 0x02
     AttributeClassType = 0x20
@@ -382,9 +382,9 @@ def _discover():
                   ret = s.recv(1024)
                   context = unpack_from('<Q', ret, 14)[0]
                   if context == 0x65696c796168:
-		      device = _parseIdentityResponse(ret)
-		      if device.IPAddress:
-			  devices.append(device)
+                      device = _parseIdentityResponse(ret)
+                      if device.IPAddress:
+                          devices.append(device)
           except:
               pass
                   
@@ -397,16 +397,16 @@ def _discover():
           s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
           s.sendto(request, ('255.255.255.255', 44818))
           try:
-            while(1):
-              ret = s.recv(1024)
-              context = unpack_from('<Q', ret, 14)[0]
-              if context == 0x65696c796168:
-		  device = _parseIdentityResponse(ret)
-		  if device.IPAddress:
-		      devices.append(device)
+              while(1):
+                ret = s.recv(1024)
+                context = unpack_from('<Q', ret, 14)[0]
+                if context == 0x65696c796168:
+                    device = _parseIdentityResponse(ret)
+                    if device.IPAddress:
+                        devices.append(device)
           except:
               pass
-	    
+
   return devices   
 
 def _connect(self):
@@ -414,31 +414,31 @@ def _connect(self):
     Open a connection to the PLC
     '''
     try:
-	self.Socket = socket.socket()
-	self.Socket.settimeout(1.0)
-	self.Socket.connect((self.IPAddress, self.Port))
+        self.Socket = socket.socket()
+        self.Socket.settimeout(1.0)
+        self.Socket.connect((self.IPAddress, self.Port))
     except:
-	self.SocketConnected = False
-	self.SequenceCounter = 1
-	self.Socket.close()
-	return
+        self.SocketConnected = False
+        self.SequenceCounter = 1
+        self.Socket.close()
+        return
 
     retData = _getBytes(self, _buildRegisterSession(self))
     if retData:
         self.SessionHandle = unpack_from('<I', retData, 4)[0]
     else:
-	self.SocketConnected = False
-	print "Failed to register session"
-	return        
+        self.SocketConnected = False
+        print "Failed to register session"
+        return        
 
     retData = _getBytes(self, _buildForwardOpenPacket(self))
     if retData:
         self.OTNetworkConnectionID = unpack_from('<I', retData, 44)[0]
-	self.SocketConnected = True
+        self.SocketConnected = True
     else:
         self.SocketConnected = False
-	print "Forward Open Failed"
-	return
+        print "Forward Open Failed"
+        return
 
 def _closeConnection(self):
     '''
@@ -465,11 +465,11 @@ def _getBytes(self, data):
         else:
             return None
     except socket.gaierror, e:
-	self.SocketConnected = False
+        self.SocketConnected = False
         return None
     except IOError, e:
-	self.SocketConnected = False
-	return None
+        self.SocketConnected = False
+        return None
         
 def _buildRegisterSession(self):
     '''
@@ -551,8 +551,8 @@ def _buildCIPForwardOpen(self):
     CIPFiller = (0x00, 0x00, 0x00)                       #(BBB) align back to word bound
     CIPOTRPI = 0x00201234                                #(I) RPI just over 2 seconds        (3-5.5.1.2)
     CIPOTNetworkConnectionParameters = 0x43f4            #(H) O->T connection Parameters    (3-5.5.1.1)
-						         # Non-Redundant,Point to Point,[reserved],Low Priority,Variable,[500 bytes] 
-						         # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
+                                                         # Non-Redundant,Point to Point,[reserved],Low Priority,Variable,[500 bytes] 
+                                                         # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
     CIPTORPI = 0x00204001                                #(I) RPI just over 2 seconds       (3-5.5.1.2)
     CIPTONetworkConnectionParameters = 0x43f4            #(H) T-O connection Parameters    (3-5.5.1.1)
                                                          # Non-Redundant,Point to Point,[reserved],Low Priority,Variable,[500 bytes] 
@@ -681,57 +681,56 @@ def _buildTagIOI(self, tagName, isBoolArray):
 
     # this loop figures out the packet length and builds our packet
     for i in xrange(len(tagArray)):
-	if tagArray[i].endswith("]"):
+        if tagArray[i].endswith("]"):
+            tag, basetag, index = TagNameParser(tagArray[i], 0)
+            
+            BaseTagLenBytes = len(basetag)                         # get number of bytes
+            if isBoolArray and i == len(tagArray)-1: index = index/32
 
-	    tag, basetag, index = TagNameParser(tagArray[i], 0)
+            # Assemble the packet
+            RequestTagData += pack('<BB', 0x91, BaseTagLenBytes)   # add the req type and tag len to packet
+            RequestTagData += basetag                              # add the tag name
+            if BaseTagLenBytes%2:                                  # check for odd bytes
+                BaseTagLenBytes += 1                               # add another byte to make it even
+                RequestTagData += pack('<B', 0x00)                 # add the byte to our packet
 
-	    BaseTagLenBytes = len(basetag)				# get number of bytes
-	    if isBoolArray and i == len(tagArray)-1: index = index/32
+            BaseTagLenWords = BaseTagLenBytes/2                    # figure out the words for this segment
 
-	    # Assemble the packet
-	    RequestTagData += pack('<BB', 0x91, BaseTagLenBytes)	# add the req type and tag len to packet
-	    RequestTagData += basetag					# add the tag name
-	    if BaseTagLenBytes%2:					# check for odd bytes
-		BaseTagLenBytes += 1					# add another byte to make it even
-		RequestTagData += pack('<B', 0x00)			# add the byte to our packet
-	    
-	    BaseTagLenWords = BaseTagLenBytes/2				# figure out the words for this segment
-	    
-	    if i < len(tagArray):
-		if not isinstance(index, list):
-		    if index < 256:				        	# if index is 1 byte...
-			RequestTagData += pack('<BB', 0x28, index)		# add one word to packet
-		    if 65536 > index > 255:					# if index is more than 1 byte...
-			RequestTagData += pack('<HH', 0x29, index) 		# add 2 words to packet
-		    if index > 65535:
-			RequestTagData += pack('<HI', 0x2A, index)
-		else:
-		    for i in xrange(len(index)):
-			if index[i] < 256:					# if index is 1 byte...
-			    RequestTagData += pack('<BB', 0x28, index[i])	# add one word to packet
-			if 65536 > index[i] > 255:				# if index is more than 1 byte...
-			    RequestTagData += pack('<HH', 0x29, index[i])  	# add 2 words to packet
-			if index[i] > 65535:					# if index is more than 4 bytes
-			    RequestTagData += pack('<HI', 0x2A, index[i])  	# add 2 words to packet
-	else:
+            if i < len(tagArray):
+                if not isinstance(index, list):
+                    if index < 256:                                 # if index is 1 byte...
+                        RequestTagData += pack('<BB', 0x28, index)  # add one word to packet
+                    if 65536 > index > 255:                         # if index is more than 1 byte...
+                        RequestTagData += pack('<HH', 0x29, index)  # add 2 words to packet
+                    if index > 65535:
+                        RequestTagData += pack('<HI', 0x2A, index)
+                else:
+                    for i in xrange(len(index)):
+                        if index[i] < 256:                                  # if index is 1 byte...
+                            RequestTagData += pack('<BB', 0x28, index[i])   # add one word to packet
+                        if 65536 > index[i] > 255:                          # if index is more than 1 byte...
+                            RequestTagData += pack('<HH', 0x29, index[i])   # add 2 words to packet
+                        if index[i] > 65535:                                # if index is more than 4 bytes
+                            RequestTagData += pack('<HI', 0x2A, index[i])   # add 2 words to packet
+        else:
             '''
-	    for non-array segment of tag
-	    the try might be a stupid way of doing this.  If the portion of the tag
+            for non-array segment of tag
+            the try might be a stupid way of doing this.  If the portion of the tag
                 can be converted to an integer successfully then we must be just looking
-	    	for a bit from a word rather than a UDT.  So we then don't want to assemble
-	    	the read request as a UDT, just read the value of the DINT.  We'll figure out
-	    	the individual bit in the read function.
-	    '''
-	    try:
-		if int(tagArray[i]) <= 31:
-		    pass
-	    except:
-		BaseTagLenBytes = len(tagArray[i])		# store len of tag
-		RequestTagData += pack('<BB', 0x91, len(tagArray[i]))	# add to packet
-		RequestTagData += tagArray[i]			# add tag req type and len to packet
-		if BaseTagLenBytes%2:			        # if odd number of bytes
-		    BaseTagLenBytes += 1			# add byte to make it even
-		    RequestTagData += pack('<B', 0x00)		# also add to packet  
+                for a bit from a word rather than a UDT.  So we then don't want to assemble
+                the read request as a UDT, just read the value of the DINT.  We'll figure out
+                the individual bit in the read function.
+            '''
+            try:
+                if int(tagArray[i]) <= 31:
+                    pass
+            except:
+                BaseTagLenBytes = len(tagArray[i])                      # store len of tag
+                RequestTagData += pack('<BB', 0x91, len(tagArray[i]))   # add to packet
+                RequestTagData += tagArray[i]                           # add tag req type and len to packet
+                if BaseTagLenBytes%2:                                   # if odd number of bytes
+                    BaseTagLenBytes += 1                                # add byte to make it even
+                    RequestTagData += pack('<B', 0x00)                  # also add to packet  
 
     return RequestTagData
 
@@ -739,11 +738,11 @@ def _addReadIOI(self, tagIOI, elements):
     '''
     Add the read service to the tagIOI
     '''
-    RequestService = 0x4C		#CIP Read_TAG_Service (PM020 Page 17)
+    RequestService = 0x4C                                   # CIP Read_TAG_Service (PM020 Page 17)
     RequestPathSize = len(tagIOI)/2
     readIOI = pack('<BB', RequestService, RequestPathSize)  # beginning of our req packet
-    readIOI += tagIOI			                    # add tagIOI to readIOI
-    readIOI += pack('<H', elements)	                    # end of packet
+    readIOI += tagIOI                                       # add tagIOI to readIOI
+    readIOI += pack('<H', elements)                         # end of packet
     return readIOI
 
 def _addPartialReadIOI(self, tagIOI, elements):
@@ -753,8 +752,8 @@ def _addPartialReadIOI(self, tagIOI, elements):
     RequestService=0x52
     RequestPathSize=len(tagIOI)/2
     readIOI = pack('<BB', RequestService, RequestPathSize)  # beginning of our req packet
-    readIOI += tagIOI					    # Tag portion of packet
-    readIOI += pack('<H', elements)	                    # end of packet
+    readIOI += tagIOI                                       # Tag portion of packet
+    readIOI += pack('<H', elements)                         # end of packet
     readIOI += pack('<H', self.Offset)
     readIOI += pack('<H', 0x0000)
     return readIOI
@@ -763,25 +762,25 @@ def _addWriteIOI(self, tagIOI, writeData, dataType, elements):
     '''
     Add the write command stuff to the tagIOI
     '''
-    elementSize = self.CIPTypes[dataType][0]     	#Dints are 4 bytes each
-    dataLen = len(writeData)            		#list of elements to write
+    elementSize = self.CIPTypes[dataType][0]        # Dints are 4 bytes each
+    dataLen = len(writeData)                        # list of elements to write
     NumberOfBytes = elementSize*dataLen
     RequestNumberOfElements = dataLen
     RequestPathSize = len(tagIOI)/2
-    if dataType == 160:  #Strings are special
-	RequestNumberOfElements = self.StructIdentifier
-	TypeCodeLen = 0x02
+    if dataType == 160:                             # Strings are special
+        RequestNumberOfElements = self.StructIdentifier
+        TypeCodeLen = 0x02
     else:
-	TypeCodeLen = 0x00
-    RequestService = 0x4D			#CIP Write_TAG_Service (PM020 Page 17)
-    CIPWriteRequest = pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
-    CIPWriteRequest += tagIOI					# Tag portion of packet 
+        TypeCodeLen = 0x00
+    RequestService = 0x4D                                           # CIP Write_TAG_Service (PM020 Page 17)
+    CIPWriteRequest = pack('<BB', RequestService, RequestPathSize)  # beginning of our req packet
+    CIPWriteRequest += tagIOI                                       # Tag portion of packet 
 
     CIPWriteRequest += pack('<BBH', dataType, TypeCodeLen, RequestNumberOfElements)
 
     for i in xrange(len(writeData)):
-	el = writeData[i]
-	CIPWriteRequest += pack(self.CIPTypes[dataType][2],el)
+        el = writeData[i]
+        CIPWriteRequest += pack(self.CIPTypes[dataType][2],el)
     return CIPWriteRequest    
 
 def _addWriteBitIOI(self, tag, tagIOI, writeData, dataType):
@@ -790,36 +789,36 @@ def _addWriteBitIOI(self, tag, tagIOI, writeData, dataType):
     Writing to a bit is handled in a different way than
     other writes
     '''
-    elementSize = self.CIPTypes[dataType][0]     	#Dints are 4 bytes each
-    dataLen = len(writeData)            		#list of elements to write
+    elementSize = self.CIPTypes[dataType][0]                # Dints are 4 bytes each
+    dataLen = len(writeData)                                # list of elements to write
     NumberOfBytes = elementSize*dataLen
     RequestNumberOfElements = dataLen
     RequestPathSize = len(tagIOI)/2
-    RequestService = 0x4E			#CIP Write (special)
-    writeIOI = pack('<BB', RequestService, RequestPathSize)	# beginning of our req packet
+    RequestService = 0x4E                                   #CIP Write (special)
+    writeIOI = pack('<BB', RequestService, RequestPathSize) # beginning of our req packet
     writeIOI += tagIOI
 
-    fmt = self.CIPTypes[dataType][2]		# get the pack format ('b')
-    fmt = fmt.upper()				# convert it to unsigned ('B')
-    s = tag.split('.')			        # split by decimal to get bit
+    fmt = self.CIPTypes[dataType][2]                        # get the pack format ('b')
+    fmt = fmt.upper()                                       # convert it to unsigned ('B')
+    s = tag.split('.')                                      # split by decimal to get bit
     if dataType == 211:
         t = s[len(s)-1]
-	tag, basetag, bit = TagNameParser(t, 0)
-	bit %= 32
+        tag, basetag, bit = TagNameParser(t, 0)
+        bit %= 32
     else:
-	bit = s[len(s)-1]				# get the bit number we're writing to
-	bit = int(bit)				# convert it to integer
-	    
-    writeIOI += pack('<h', NumberOfBytes)	# pack the number of bytes
-    byte = 2**(NumberOfBytes*8)-1			
+        bit = s[len(s)-1]                                   # get the bit number we're writing to
+        bit = int(bit)                                      # convert it to integer
+
+    writeIOI += pack('<h', NumberOfBytes)                   # pack the number of bytes
+    byte = 2**(NumberOfBytes*8)-1
     bits = 2**bit
     if writeData[0]:
-	writeIOI += pack(fmt, bits)
-	writeIOI += pack(fmt, byte)
+        writeIOI += pack(fmt, bits)
+        writeIOI += pack(fmt, byte)
     else:
-	writeIOI += pack(fmt, 0x00)
-	writeIOI += pack(fmt, (byte-bits))
-	
+        writeIOI += pack(fmt, 0x00)
+        writeIOI += pack(fmt, (byte-bits))
+
     return writeIOI
 
 def _buildEIPHeader(self, tagIOI):
@@ -882,12 +881,12 @@ def _buildMultiServiceHeader():
     MultiInstanceSegment = 0x01
     
     return pack('<BBBBBB',
-		MultiService,
-		MultiPathSize,
-		MutliClassType,
-		MultiClassSegment,
-		MultiInstanceType,
-		MultiInstanceSegment)
+                MultiService,
+                MultiPathSize,
+                MutliClassType,
+                MultiClassSegment,
+                MultiInstanceType,
+                MultiInstanceSegment)
 
 def _buildTagListRequest(self, programName):
     '''
@@ -933,76 +932,75 @@ def _parseReply(self, tag, elements, data):
     extendedStatus = unpack_from('<B', data, 49)[0]
     
     if status == 0 or status == 6:
-	# parse the tag
-	tagName, basetag, index = TagNameParser(tag, 0)
-	datatype = self.KnownTags[basetag][0]
-	CIPFormat = self.CIPTypes[datatype][2]
-	
-	if elements == 1:
-	    # Do different stuff based on the returned data type
-	    if datatype == 211:
-		returnvalue = _getBoolArrayValue(CIPFormat, tag, data)
-	    elif datatype == 160:
-		returnvalue = _getSingleString( data)
-	    else:
-		returnvalue = unpack_from(CIPFormat, data, 52)[0]
-	    
-	    # check if we were trying to read a bit of a word
-	    s = tag.split(".")
-	    doo = s[len(s)-1]
-	    if doo.isdigit():
-		returnvalue = _getBitOfWord(s, returnvalue)
- 
-	    return returnvalue
-	  
-	else:	# user passed more than one argument (array read)
-            Array = []
-	    if datatype == 160:
-		dataSize = self.KnownTags[basetag][1]-30
-	    else:
-		dataSize = self.CIPTypes[datatype][0]
-	    
-	    numbytes = len(data)-dataSize	        # total number of bytes in packet
-	    counter = 0					# counter for indexing through packet
-	    self.Offset = 0				# offset for next packet request
-	    stringLen = self.KnownTags[basetag][1]-30	# get the stored length (only for string)
-	    for i in xrange(elements):	
-		index = 52+(counter*dataSize)		# location of data in packet
-		self.Offset += dataSize
-		
-		if datatype == 160:
-		    # gotta handle strings a little different
-		    index = 54+(counter*stringLen)
-		    NameLength = unpack_from('<L', data, index)[0]
-		    returnvalue = data[index+4:index+4+NameLength]
-		else:
-		    returnvalue = unpack_from(CIPFormat, data, index)[0]
-	        
-	        #Array[i] = returnvalue
-		Array.append(returnvalue)
-		counter += 1
-		# with large arrays, the data takes multiple packets so at the end of
-		# a packet, we need to send a new request
-		if index == numbytes and status == 6:
-		    index = 0
-		    counter = 0
+        # parse the tag
+        tagName, basetag, index = TagNameParser(tag, 0)
+        datatype = self.KnownTags[basetag][0]
+        CIPFormat = self.CIPTypes[datatype][2]
 
-		    tagIOI = _buildTagIOI(self, tag, isBoolArray=False)
-		    readIOI = _addPartialReadIOI(self, tagIOI, elements)
-		    eipHeader = _buildEIPHeader(self, readIOI)
+        if elements == 1:
+            # Do different stuff based on the returned data type
+            if datatype == 211:
+                returnvalue = _getBoolArrayValue(CIPFormat, tag, data)
+            elif datatype == 160:
+                returnvalue = _getSingleString( data)
+            else:
+                returnvalue = unpack_from(CIPFormat, data, 52)[0]
+
+            # check if we were trying to read a bit of a word
+            s = tag.split(".")
+            doo = s[len(s)-1]
+            if doo.isdigit():
+                returnvalue = _getBitOfWord(s, returnvalue)
+ 
+            return returnvalue
+
+        else:   # user passed more than one argument (array read)
+            Array = []
+            if datatype == 160:
+                dataSize = self.KnownTags[basetag][1]-30
+            else:
+                dataSize = self.CIPTypes[datatype][0]
+
+            numbytes = len(data)-dataSize	        # total number of bytes in packet
+            counter = 0					# counter for indexing through packet
+            self.Offset = 0				# offset for next packet request
+            stringLen = self.KnownTags[basetag][1]-30	# get the stored length (only for string)
+            for i in xrange(elements):	
+                index = 52+(counter*dataSize)		# location of data in packet
+                self.Offset += dataSize
+
+                if datatype == 160:
+                    # gotta handle strings a little different
+                    index = 54+(counter*stringLen)
+                    NameLength = unpack_from('<L', data, index)[0]
+                    returnvalue = data[index+4:index+4+NameLength]
+                else:
+                    returnvalue = unpack_from(CIPFormat, data, index)[0]
+
+                Array.append(returnvalue)
+                counter += 1
+                # with large arrays, the data takes multiple packets so at the end of
+                # a packet, we need to send a new request
+                if index == numbytes and status == 6:
+                    index = 0
+                    counter = 0
+
+                    tagIOI = _buildTagIOI(self, tag, isBoolArray=False)
+                    readIOI = _addPartialReadIOI(self, tagIOI, elements)
+                    eipHeader = _buildEIPHeader(self, readIOI)
     
-		    self.Socket.send(eipHeader)
-		    data = self.Socket.recv(1024)
-		    status = unpack_from('<h', data, 48)[0]
-		    numbytes = len(data)-dataSize
-		    
-	    return Array
+                    self.Socket.send(eipHeader)
+                    data = self.Socket.recv(1024)
+                    status = unpack_from('<h', data, 48)[0]
+                    numbytes = len(data)-dataSize
+
+            return Array
     else: # didn't nail it
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
             err = 'Unknown error'
-	return "Failed to read tag: " + tag + ' - ' + err   
+        return "Failed to read tag: " + tag + ' - ' + err   
 
 def _getBoolArrayValue(CIPFormat, tag, data):
     '''
@@ -1022,10 +1020,10 @@ def _getBitOfWord(split_tag, value):
     bitPos = split_tag[len(split_tag)-1]
     bitPos = int(bitPos)
     try:
-	if int(bitPos)<=31:
-	    returnvalue = BitValue(value, bitPos)
+        if int(bitPos)<=31:
+            returnvalue = BitValue(value, bitPos)
     except:
-	pass  
+        pass  
     return returnvalue
     
 def _getSingleString(data):
@@ -1080,9 +1078,9 @@ def TagNameParser(tag, offset):
                     ind.append(s[i])
         else:
             pass
-	return tag, bt, ind    
+        return tag, bt, ind    
     except:
-	return tag, bt, 0
+        return tag, bt, 0
 
 def MultiParser(self, data):
     '''
@@ -1095,19 +1093,19 @@ def MultiParser(self, data):
     # get the offset values for each of the tags in the packet
     reply = []
     for i in xrange(tagCount):
-	loc = 2+(i*2)					# pointer to offset
-	offset = unpack_from('<H', stripped, loc)[0]	# get offset
-	replyStatus = unpack_from('<b', stripped, offset+2)[0]
-	replyExtended = unpack_from('<b', stripped, offset+3)[0]
+        loc = 2+(i*2)					# pointer to offset
+        offset = unpack_from('<H', stripped, loc)[0]	# get offset
+        replyStatus = unpack_from('<b', stripped, offset+2)[0]
+        replyExtended = unpack_from('<b', stripped, offset+3)[0]
 
-	# successful reply, add the value to our list
-	if replyStatus == 0 and replyExtended == 0:
-	    dataTypeValue = unpack_from('<B', stripped, offset+4)[0]	# data type
-	    dataTypeFormat = self.CIPTypes[dataTypeValue][2]     	# number of bytes for datatype	  
-	    reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
-	else:
-	    reply.append("Error")
-	    
+        # successful reply, add the value to our list
+        if replyStatus == 0 and replyExtended == 0:
+            dataTypeValue = unpack_from('<B', stripped, offset+4)[0]	# data type
+            dataTypeFormat = self.CIPTypes[dataTypeValue][2]     	# number of bytes for datatype	  
+            reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
+        else:
+            reply.append("Error")
+
     return reply
 
 def MakeString(string):
@@ -1130,9 +1128,9 @@ def BitofWord(tag):
     '''
     s = tag.split('.')
     if s[len(s)-1].isdigit():
-	return True
+        return True
     else:
-	return False
+        return False
 
 def BitValue(value, bitno):
     '''
@@ -1140,9 +1138,9 @@ def BitValue(value, bitno):
     '''
     mask = 1 << bitno
     if (value & mask):
-	return True
+        return True
     else:
-	return False
+        return False
 
 def _buildListIdentity():
     '''
@@ -1161,14 +1159,14 @@ def _buildListIdentity():
   
     return pack("<HHIIHHHHI",
                 ListService,
-		ListLength,
-		ListSessionHandle,
-		ListStatus,
-		ListResponse,
-		ListContext1,
-		ListContext2,
-		ListContext3,
-		ListOptions)
+                ListLength,
+                ListSessionHandle,
+                ListStatus,
+                ListResponse,
+                ListContext1,
+                ListContext2,
+                ListContext3,
+                ListOptions)
 
 def _parseIdentityResponse(data):
     # we're going to take the packet and parse all
@@ -1217,7 +1215,7 @@ def extractTagPacket(self, data, programName):
     tag = parseLgxTag(packet, programName)
     # filter out garbage
     if "__DEFVAL_" and "Routine:" not in tag.TagName:
-	taglist.append(tag)
+        taglist.append(tag)
     if not programName:
         if 'Program:' in tag.TagName:
             programNames.append(tag.TagName)
