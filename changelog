@@ -1,3 +1,6 @@
+02/12/17
+  -Cleaned up _connect() and it's usage
+
 02/11/17
   -Fixed CIP type for LINT, changed to signed
   -Cleaned up some formatting issues

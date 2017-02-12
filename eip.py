@@ -144,8 +144,8 @@ def _readTag(self, tag, elements):
     processes the read request
     '''
     self.Offset = 0
-    if not self.SocketConnected: _connect(self)
-    if not self.SocketConnected: return None
+    
+    if not _connect(self): return None
 
     t,b,i = TagNameParser(tag, 0)
     if not InitialRead(self, t, b): return None
@@ -169,9 +169,8 @@ def _writeTag(self, tag, value, elements):
     '''
     self.Offset = 0
     writeData = []
-    
-    if not self.SocketConnected: _connect(self)
-    if not self.SocketConnected: return None
+
+    if not _connect(self): return None
 
     t,b,i = TagNameParser(tag, 0)
     if not InitialRead(self, t, b): return None
@@ -213,8 +212,8 @@ def _multiRead(self, args):
     serviceSegments = []
     segments = ""
     tagCount = len(args)
-    if not self.SocketConnected: _connect(self)
-    if not self.SocketConnected: return None
+
+    if not _connect(self): return None
 
     for i in xrange(tagCount):
         t,b,i = TagNameParser(args[i], 0)
@@ -252,8 +251,7 @@ def _getPLCTime(self):
     '''
     Requests the PLC clock time
     ''' 
-    if not self.SocketConnected: _connect(self)
-    if not self.SocketConnected: return None
+    if not _connect(self): return None
 
     AttributeService = 0x03
     AttributeSize = 0x02
@@ -286,8 +284,7 @@ def _setPLCTime(self):
     '''
     Requests the PLC clock time
     ''' 
-    if not self.SocketConnected: _connect(self)
-    if not self.SocketConnected: return None
+    if not _connect(self): return None
 
     AttributeService = 0x04
     AttributeSize = 0x02
@@ -317,9 +314,7 @@ def _getTagList(self):
     '''
     Requests the controller tag list and returns a list of LgxTag type
     '''
-
-    if not self.SocketConnected: _connect(self)
-    if not self.SocketConnected: return None
+    if not _connect(self): return None
 
     self.Offset = 0
     
@@ -416,6 +411,9 @@ def _connect(self):
     '''
     Open a connection to the PLC
     '''
+    if self.SocketConnected:
+        return True
+    
     try:
         self.Socket = socket.socket()
         self.Socket.settimeout(1.0)
@@ -424,7 +422,7 @@ def _connect(self):
         self.SocketConnected = False
         self.SequenceCounter = 1
         self.Socket.close()
-        return
+        return False
 
     retData = _getBytes(self, _buildRegisterSession(self))
     if retData:
@@ -432,7 +430,7 @@ def _connect(self):
     else:
         self.SocketConnected = False
         print "Failed to register session"
-        return        
+        return False
 
     retData = _getBytes(self, _buildForwardOpenPacket(self))
     if retData:
@@ -441,7 +439,9 @@ def _connect(self):
     else:
         self.SocketConnected = False
         print "Forward Open Failed"
-        return
+        return False
+    
+    return True
 
 def _closeConnection(self):
     '''
