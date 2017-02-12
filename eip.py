@@ -148,7 +148,7 @@ def _readTag(self, tag, elements):
     if not self.SocketConnected: return None
 
     t,b,i = TagNameParser(tag, 0)
-    if b not in self.KnownTags: InitialRead(self, t, b)
+    if not InitialRead(self, t, b): return None
 
     if self.KnownTags[b][0] == 211:
         tagData = _buildTagIOI(self, tag, isBoolArray=True)
@@ -174,7 +174,7 @@ def _writeTag(self, tag, value, elements):
     if not self.SocketConnected: return None
 
     t,b,i = TagNameParser(tag, 0)
-    if b not in self.KnownTags: InitialRead(self, t, b)
+    if not InitialRead(self, t, b): return None
 
     dataType = self.KnownTags[b][0]
 
@@ -189,7 +189,7 @@ def _writeTag(self, tag, value, elements):
         for i in xrange(elements):
             writeData.append(int(value[i]))  
     else:
-        print "Fix this"
+        pass
 
      # write a bit of a word, boolean array or everything else
     if BitofWord(tag):
@@ -204,6 +204,7 @@ def _writeTag(self, tag, value, elements):
     
     eipHeader = _buildEIPHeader(self, writeRequest)
     retData = _getBytes(self, eipHeader)
+    return
     
 def _multiRead(self, args):
     '''
@@ -217,8 +218,8 @@ def _multiRead(self, args):
 
     for i in xrange(tagCount):
         t,b,i = TagNameParser(args[i], 0)
-        if b not in self.KnownTags: InitialRead(self, t, b)
-
+        if not InitialRead(self, t, b): return None
+    
         tagIOI = _buildTagIOI(self, t, isBoolArray=False)
         readIOI = _addReadIOI(self, tagIOI, 1)
         serviceSegments.append(readIOI)
@@ -1043,6 +1044,10 @@ def InitialRead(self, tag, baseTag):
     Store each unique tag read in a dict so that we can retreive the
     data type or data length (for STRING) later
     '''
+    # if a tag alread exists, return True
+    if baseTag in self.KnownTags:
+        return True
+    
     tagData = _buildTagIOI(self, baseTag, isBoolArray=False)
     readRequest = _addPartialReadIOI(self, tagData, 1)
     eipHeader = _buildEIPHeader(self, readRequest)
@@ -1050,10 +1055,17 @@ def InitialRead(self, tag, baseTag):
     # send our tag read request
     self.Socket.send(eipHeader)
     retData = self.Socket.recv(1024)
-    dataType = unpack_from('<B', retData, 50)[0]
-    dataLen = unpack_from('<H', retData, 2)[0] # this is really just used for STRING
-    self.KnownTags[baseTag] = (dataType, dataLen)	
-    return
+    status = unpack_from('<b', retData, 48)[0]
+    
+    # make sure it was successful
+    if status == 0 or status == 6:
+        dataType = unpack_from('<B', retData, 50)[0]
+        dataLen = unpack_from('<H', retData, 2)[0] # this is really just used for STRING
+        self.KnownTags[baseTag] = (dataType, dataLen)
+        return True
+    else:
+        raise Exception('Failed to read initial tag: ' + cipErrorCodes[status]) 
+
 
 def TagNameParser(tag, offset):
     '''
@@ -1203,26 +1215,26 @@ def _parseIdentityResponse(data):
     return resp
 
 def extractTagPacket(self, data, programName):
-  # the first tag in a packet starts at byte 50
-  packetStart = 50
+    # the first tag in a packet starts at byte 50
+    packetStart = 50
 
-  while packetStart < len(data):
-    # get the length of the tag name
-    tagLen = unpack_from('<H', data, packetStart+8)[0]
-    # get a single tag from the packet
-    packet = data[packetStart:packetStart+tagLen+10]
-    # extract the offset
-    self.Offset = unpack_from('<H', packet, 0)[0]
-    # add the tag to our tag list
-    tag = parseLgxTag(packet, programName)
-    # filter out garbage
-    if "__DEFVAL_" and "Routine:" not in tag.TagName:
-        taglist.append(tag)
-    if not programName:
-        if 'Program:' in tag.TagName:
-            programNames.append(tag.TagName)
-    # increment ot the next tag in the packet
-    packetStart = packetStart+tagLen+10
+    while packetStart < len(data):
+        # get the length of the tag name
+        tagLen = unpack_from('<H', data, packetStart+8)[0]
+        # get a single tag from the packet
+        packet = data[packetStart:packetStart+tagLen+10]
+        # extract the offset
+        self.Offset = unpack_from('<H', packet, 0)[0]
+        # add the tag to our tag list
+        tag = parseLgxTag(packet, programName)
+        # filter out garbage
+        if "__DEFVAL_" and "Routine:" not in tag.TagName:
+            taglist.append(tag)
+        if not programName:
+            if 'Program:' in tag.TagName:
+                programNames.append(tag.TagName)
+        # increment ot the next tag in the packet
+        packetStart = packetStart+tagLen+10
 
 def parseLgxTag(packet, programName):
     tag = LGXTag()
