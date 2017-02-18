@@ -1,5 +1,6 @@
 02/17/17
   -Updated InitialRead usage
+  -Found a few more formatting issues
 
 02/12/17
   -Cleaned up _connect() and it's usage

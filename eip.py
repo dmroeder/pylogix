@@ -359,37 +359,37 @@ def _getTagList(self):
     return taglist
     
 def _discover():
-  devices = []
-  request = _buildListIdentity()
+    devices = []
+    request = _buildListIdentity()
   
-  # get available ip addresses
-  addresses = socket.getaddrinfo(socket.gethostname(), None)
+    # get available ip addresses
+    addresses = socket.getaddrinfo(socket.gethostname(), None)
 
-  # we're going to send a request for all available ipv4
-  # addresses and build a list of all the devices that reply
-  for ip in addresses:
+    # we're going to send a request for all available ipv4
+    # addresses and build a list of all the devices that reply
+    for ip in addresses:
         if ip[0] == 2:  # IP v4
-          # create a socket
-          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-          s.settimeout(0.5)
-          s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-          s.bind((ip[4][0], 0))
-          s.sendto(request, ('255.255.255.255', 44818))
-          try:
-              while(1):
-                  ret = s.recv(1024)
-                  context = unpack_from('<Q', ret, 14)[0]
-                  if context == 0x65696c796168:
-                      device = _parseIdentityResponse(ret)
-                      if device.IPAddress:
-                          devices.append(device)
-          except:
-              pass
+            # create a socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0.5)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.bind((ip[4][0], 0))
+            s.sendto(request, ('255.255.255.255', 44818))
+            try:
+                while(1):
+                    ret = s.recv(1024)
+                    context = unpack_from('<Q', ret, 14)[0]
+                    if context == 0x65696c796168:
+                        device = _parseIdentityResponse(ret)
+                        if device.IPAddress:
+                            devices.append(device)
+            except:
+                pass
                   
-  # added this because looping through addresses above doesn't work on
-  # linux so this is a "just in case".  If we don't get results with the 
-  # above code, try one more time without binding to an address
-  if len(devices) == 0:
+    # added this because looping through addresses above doesn't work on
+    # linux so this is a "just in case".  If we don't get results with the 
+    # above code, try one more time without binding to an address
+    if len(devices) == 0:
           s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
           s.settimeout(0.5)
           s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -405,7 +405,7 @@ def _discover():
           except:
               pass
 
-  return devices   
+    return devices   
 
 def _connect(self):
     '''
