@@ -148,7 +148,7 @@ def _readTag(self, tag, elements):
     if not _connect(self): return None
 
     t,b,i = TagNameParser(tag, 0)
-    if not InitialRead(self, t, b): return None
+    InitialRead(self, t, b)
 
     if self.KnownTags[b][0] == 211:
         tagData = _buildTagIOI(self, tag, isBoolArray=True)
@@ -173,7 +173,7 @@ def _writeTag(self, tag, value, elements):
     if not _connect(self): return None
 
     t,b,i = TagNameParser(tag, 0)
-    if not InitialRead(self, t, b): return None
+    InitialRead(self, t, b)
 
     dataType = self.KnownTags[b][0]
 
@@ -217,7 +217,7 @@ def _multiRead(self, args):
 
     for i in xrange(tagCount):
         t,b,i = TagNameParser(args[i], 0)
-        if not InitialRead(self, t, b): return None
+        InitialRead(self, t, b)
     
         tagIOI = _buildTagIOI(self, t, isBoolArray=False)
         readIOI = _addReadIOI(self, tagIOI, 1)
