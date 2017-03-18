@@ -1,3 +1,6 @@
+03/17/17
+  -Fixed GetTagList() appending every time it is called
+  
 02/17/17
   -Updated InitialRead usage
   -Found a few more formatting issues
