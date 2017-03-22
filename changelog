@@ -1,3 +1,6 @@
+03/21/17
+  -Fixed GetTagList() appending program scoped tags
+
 03/17/17
   -Fixed GetTagList() appending every time it is called
   

@@ -317,6 +317,7 @@ def _getTagList(self):
     if not _connect(self): return None
 
     self.Offset = 0
+    del programNames[:]
     del taglist[:]
     
     request = _buildTagListRequest(self, programName=None)
