@@ -947,7 +947,7 @@ def _parseReply(self, tag, elements, data):
             if datatype == 211:
                 returnvalue = _getBoolArrayValue(CIPFormat, tag, data)
             elif datatype == 160:
-                returnvalue = _getSingleString( data)
+                returnvalue = _getSingleString(data)
             else:
                 returnvalue = unpack_from(CIPFormat, data, 52)[0]
 
@@ -1117,8 +1117,12 @@ def MultiParser(self, data):
         # successful reply, add the value to our list
         if replyStatus == 0 and replyExtended == 0:
             dataTypeValue = unpack_from('<B', stripped, offset+4)[0]	# data type
-            dataTypeFormat = self.CIPTypes[dataTypeValue][2]     	# number of bytes for datatype	  
-            reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
+            if dataTypeValue == 160:
+                strlen = unpack_from('<B', stripped, offset+8)[0]
+                reply.append(stripped[offset+12:offset+12+strlen])
+            else:
+                dataTypeFormat = self.CIPTypes[dataTypeValue][2]     # number of bytes for datatype	  
+                reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
         else:
             reply.append("Error")
 
