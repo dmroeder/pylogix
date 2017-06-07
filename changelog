@@ -1,3 +1,6 @@
+06/06/17
+  -Specify max timeout when discovering devices
+  
 06/04/17
   -Fixed multiread not dealing with strings properly
   

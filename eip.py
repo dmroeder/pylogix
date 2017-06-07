@@ -381,7 +381,7 @@ def _discover():
                 while(1):
                     ret = s.recv(1024)
                     context = unpack_from('<Q', ret, 14)[0]
-                    if context == 0x65696c796168:
+                    if context == 0x006d6f4d6948:
                         device = _parseIdentityResponse(ret)
                         if device.IPAddress:
                             devices.append(device)
@@ -400,7 +400,7 @@ def _discover():
               while(1):
                 ret = s.recv(1024)
                 context = unpack_from('<Q', ret, 14)[0]
-                if context == 0x65696c796168:
+                if context == 0x006d6f4d6948:
                     device = _parseIdentityResponse(ret)
                     if device.IPAddress:
                         devices.append(device)
@@ -1171,10 +1171,10 @@ def _buildListIdentity():
     ListLength = 0x00
     ListSessionHandle = 0x00
     ListStatus = 0x00
-    ListResponse = 0x00
-    ListContext1 = 0x6168
-    ListContext2 = 0x6c79
-    ListContext3 = 0x6569
+    ListResponse = 0xFA
+    ListContext1 = 0x6948
+    ListContext2 = 0x6f4d
+    ListContext3 = 0x006d
     ListOptions = 0x00
   
     return pack("<HHIIHHHHI",
