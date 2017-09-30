@@ -52,7 +52,7 @@ class PLC:
         self.Offset = 0
         self.KnownTags = {}
         self.StructIdentifier = 0x0fCE
-        self.CIPTypes = {160:(0 ,"STRUCT", 'B'),
+        self.CIPTypes = {160:(88 ,"STRUCT", 'B'),
                          193:(1, "BOOL", '?'),
                          194:(1, "SINT", 'b'),
                          195:(2, "INT", 'h'),
@@ -150,12 +150,29 @@ def _readTag(self, tag, elements):
     t,b,i = TagNameParser(tag, 0)
     InitialRead(self, t, b)
 
-    if self.KnownTags[b][0] == 211:
+    datatype = self.KnownTags[b][0]
+    bitCount = self.CIPTypes[datatype][0] * 8
+
+    if datatype == 211:
+        # bool array
         tagData = _buildTagIOI(self, tag, isBoolArray=True)
-    else:
+        words = _getWordCount(i, elements, bitCount)
+        readRequest = _addReadIOI(self, tagData, words)
+    elif BitofWord(t):
+        # bits of word
+        split_tag = tag.split('.')
+        bitPos = split_tag[len(split_tag)-1]
+        bitPos = int(bitPos)
+
         tagData = _buildTagIOI(self, tag, isBoolArray=False)
+        words = _getWordCount(bitPos, elements, bitCount)
+
+        readRequest = _addReadIOI(self, tagData, words)
+    else:
+        # everything else
+        tagData = _buildTagIOI(self, tag, isBoolArray=False)
+        readRequest = _addReadIOI(self, tagData, elements)
         
-    readRequest = _addReadIOI(self, tagData, elements)
     eipHeader = _buildEIPHeader(self, readRequest)
     retData = _getBytes(self, eipHeader)
     if retData:
@@ -927,101 +944,97 @@ def _buildTagListRequest(self, programName):
      
 def _parseReply(self, tag, elements, data):
     '''
-    Take the received packet data on a read and
-    extract the value out of it.  This is a little
-    crazy because different data types (DINT/STRING/REAL)
-    and different types of reads (Single/Array/Partial) all
-    have to be handled differently
+    Gets the replies from the PLC
+    In the case of BOOL arrays and bits of
+        a word, we do some reformating
+    '''
+
+    tagName, basetag, index = TagNameParser(tag, 0)
+    datatype = self.KnownTags[basetag][0]
+    bitCount = self.CIPTypes[datatype][0] * 8
+
+    # if bit of word was requested
+    if BitofWord(tag):
+        split_tag = tag.split('.')
+        bitPos = split_tag[len(split_tag)-1]
+        bitPos = int(bitPos)
+
+        wordCount = _getWordCount(bitPos, elements, bitCount)
+        words = _getReplyValues(self, tag, wordCount, data)
+        vals = _wordsToBits(self, tag, words, count=elements)
+    elif datatype == 211:
+        wordCount = _getWordCount(index, elements, bitCount)
+        words = _getReplyValues(self, tag, wordCount, data)
+        vals = _wordsToBits(self, tag, words, count=elements)        
+    else:
+        vals = _getReplyValues(self, tag, elements, data)
+    
+    if len(vals) == 1:
+        return vals[0]
+    else:
+        return vals
+
+def _getReplyValues(self, tag, elements, data):
+    '''
+    Gather up all the values in the reply/replies
     '''
     status = unpack_from('<B', data, 48)[0]
     extendedStatus = unpack_from('<B', data, 49)[0]
-    
+
     if status == 0 or status == 6:
         # parse the tag
         tagName, basetag, index = TagNameParser(tag, 0)
         datatype = self.KnownTags[basetag][0]
         CIPFormat = self.CIPTypes[datatype][2]
+        vals = []
 
-        if elements == 1:
-            # Do different stuff based on the returned data type
-            if datatype == 211:
-                returnvalue = _getBoolArrayValue(CIPFormat, tag, data)
-            elif datatype == 160:
-                returnvalue = _getSingleString(data)
-            else:
-                returnvalue = unpack_from(CIPFormat, data, 52)[0]
-
-            # check if we were trying to read a bit of a word
-            s = tag.split(".")
-            doo = s[len(s)-1]
-            if doo.isdigit():
-                returnvalue = _getBitOfWord(s, returnvalue)
- 
-            return returnvalue
-
-        else:   # user passed more than one argument (array read)
-            Array = []
+        dataSize = self.CIPTypes[datatype][0]
+        numbytes = len(data)-dataSize
+        counter = 0
+        self.Offset = 0
+        for i in range(elements):
+            index = 52+(counter*dataSize)
             if datatype == 160:
-                dataSize = self.KnownTags[basetag][1]-30
+                # gotta handle strings a little different
+                index = 54+(counter*dataSize)
+                NameLength = unpack_from('<L', data, index)[0]
+                vals.append(data[index+4:index+4+NameLength])
             else:
-                dataSize = self.CIPTypes[datatype][0]
+                returnvalue = unpack_from(CIPFormat, data, index)[0]
+                vals.append(returnvalue)
 
-            numbytes = len(data)-dataSize	        # total number of bytes in packet
-            counter = 0					# counter for indexing through packet
-            self.Offset = 0				# offset for next packet request
-            stringLen = self.KnownTags[basetag][1]-30	# get the stored length (only for string)
-            for i in xrange(elements):	
-                index = 52+(counter*dataSize)		# location of data in packet
-                self.Offset += dataSize
+            self.Offset += dataSize
+            counter += 1
+            
+            # re-read because the data is in more than one packet
+            if index == numbytes and status == 6:
+                index = 0
+                counter = 0
 
-                if datatype == 160:
-                    # gotta handle strings a little different
-                    index = 54+(counter*stringLen)
-                    NameLength = unpack_from('<L', data, index)[0]
-                    returnvalue = data[index+4:index+4+NameLength]
-                else:
-                    returnvalue = unpack_from(CIPFormat, data, index)[0]
+                tagIOI = _buildTagIOI(self, tag, isBoolArray=False)
+                readIOI = _addPartialReadIOI(self, tagIOI, elements)
+                eipHeader = _buildEIPHeader(self, readIOI)
 
-                Array.append(returnvalue)
-                counter += 1
-                # with large arrays, the data takes multiple packets so at the end of
-                # a packet, we need to send a new request
-                if index == numbytes and status == 6:
-                    index = 0
-                    counter = 0
+                self.Socket.send(eipHeader)
+                data = self.Socket.recv(1024)
+                status = unpack_from('<h', data, 48)[0]
+                numbytes = len(data)-dataSize
 
-                    tagIOI = _buildTagIOI(self, tag, isBoolArray=False)
-                    readIOI = _addPartialReadIOI(self, tagIOI, elements)
-                    eipHeader = _buildEIPHeader(self, readIOI)
-    
-                    self.Socket.send(eipHeader)
-                    data = self.Socket.recv(1024)
-                    status = unpack_from('<h', data, 48)[0]
-                    numbytes = len(data)-dataSize
+        return vals
 
-            return Array
     else: # didn't nail it
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
             err = 'Unknown error'
-        return "Failed to read tag: " + tag + ' - ' + err   
+        return "Failed to read tag: " + tag + ' - ' + err  
 
-def _getBoolArrayValue(CIPFormat, tag, data):
-    '''
-    Gets the value from a single boolean array element
-    '''
-    returnValue = unpack_from(CIPFormat, data, 52)[0]
-    ugh = tag.split('.')
-    ughlen = len(ugh)-1
-    tagName, basetag, index = TagNameParser(ugh[ughlen], 0)
-    return BitValue(returnValue, index%32)
-
-def _getBitOfWord(split_tag, value):
+def _getBitOfWord(tag, value):
     '''
     Takes a tag name, gets the bit from the end of
     it, then returns that bits value
     '''
+    split_tag = tag.split('.')
     bitPos = split_tag[len(split_tag)-1]
     bitPos = int(bitPos)
     try:
@@ -1030,16 +1043,48 @@ def _getBitOfWord(split_tag, value):
     except:
         pass  
     return returnvalue
-    
+
+def _wordsToBits(self, tag, value, count=0):
+    '''
+    Convert words to a list of true/false
+    '''
+    tagName, basetag, index = TagNameParser(tag, 0)
+    datatype = self.KnownTags[basetag][0]
+    bitCount = self.CIPTypes[datatype][0] * 8
+
+    if datatype == 211:
+        bitPos = index
+    else:
+        split_tag = tag.split('.')
+        bitPos = split_tag[len(split_tag)-1]
+        bitPos = int(bitPos)
+
+    ret = []
+    for v in value:
+        for i in range(0,bitCount):
+            ret.append(BitValue(v, i))
+
+    return ret[bitPos:bitPos+count]
+
 def _getSingleString(data):
     '''
     extracts the value from a string read
     '''
-    # get STRING
     NameLength = unpack_from('<L', data, 54)[0]
     stringLen = unpack_from('<H', data, 2)[0]
     stringLen -= 34
     return data[-stringLen:(-stringLen+NameLength)]
+
+def _getWordCount(start, length, bits):
+    '''
+    Returns the number of words reqired to accomodate
+    all the bits requested.
+    '''
+    totalBits = start+length
+    wordCount = totalBits / bits
+    if totalBits % 32 > 0:
+        wordCount += 1
+    return wordCount
 
 def InitialRead(self, tag, baseTag):
     '''
