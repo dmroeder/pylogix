@@ -27,6 +27,10 @@ USAGE - Python 2.7.11
     Write a value: test.Write("tagname", value)
 	ex: test.Write("MyDINT", 1337)
 	
+	Write an array of values:
+	vals = [1234, 56789]
+	test.Write("MyDint[0]", vals)
+	
     Get the controller scoped tags
 	ex: tags = test.GetTagList()
 	    (returns a structure of .TagName, .DataType and .Offset)
@@ -38,7 +42,8 @@ USAGE - Python 2.7.11
     Get or Set the PLC clock: test.GetPLCTime() or test.SetPLCTime()
     Note:  SetPLCTime() will use your computers clock to set the PLC
 		    
-6) Close the connection with test.Close()
+6) Close the connection with test.Close().  This should be called when you are
+    completely done reading/writing, not with each exchange of data.
 		    
 So a complete script to read a tag would look like this:
 

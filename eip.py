@@ -92,7 +92,7 @@ class PLC:
         if not args or args == 1:
             return "You must provide a tag name and value"
         elif len(args) == 2:
-            _writeTag(self, args[0], args[1], 1)
+            _writeTag(self, args[0], args[1])
         else:
             return "You provided too many arguments, not sure what you want to do"
 
@@ -180,7 +180,7 @@ def _readTag(self, tag, elements):
     else:
         return None        
 
-def _writeTag(self, tag, value, elements):
+def _writeTag(self, tag, value):
     '''
     Processes the write request
     '''
@@ -194,19 +194,21 @@ def _writeTag(self, tag, value, elements):
 
     dataType = self.KnownTags[b][0]
 
-    if elements == 1:
-        if dataType == 202:
-            writeData.append(float(value))
-        elif dataType == 160:
-            writeData = MakeString(value)
-        else:
-            writeData.append(int(value))
-    elif elements > 1:
-        for i in xrange(elements):
-            writeData.append(int(value[i]))  
+    # check if values passed were a list
+    if isinstance(value, list):
+        elements = len(value)
     else:
-        pass
+        elements = 1
+        value = [value]
 
+    for v in value:
+        if dataType == 202:
+            writeData.append(float(v))
+        elif dataType == 160:
+            writeData.append(MakeString(v))
+        else:
+            writeData.append(int(v))
+        
      # write a bit of a word, boolean array or everything else
     if BitofWord(tag):
         tagData = _buildTagIOI(self, tag, isBoolArray=False)
@@ -216,7 +218,7 @@ def _writeTag(self, tag, value, elements):
         writeRequest = _addWriteBitIOI(self, tag, tagData, writeData, dataType)
     else:
         tagData = _buildTagIOI(self, tag, isBoolArray=False)
-        writeRequest = _addWriteIOI(self, tagData, writeData, dataType, 1)
+        writeRequest = _addWriteIOI(self, tagData, writeData, dataType)
     
     eipHeader = _buildEIPHeader(self, writeRequest)
     retData = _getBytes(self, eipHeader)
@@ -780,7 +782,7 @@ def _addPartialReadIOI(self, tagIOI, elements):
     readIOI += pack('<H', 0x0000)
     return readIOI
 
-def _addWriteIOI(self, tagIOI, writeData, dataType, elements):
+def _addWriteIOI(self, tagIOI, writeData, dataType):
     '''
     Add the write command stuff to the tagIOI
     '''
@@ -789,21 +791,27 @@ def _addWriteIOI(self, tagIOI, writeData, dataType, elements):
     NumberOfBytes = elementSize*dataLen
     RequestNumberOfElements = dataLen
     RequestPathSize = len(tagIOI)/2
-    if dataType == 160:                             # Strings are special
+    RequestService = 0x4D
+    CIPWriteRequest = pack('<BB', RequestService, RequestPathSize)
+    CIPWriteRequest += tagIOI
+
+    if dataType == 160:
         RequestNumberOfElements = self.StructIdentifier
         TypeCodeLen = 0x02
+        CIPWriteRequest += pack('<BBHH', dataType, TypeCodeLen, RequestNumberOfElements, len(writeData))
     else:
         TypeCodeLen = 0x00
-    RequestService = 0x4D                                           # CIP Write_TAG_Service (PM020 Page 17)
-    CIPWriteRequest = pack('<BB', RequestService, RequestPathSize)  # beginning of our req packet
-    CIPWriteRequest += tagIOI                                       # Tag portion of packet 
+        CIPWriteRequest += pack('<BBH', dataType, TypeCodeLen, RequestNumberOfElements)
 
-    CIPWriteRequest += pack('<BBH', dataType, TypeCodeLen, RequestNumberOfElements)
+    for v in writeData:
+        try:
+            for i in xrange(len(v)):
+                el = v[i]
+                CIPWriteRequest += pack(self.CIPTypes[dataType][2],el)
+        except:
+            CIPWriteRequest += pack(self.CIPTypes[dataType][2],v)
 
-    for i in xrange(len(writeData)):
-        el = writeData[i]
-        CIPWriteRequest += pack(self.CIPTypes[dataType][2],el)
-    return CIPWriteRequest    
+    return CIPWriteRequest     
 
 def _addWriteBitIOI(self, tag, tagIOI, writeData, dataType):
     '''
@@ -1175,14 +1183,12 @@ def MultiParser(self, data):
 
 def MakeString(string):
     work = []
-    work.append(0x01)
-    work.append(0x00)
-    temp = pack('<I',len(string))
+    temp = pack('<I', len(string))
     for char in temp:
         work.append(ord(char))
     for char in string:
         work.append(ord(char))
-    for x in xrange(len(string),84):
+    for x in xrange(len(string), 84):
         work.append(0x00)
     return work
 
