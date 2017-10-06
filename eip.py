@@ -583,7 +583,7 @@ def _buildCIPForwardOpen(self):
                                                          # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
     CIPTransportTrigger = 0xA3                           #(B)                                   (3-5.5.1.12)
     CIPConnectionPathSize = 0x03                         #(B)                                   (3-5.5.1.9)
-    CIPConnectionPath = (0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01) #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
+    CIPConnectionPath = [0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01] #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
     """
     Port Identifier [BackPlane]
     Link adress .SetProcessorSlot (default=0x00)
@@ -594,7 +594,7 @@ def _buildCIPForwardOpen(self):
     Logical Segment -> connection point ->8 bit
     Connection Point 0x01
     """
-    return pack('<BBBBBBBBIIHHIB3BIhIhBB6B',
+    return pack('<BBBBBBBBIIHHIIIhIhBB6B',
                 CIPService,
                 CIPPathSize,
                 CIPClassType,
@@ -609,15 +609,13 @@ def _buildCIPForwardOpen(self):
                 CIPVendorID,
                 CIPOriginatorSerialNumber,
                 CIPMultiplier,
-                CIPFiller[0],CIPFiller[1],CIPFiller[2],           #Very Unclean!!!!!
                 CIPOTRPI,
                 CIPOTNetworkConnectionParameters,
                 CIPTORPI,
                 CIPTONetworkConnectionParameters,
                 CIPTransportTrigger,
                 CIPConnectionPathSize,
-                CIPConnectionPath[0],CIPConnectionPath[1],CIPConnectionPath[2],CIPConnectionPath[3],
-                CIPConnectionPath[4],CIPConnectionPath[5])
+                *CIPConnectionPath)
 
 def _buildForwardClose(self):
     CIPService = 0x4E                                    #(B) CIP OpenForward        Vol 3 (3-5.5.2)(3-5.5)
@@ -635,7 +633,7 @@ def _buildForwardClose(self):
     CIPOriginatorSerialNumber = self.OriginatorSerialNumber  #(I)
     CIPConnectionPathSize = 0x03                         #(B)                                   (3-5.5.1.9)
     CIPReserved = 0x00                                   #(B)
-    CIPConnectionPath = (0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01) #(6B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
+    CIPConnectionPath = [0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01] #(6B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
 
     return pack('<BBBBBBBBHHIBB6B', CIPService,
                 CIPPathSize,
@@ -650,9 +648,7 @@ def _buildForwardClose(self):
                 CIPOriginatorSerialNumber,
                 CIPConnectionPathSize,
                 CIPReserved,
-                CIPConnectionPath[0], CIPConnectionPath[1],
-                CIPConnectionPath[2], CIPConnectionPath[3],
-                CIPConnectionPath[4], CIPConnectionPath[5])
+                *CIPConnectionPath)
                                   
 def _buildEIPSendRRDataHeader(self, frameLen):
     EIPCommand = 0x6F                               #(H)EIP SendRRData  (Vol2 2-4.7)
