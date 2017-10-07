@@ -1,5 +1,6 @@
 10/06/17
   -Added Micro8xx support
+  -Cleaned up formatting of lgxDevice.py
   
 10/05/17
   -Added array writing
