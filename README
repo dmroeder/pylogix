@@ -10,6 +10,8 @@ USAGE - Python 2.7.11
 
 4) If your processor is in a slot other than 0, set that: test.ProcessorSlot = 1
 
+4a) For Micro8xx controllers, use test.Micro800 = True
+
 5) Do one of the following:
 
     Read a value:  value = test.Read("tagname")

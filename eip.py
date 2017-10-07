@@ -2,7 +2,7 @@
    Originally created by Burt Peterson
    Updated and maintained by Dustin Roeder (dmroeder@gmail.com) 
 
-   Copyright 2016 Dustin Roeder
+   Copyright 2017 Dustin Roeder
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ class PLC:
         '''
         self.IPAddress = ""
         self.ProcessorSlot = 0
+        self.Micro800 = False
         self.Port = 44818
         self.VendorID = 0x1337
         self.Context = 0x00
@@ -57,9 +58,15 @@ class PLC:
                          194:(1, "SINT", 'b'),
                          195:(2, "INT", 'h'),
                          196:(4, "DINT", 'i'),
+                         197:(8, "LINT", 'q'),
+                         198:(1, "USINT", 'B'),
+                         199:(2, "UINT", 'H'),
+                         200:(4, "UDINT", 'I'),
+                         201:(8, "LWORD", 'Q'),
                          202:(4, "REAL", 'f'),
+                         203:(8, "LREAL", 'd'),
                          211:(4, "DWORD", 'I'),
-                         197:(8, "LINT", 'q')}
+                         218:(0, "STRING", 'B')}
 
     def __enter__(self):
         return self
@@ -204,8 +211,8 @@ def _writeTag(self, tag, value):
     for v in value:
         if dataType == 202:
             writeData.append(float(v))
-        elif dataType == 160:
-            writeData.append(MakeString(v))
+        elif dataType == 160 or dataType == 218:
+            writeData.append(MakeString(self, v))
         else:
             writeData.append(int(v))
         
@@ -293,11 +300,19 @@ def _getPLCTime(self):
     
     eipHeader = _buildEIPHeader(self, AttributePacket)
     retData = _getBytes(self, eipHeader)
-    # get the time from the packet
-    plcTime = unpack_from('<Q', retData, 56)[0]
-    humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
-    
-    return humanTime
+    status = unpack_from('<h', retData, 48)[0]
+
+    if status == 0:
+        # get the time from the packet
+        plcTime = unpack_from('<Q', retData, 56)[0]
+        humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
+        return humanTime
+    else:
+        if status in cipErrorCodes.keys():
+            err = cipErrorCodes[status]
+        else:
+            err = 'Unknown error'
+        raise Exception('Failed to get PLC time, ' + err)
 
 def _setPLCTime(self):
     '''
@@ -556,100 +571,105 @@ def _buildCIPForwardOpen(self):
     Forward Open happens after a connection is made,
     this will sequp the CIP connection parameters
     '''
-    CIPService = 0x54                                    #(B) CIP OpenForward        Vol 3 (3-5.5.2)(3-5.5)
-    CIPPathSize = 0x02                                   #(B) Request Path zize              (2-4.1)
-    CIPClassType = 0x20                                  #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
-                                                         #[Logical Segment][Class ID][8 bit addressing]
-    CIPClass = 0x06                                      #(B) Connection Manager Object      (3-5)
-    CIPInstanceType = 0x24                               #(B) Instance type                  (C-1.1)
-                                                         #[Logical Segment][Instance ID][8 bit addressing]
-    CIPInstance = 0x01                                   #(B) Instance
-    CIPPriority = 0x0A                                   #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
-    CIPTimeoutTicks = 0x0e                               #(B) Timeout Info                   (3-5.5.1.3)
-    CIPOTConnectionID = 0x20000002                       #(I) O->T connection ID             (3-5.16)
-    CIPTOConnectionID = 0x20000001                       #(I) T->O connection ID             (3-5.16)
-    CIPConnectionSerialNumber = self.SerialNumber        #(H) Serial number for THIS connection (3-5.5.1.4)
-    CIPVendorID = self.VendorID                          #(H) Vendor ID                      (3-5.5.1.6)
-    CIPOriginatorSerialNumber = self.OriginatorSerialNumber    #(I)                        (3-5.5.1.7)
-    CIPMultiplier = 0x03                                 #(B) Timeout Multiplier             (3-5.5.1.5)
-    CIPFiller = (0x00, 0x00, 0x00)                       #(BBB) align back to word bound
-    CIPOTRPI = 0x00201234                                #(I) RPI just over 2 seconds        (3-5.5.1.2)
-    CIPOTNetworkConnectionParameters = 0x43f4            #(H) O->T connection Parameters    (3-5.5.1.1)
-                                                         # Non-Redundant,Point to Point,[reserved],Low Priority,Variable,[500 bytes] 
-                                                         # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
-    CIPTORPI = 0x00204001                                #(I) RPI just over 2 seconds       (3-5.5.1.2)
-    CIPTONetworkConnectionParameters = 0x43f4            #(H) T-O connection Parameters    (3-5.5.1.1)
-                                                         # Non-Redundant,Point to Point,[reserved],Low Priority,Variable,[500 bytes] 
-                                                         # Above is word for Open Forward and dint for Large_Forward_Open (3-5.5.1.1)
-    CIPTransportTrigger = 0xA3                           #(B)                                   (3-5.5.1.12)
-    CIPConnectionPathSize = 0x03                         #(B)                                   (3-5.5.1.9)
-    CIPConnectionPath = [0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01] #(8B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
-    """
-    Port Identifier [BackPlane]
-    Link adress .SetProcessorSlot (default=0x00)
-    Logical Segment ->Class ID ->8-bit
-    ClassID 0x02
-    Logical Segment ->Instance ID -> 8-bit
-    Instance 0x01
-    Logical Segment -> connection point ->8 bit
-    Connection Point 0x01
-    """
-    return pack('<BBBBBBBBIIHHIIIhIhBB6B',
-                CIPService,
-                CIPPathSize,
-                CIPClassType,
-                CIPClass,
-                CIPInstanceType,
-                CIPInstance,
-                CIPPriority,
-                CIPTimeoutTicks,
-                CIPOTConnectionID,
-                CIPTOConnectionID,
-                CIPConnectionSerialNumber,
-                CIPVendorID,
-                CIPOriginatorSerialNumber,
-                CIPMultiplier,
-                CIPOTRPI,
-                CIPOTNetworkConnectionParameters,
-                CIPTORPI,
-                CIPTONetworkConnectionParameters,
-                CIPTransportTrigger,
-                CIPConnectionPathSize,
-                *CIPConnectionPath)
+    CIPService = 0x54
+    CIPPathSize = 0x02
+    CIPClassType = 0x20
+
+    CIPClass = 0x06
+    CIPInstanceType = 0x24
+
+    CIPInstance = 0x01
+    CIPPriority = 0x0A
+    CIPTimeoutTicks = 0x0e
+    CIPOTConnectionID = 0x20000002
+    CIPTOConnectionID = 0x20000001
+    CIPConnectionSerialNumber = self.SerialNumber
+    CIPVendorID = self.VendorID
+    CIPOriginatorSerialNumber = self.OriginatorSerialNumber
+    CIPMultiplier = 0x03
+    CIPOTRPI = 0x00201234
+    CIPOTNetworkConnectionParameters = 0x43f4
+
+    CIPTORPI = 0x00204001
+    CIPTONetworkConnectionParameters = 0x43f4
+
+    CIPTransportTrigger = 0xA3
+
+    ForwardOpen = pack('<BBBBBBBBIIHHIIIhIhB',
+                       CIPService,
+                       CIPPathSize,
+                       CIPClassType,
+                       CIPClass,
+                       CIPInstanceType,
+                       CIPInstance,
+                       CIPPriority,
+                       CIPTimeoutTicks,
+                       CIPOTConnectionID,
+                       CIPTOConnectionID,
+                       CIPConnectionSerialNumber,
+                       CIPVendorID,
+                       CIPOriginatorSerialNumber,
+                       CIPMultiplier,
+                       CIPOTRPI,
+                       CIPOTNetworkConnectionParameters,
+                       CIPTORPI,
+                       CIPTONetworkConnectionParameters,
+                       CIPTransportTrigger)
+    
+    # add the connection path
+    if self.Micro800:
+        ConnectionPath = [0x20, 0x02, 0x24, 0x01]
+    else:
+        ConnectionPath = [0x01, self.ProcessorSlot, 0x20, 0x02, 0x24, 0x01]
+    
+    ConnectionPathSize = len(ConnectionPath)/2
+    pack_format = '<B' + str(len(ConnectionPath)) + 'B'
+    CIPConnectionPath = pack(pack_format, ConnectionPathSize, *ConnectionPath)
+    
+    return ForwardOpen + CIPConnectionPath
 
 def _buildForwardClose(self):
-    CIPService = 0x4E                                    #(B) CIP OpenForward        Vol 3 (3-5.5.2)(3-5.5)
-    CIPPathSize = 0x02                                   #(B) Request Path zize              (2-4.1)
-    CIPClassType = 0x20                                  #(B) Segment type                   (C-1.1)(C-1.4)(C-1.4.2)
-                                                         #[Logical Segment][Class ID][8 bit addressing]
-    CIPClass = 0x06                                      #(B) Connection Manager Object      (3-5)
-    CIPInstanceType = 0x24                               #(B) Instance type                  (C-1.1)
+    '''
+    Forward Close packet for closing the connection
+    '''
+    CIPService = 0x4E
+    CIPPathSize = 0x02
+    CIPClassType = 0x20
+    CIPClass = 0x06
+    CIPInstanceType = 0x24
 
-    CIPInstance = 0x01                                   #(B) Instance
-    CIPPriority = 0x0A                                   #(B) Timeout info                   (3-5.5.1.3)(3-5.5.1.2)
-    CIPTimeoutTicks = 0x0e                               #(B) Timeout Info                   (3-5.5.1.3)
-    CIPConnectionSerialNumber = self.SerialNumber        #(H) Serial number for THIS connection (3-5.5.1.4)
-    CIPVendorID = self.VendorID                          #(H)
-    CIPOriginatorSerialNumber = self.OriginatorSerialNumber  #(I)
-    CIPConnectionPathSize = 0x03                         #(B)                                   (3-5.5.1.9)
-    CIPReserved = 0x00                                   #(B)
-    CIPConnectionPath = [0x01,self.ProcessorSlot,0x20,0x02,0x24,0x01] #(6B) Compressed / Encoded Path  (C-1.3)(Fig C-1.2)
+    CIPInstance = 0x01
+    CIPPriority = 0x0A
+    CIPTimeoutTicks = 0x0e
+    CIPConnectionSerialNumber = self.SerialNumber
+    CIPVendorID = self.VendorID
+    CIPOriginatorSerialNumber = self.OriginatorSerialNumber
 
-    return pack('<BBBBBBBBHHIBB6B', CIPService,
-                CIPPathSize,
-                CIPClassType,
-                CIPClass,
-                CIPInstanceType,
-                CIPInstance,
-                CIPPriority,
-                CIPTimeoutTicks,
-                CIPConnectionSerialNumber,
-                CIPVendorID,
-                CIPOriginatorSerialNumber,
-                CIPConnectionPathSize,
-                CIPReserved,
-                *CIPConnectionPath)
-                                  
+    ForwardClose = pack('<BBBBBBBBHHI',
+                        CIPService,
+                        CIPPathSize,
+                        CIPClassType,
+                        CIPClass,
+                        CIPInstanceType,
+                        CIPInstance,
+                        CIPPriority,
+                        CIPTimeoutTicks,
+                        CIPConnectionSerialNumber,
+                        CIPVendorID,
+                        CIPOriginatorSerialNumber)
+    
+    # add the connection path
+    if self.Micro800:
+        ConnectionPath = [0x20, 0x02, 0x24, 0x01]
+    else:
+        ConnectionPath = [0x01, self.ProcessorSlot, 0x20, 0x02, 0x24, 0x01]
+    
+    ConnectionPathSize = len(ConnectionPath)/2
+    pack_format = '<H' + str(len(ConnectionPath)) + 'B'
+    CIPConnectionPath = pack(pack_format, ConnectionPathSize, *ConnectionPath)
+        
+    return ForwardClose + CIPConnectionPath 
+  
 def _buildEIPSendRRDataHeader(self, frameLen):
     EIPCommand = 0x6F                               #(H)EIP SendRRData  (Vol2 2-4.7)
     EIPLength = 16+frameLen                         #(H)
@@ -1003,6 +1023,10 @@ def _getReplyValues(self, tag, elements, data):
                 index = 54+(counter*dataSize)
                 NameLength = unpack_from('<L', data, index)[0]
                 vals.append(data[index+4:index+4+NameLength])
+            elif datatype == 218:
+                index = 52+(counter*dataSize)
+                NameLength = unpack_from('<B', data, index)[0]
+                vals.append(data[index+1:index+1+NameLength])
             else:
                 returnvalue = unpack_from(CIPFormat, data, index)[0]
                 vals.append(returnvalue)
@@ -1069,15 +1093,6 @@ def _wordsToBits(self, tag, value, count=0):
             ret.append(BitValue(v, i))
 
     return ret[bitPos:bitPos+count]
-
-def _getSingleString(data):
-    '''
-    extracts the value from a string read
-    '''
-    NameLength = unpack_from('<L', data, 54)[0]
-    stringLen = unpack_from('<H', data, 2)[0]
-    stringLen -= 34
-    return data[-stringLen:(-stringLen+NameLength)]
 
 def _getWordCount(start, length, bits):
     '''
@@ -1177,17 +1192,20 @@ def MultiParser(self, data):
 
     return reply
 
-def MakeString(string):
+def MakeString(self, string):
     work = []
-    temp = pack('<I', len(string))
+    if self.Micro800:
+        temp = pack('<B', len(string))
+    else:
+        temp = pack('<I', len(string))
     for char in temp:
         work.append(ord(char))
     for char in string:
         work.append(ord(char))
-    for x in xrange(len(string), 84):
-        work.append(0x00)
+    if not self.Micro800:
+        for x in xrange(len(string), 84):
+            work.append(0x00)
     return work
-
 def BitofWord(tag):
     '''
     Test if the user is trying to write to a bit of a word
