@@ -1,3 +1,6 @@
+10/23/17
+  -Raise error for unsupported features
+
 10/06/17
   -Added Micro8xx support
   -Cleaned up formatting of lgxDevice.py

@@ -182,10 +182,16 @@ def _readTag(self, tag, elements):
         
     eipHeader = _buildEIPHeader(self, readRequest)
     retData = _getBytes(self, eipHeader)
-    if retData:
+    status = unpack_from('<h', retData, 48)[0]
+
+    if status == 0 or status == 6:
         return _parseReply(self, tag, elements, retData)
     else:
-        return None        
+        if status in cipErrorCodes.keys():
+            err = cipErrorCodes[status]
+        else:
+            err = 'Unknown error'
+        raise Exception('Read failed, ' + err)       
 
 def _writeTag(self, tag, value):
     '''
@@ -229,7 +235,16 @@ def _writeTag(self, tag, value):
     
     eipHeader = _buildEIPHeader(self, writeRequest)
     retData = _getBytes(self, eipHeader)
-    return
+    status = unpack_from('<h', retData, 48)[0]
+
+    if status == 0:
+        return
+    else:
+        if status in cipErrorCodes.keys():
+            err = cipErrorCodes[status]
+        else:
+            err = 'Unknown error'
+        raise Exception('Write failed, ' + err)
     
 def _multiRead(self, args):
     '''
@@ -268,10 +283,16 @@ def _multiRead(self, args):
     readRequest = header+segmentCount+offsets+segments
     eipHeader = _buildEIPHeader(self, readRequest)
     retData = _getBytes(self, eipHeader)
-    if retData:
+    status = unpack_from('<h', retData, 48)[0]
+
+    if status == 0:
         return MultiParser(self, retData)
     else:
-        return None
+        if status in cipErrorCodes.keys():
+            err = cipErrorCodes[status]
+        else:
+            err = 'Unknown error'
+        raise Exception('Multi-read failed, ' + err)
 
 def _getPLCTime(self):
     '''
@@ -342,7 +363,16 @@ def _setPLCTime(self):
 
     eipHeader = _buildEIPHeader(self, AttributePacket)
     retData = _getBytes(self, eipHeader)
-    return
+    status = unpack_from('<h', retData, 48)[0]
+
+    if status == 0:
+        return
+    else:
+        if status in cipErrorCodes.keys():
+            err = cipErrorCodes[status]
+        else:
+            err = 'Unknown error'
+        raise Exception('Failed to set PLC time, ' + err)
 
 def _getTagList(self):
     '''
