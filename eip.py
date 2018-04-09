@@ -42,7 +42,6 @@ class PLC:
         self.Context = 0x00
         self.ContextPointer = 0
         self.Socket = socket.socket()
-        self.Socket.settimeout(0.5)
         self.SocketConnected = False
         self.OTNetworkConnectionID=None
         self.SessionHandle = 0x0000
@@ -482,7 +481,7 @@ def _connect(self):
     
     try:
         self.Socket = socket.socket()
-        self.Socket.settimeout(1.0)
+        self.Socket.settimeout(5.0)
         self.Socket.connect((self.IPAddress, self.Port))
     except:
         self.SocketConnected = False
