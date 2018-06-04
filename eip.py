@@ -252,6 +252,7 @@ def _multiRead(self, args):
     serviceSegments = []
     segments = ""
     tagCount = len(args)
+    self.Offset = 0
 
     if not _connect(self): return None
 
