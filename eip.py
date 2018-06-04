@@ -181,7 +181,7 @@ def _readTag(self, tag, elements):
         
     eipHeader = _buildEIPHeader(self, readRequest)
     retData = _getBytes(self, eipHeader)
-    status = unpack_from('<h', retData, 48)[0]
+    status = unpack_from('<B', retData, 48)[0]
 
     if status == 0 or status == 6:
         return _parseReply(self, tag, elements, retData)
@@ -234,7 +234,7 @@ def _writeTag(self, tag, value):
     
     eipHeader = _buildEIPHeader(self, writeRequest)
     retData = _getBytes(self, eipHeader)
-    status = unpack_from('<h', retData, 48)[0]
+    status = unpack_from('<B', retData, 48)[0]
 
     if status == 0:
         return
@@ -282,7 +282,7 @@ def _multiRead(self, args):
     readRequest = header+segmentCount+offsets+segments
     eipHeader = _buildEIPHeader(self, readRequest)
     retData = _getBytes(self, eipHeader)
-    status = unpack_from('<h', retData, 48)[0]
+    status = unpack_from('<B', retData, 48)[0]
 
     if status == 0:
         return MultiParser(self, retData)
@@ -320,7 +320,7 @@ def _getPLCTime(self):
     
     eipHeader = _buildEIPHeader(self, AttributePacket)
     retData = _getBytes(self, eipHeader)
-    status = unpack_from('<h', retData, 48)[0]
+    status = unpack_from('<B', retData, 48)[0]
 
     if status == 0:
         # get the time from the packet
@@ -362,7 +362,7 @@ def _setPLCTime(self):
 
     eipHeader = _buildEIPHeader(self, AttributePacket)
     retData = _getBytes(self, eipHeader)
-    status = unpack_from('<h', retData, 48)[0]
+    status = unpack_from('<B', retData, 48)[0]
 
     if status == 0:
         return
@@ -386,7 +386,7 @@ def _getTagList(self):
     request = _buildTagListRequest(self, programName=None)
     eipHeader = _buildEIPHeader(self, request)
     retData = _getBytes(self, eipHeader)
-    status = unpack_from('<h', retData, 48)[0]
+    status = unpack_from('<B', retData, 48)[0]
     extractTagPacket(self, retData, programName=None)
 
     while status == 6:
@@ -395,7 +395,7 @@ def _getTagList(self):
         eipHeader = _buildEIPHeader(self, request)
         retData = _getBytes(self, eipHeader)
         extractTagPacket(self, retData, programName=None)
-        status = unpack_from('<h', retData, 48)[0]
+        status = unpack_from('<B', retData, 48)[0]
         time.sleep(0.25)
 
     '''
@@ -409,7 +409,7 @@ def _getTagList(self):
         request = _buildTagListRequest(self, programName)
         eipHeader = _buildEIPHeader(self, request)
         retData = _getBytes(self, eipHeader)
-        status = unpack_from('<h', retData, 48)[0]
+        status = unpack_from('<B', retData, 48)[0]
         extractTagPacket(self, retData, programName)
         
         while status == 6:
@@ -418,7 +418,7 @@ def _getTagList(self):
             eipHeader = _buildEIPHeader(self, request)
             retData = _getBytes(self, eipHeader)
             extractTagPacket(self, retData, programName)
-            status = unpack_from('<h', retData, 48)[0]
+            status = unpack_from('<B', retData, 48)[0]
             time.sleep(0.25)
     
     return taglist
@@ -1074,7 +1074,7 @@ def _getReplyValues(self, tag, elements, data):
 
                 self.Socket.send(eipHeader)
                 data = self.Socket.recv(1024)
-                status = unpack_from('<h', data, 48)[0]
+                status = unpack_from('<B', data, 48)[0]
                 numbytes = len(data)-dataSize
 
         return vals
@@ -1150,7 +1150,7 @@ def InitialRead(self, tag, baseTag):
     # send our tag read request
     self.Socket.send(eipHeader)
     retData = self.Socket.recv(1024)
-    status = unpack_from('<b', retData, 48)[0]
+    status = unpack_from('<B', retData, 48)[0]
     
     # make sure it was successful
     if status == 0 or status == 6:
@@ -1159,8 +1159,10 @@ def InitialRead(self, tag, baseTag):
         self.KnownTags[baseTag] = (dataType, dataLen)
         return True
     else:
-        raise Exception('Failed to read initial tag: ' + cipErrorCodes[status]) 
-
+        if status in cipErrorCodes.keys():
+            raise ValueError(cipErrorCodes[status])
+        else:
+            raise ValueError("Failed to read tag: " + tag + ' - unknown error ' + str(status))
 
 def TagNameParser(tag, offset):
     '''

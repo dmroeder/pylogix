@@ -1,3 +1,6 @@
+06/03/18
+  -Fixed issues handling CIP error codes
+  
 04/08/18
   -Increased default socket timeout
 
