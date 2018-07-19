@@ -1,3 +1,6 @@
+07/18/18
+  -Fixed reading bits of a word with MultiRead.  Ex: DintTag.0
+
 06/03/18
   -Fixed issues handling CIP error codes
   -Fixed issue when mixing Read with MultiRead

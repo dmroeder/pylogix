@@ -286,7 +286,7 @@ def _multiRead(self, args):
     status = unpack_from('<B', retData, 48)[0]
 
     if status == 0:
-        return MultiParser(self, retData)
+        return MultiParser(self, args, retData)
     else:
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
@@ -1194,7 +1194,7 @@ def TagNameParser(tag, offset):
     except:
         return tag, bt, 0
 
-def MultiParser(self, data):
+def MultiParser(self, tags, data):
     '''
     Takes multi read reply data and returns an array of the values
     '''
@@ -1213,7 +1213,13 @@ def MultiParser(self, data):
         # successful reply, add the value to our list
         if replyStatus == 0 and replyExtended == 0:
             dataTypeValue = unpack_from('<B', stripped, offset+4)[0]	# data type
-            if dataTypeValue == 160:
+            # if bit of word was requested
+            if BitofWord(tags[i]):
+                dataTypeFormat = self.CIPTypes[dataTypeValue][2]
+                val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
+                bitState = _getBitOfWord(tags[i], val)
+                reply.append(bitState)
+            elif dataTypeValue == 160:
                 strlen = unpack_from('<B', stripped, offset+8)[0]
                 reply.append(stripped[offset+12:offset+12+strlen])
             else:
@@ -1238,6 +1244,7 @@ def MakeString(self, string):
         for x in xrange(len(string), 84):
             work.append(0x00)
     return work
+
 def BitofWord(tag):
     '''
     Test if the user is trying to write to a bit of a word
