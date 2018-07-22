@@ -257,10 +257,14 @@ def _multiRead(self, args):
     if not _connect(self): return None
 
     for i in xrange(tagCount):
-        t,b,i = TagNameParser(args[i], 0)
-        InitialRead(self, t, b)
+        tag,base,ind = TagNameParser(args[i], 0)
+        InitialRead(self, tag, base)
     
-        tagIOI = _buildTagIOI(self, t, isBoolArray=False)
+        dataType = self.KnownTags[base][0]
+        if dataType == 211:
+            tagIOI = _buildTagIOI(self, tag, isBoolArray=True)
+        else:
+            tagIOI = _buildTagIOI(self, tag, isBoolArray=False)
         readIOI = _addReadIOI(self, tagIOI, 1)
         serviceSegments.append(readIOI)
 
@@ -1093,14 +1097,21 @@ def _getBitOfWord(tag, value):
     it, then returns that bits value
     '''
     split_tag = tag.split('.')
-    bitPos = split_tag[len(split_tag)-1]
-    bitPos = int(bitPos)
-    try:
-        if int(bitPos)<=31:
-            returnvalue = BitValue(value, bitPos)
-    except:
-        pass  
-    return returnvalue
+    stripped = split_tag[len(split_tag)-1]
+
+    if stripped.endswith(']'):
+        val = stripped[stripped.find("[")+1:stripped.find("]")]
+        val = int(val)
+        bitPos = val & 0x1f
+        returnValue = BitValue(value, bitPos)
+    else:
+        try:
+            bitPos = int(stripped)
+            if bitPos <= 31:
+                returnValue = BitValue(value, bitPos)
+        except:
+            pass
+    return returnValue
 
 def _wordsToBits(self, tag, value, count=0):
     '''
@@ -1205,16 +1216,21 @@ def MultiParser(self, tags, data):
     # get the offset values for each of the tags in the packet
     reply = []
     for i in xrange(tagCount):
-        loc = 2+(i*2)					# pointer to offset
-        offset = unpack_from('<H', stripped, loc)[0]	# get offset
+        loc = 2+(i*2)
+        offset = unpack_from('<H', stripped, loc)[0]
         replyStatus = unpack_from('<b', stripped, offset+2)[0]
         replyExtended = unpack_from('<b', stripped, offset+3)[0]
 
         # successful reply, add the value to our list
         if replyStatus == 0 and replyExtended == 0:
-            dataTypeValue = unpack_from('<B', stripped, offset+4)[0]	# data type
+            dataTypeValue = unpack_from('<B', stripped, offset+4)[0]
             # if bit of word was requested
             if BitofWord(tags[i]):
+                dataTypeFormat = self.CIPTypes[dataTypeValue][2]
+                val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
+                bitState = _getBitOfWord(tags[i], val)
+                reply.append(bitState)
+            elif dataTypeValue == 211:
                 dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                 val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
                 bitState = _getBitOfWord(tags[i], val)
@@ -1223,7 +1239,7 @@ def MultiParser(self, tags, data):
                 strlen = unpack_from('<B', stripped, offset+8)[0]
                 reply.append(stripped[offset+12:offset+12+strlen])
             else:
-                dataTypeFormat = self.CIPTypes[dataTypeValue][2]     # number of bytes for datatype	  
+                dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                 reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
         else:
             reply.append("Error")
