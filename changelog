@@ -1,3 +1,6 @@
+08/23/18
+  -Connection serial number now generated in ForwardOpen
+
 07/21/18
   -Fixed bools that are part of an array with MultiRead. Ex MyBool[0]
 

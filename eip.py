@@ -46,7 +46,7 @@ class PLC:
         self.OTNetworkConnectionID=None
         self.SessionHandle = 0x0000
         self.SessionRegistered = False
-        self.SerialNumber = randrange(65000)
+        self.SerialNumber = 0
         self.OriginatorSerialNumber = 42
         self.SequenceCounter = 1
         self.Offset = 0
@@ -617,6 +617,7 @@ def _buildCIPForwardOpen(self):
     CIPTimeoutTicks = 0x0e
     CIPOTConnectionID = 0x20000002
     CIPTOConnectionID = 0x20000001
+    self.SerialNumber = randrange(65000)
     CIPConnectionSerialNumber = self.SerialNumber
     CIPVendorID = self.VendorID
     CIPOriginatorSerialNumber = self.OriginatorSerialNumber
