@@ -180,8 +180,7 @@ def _readTag(self, tag, elements):
         readRequest = _addReadIOI(self, tagData, elements)
         
     eipHeader = _buildEIPHeader(self, readRequest)
-    retData = _getBytes(self, eipHeader)
-    status = unpack_from('<B', retData, 48)[0]
+    status, retData = _getBytes(self, eipHeader)
 
     if status == 0 or status == 6:
         return _parseReply(self, tag, elements, retData)
@@ -233,8 +232,7 @@ def _writeTag(self, tag, value):
         writeRequest = _addWriteIOI(self, tagData, writeData, dataType)
     
     eipHeader = _buildEIPHeader(self, writeRequest)
-    retData = _getBytes(self, eipHeader)
-    status = unpack_from('<B', retData, 48)[0]
+    status, retData = _getBytes(self, eipHeader)
 
     if status == 0:
         return
@@ -286,8 +284,7 @@ def _multiRead(self, args):
 
     readRequest = header+segmentCount+offsets+segments
     eipHeader = _buildEIPHeader(self, readRequest)
-    retData = _getBytes(self, eipHeader)
-    status = unpack_from('<B', retData, 48)[0]
+    status, retData = _getBytes(self, eipHeader)
 
     if status == 0:
         return MultiParser(self, args, retData)
@@ -324,8 +321,7 @@ def _getPLCTime(self):
                            TimeAttribute)
     
     eipHeader = _buildEIPHeader(self, AttributePacket)
-    retData = _getBytes(self, eipHeader)
-    status = unpack_from('<B', retData, 48)[0]
+    status, retData = _getBytes(self, eipHeader)
 
     if status == 0:
         # get the time from the packet
@@ -366,8 +362,7 @@ def _setPLCTime(self):
                            Time)
 
     eipHeader = _buildEIPHeader(self, AttributePacket)
-    retData = _getBytes(self, eipHeader)
-    status = unpack_from('<B', retData, 48)[0]
+    status, retData = _getBytes(self, eipHeader)
 
     if status == 0:
         return
@@ -390,17 +385,15 @@ def _getTagList(self):
     
     request = _buildTagListRequest(self, programName=None)
     eipHeader = _buildEIPHeader(self, request)
-    retData = _getBytes(self, eipHeader)
-    status = unpack_from('<B', retData, 48)[0]
+    status, retData = _getBytes(self, eipHeader)
     extractTagPacket(self, retData, programName=None)
 
     while status == 6:
         self.Offset += 1
         request = _buildTagListRequest(self, programName=None)
         eipHeader = _buildEIPHeader(self, request)
-        retData = _getBytes(self, eipHeader)
+        status, retData = _getBytes(self, eipHeader)
         extractTagPacket(self, retData, programName=None)
-        status = unpack_from('<B', retData, 48)[0]
         time.sleep(0.25)
 
     '''
@@ -413,17 +406,15 @@ def _getTagList(self):
         
         request = _buildTagListRequest(self, programName)
         eipHeader = _buildEIPHeader(self, request)
-        retData = _getBytes(self, eipHeader)
-        status = unpack_from('<B', retData, 48)[0]
+        status, retData = _getBytes(self, eipHeader)
         extractTagPacket(self, retData, programName)
         
         while status == 6:
             self.Offset += 1
             request = _buildTagListRequest(self, programName)
             eipHeader = _buildEIPHeader(self, request)
-            retData = _getBytes(self, eipHeader)
+            status, retData = _getBytes(self, eipHeader)
             extractTagPacket(self, retData, programName)
-            status = unpack_from('<B', retData, 48)[0]
             time.sleep(0.25)
     
     return taglist
@@ -494,7 +485,9 @@ def _connect(self):
         self.Socket.close()
         return False
 
-    retData = _getBytes(self, _buildRegisterSession(self))
+    #retData = _getBytes(self, _buildRegisterSession(self))
+    self.Socket.send(_buildRegisterSession(self))
+    retData = self.Socket.recv(1024)
     if retData:
         self.SessionHandle = unpack_from('<I', retData, 4)[0]
     else:
@@ -502,7 +495,8 @@ def _connect(self):
         print "Failed to register session"
         return False
 
-    retData = _getBytes(self, _buildForwardOpenPacket(self))
+    self.Socket.send(_buildForwardOpenPacket(self))
+    retData = self.Socket.recv(1024)
     if retData:
         self.OTNetworkConnectionID = unpack_from('<I', retData, 44)[0]
         self.SocketConnected = True
@@ -517,14 +511,18 @@ def _closeConnection(self):
     '''
     Close the connection to the PLC (forward close, unregister session)
     '''
+    self.SocketConnected = False
     closePacket = _buildForwardClosePacket(self)
     unregPacket = _buildUnregisterSession(self)
-    retData = _getBytes(self, closePacket)
-    retData = _getBytes(self, unregPacket)
     try:
+        self.Socket.send(closePacket)
+        retData = self.Socket.recv(1024)
+        self.Socket.send(unregPacket)
+        retData = self.Socket.recv(1024)
         self.Socket.close()
     except:
-        pass 
+        pass
+
 
 def _getBytes(self, data):
     '''
@@ -534,15 +532,16 @@ def _getBytes(self, data):
         self.Socket.send(data)
         retData = self.Socket.recv(1024)
         if retData:
-            return retData
+            status = unpack_from('<B', retData, 48)[0]
+            return status, retData
         else:
-            return None
+            return 1, None
     except socket.gaierror, e:
         self.SocketConnected = False
-        return None
+        return 1, None
     except IOError, e:
         self.SocketConnected = False
-        return None
+        return 7, None
         
 def _buildRegisterSession(self):
     '''
@@ -1161,9 +1160,7 @@ def InitialRead(self, tag, baseTag):
     eipHeader = _buildEIPHeader(self, readRequest)
     
     # send our tag read request
-    self.Socket.send(eipHeader)
-    retData = self.Socket.recv(1024)
-    status = unpack_from('<B', retData, 48)[0]
+    status, retData = _getBytes(self, eipHeader)
     
     # make sure it was successful
     if status == 0 or status == 6:

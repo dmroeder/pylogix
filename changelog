@@ -1,3 +1,6 @@
+08/24/18
+  -getBytes returns the status as well as the packet data
+
 08/23/18
   -Connection serial number now generated in ForwardOpen
 
