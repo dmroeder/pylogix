@@ -1,3 +1,6 @@
+08/27/18
+  -Added Python3 support
+  
 08/24/18
   -getBytes returns the status as well as the packet data
 
