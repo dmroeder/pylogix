@@ -1,3 +1,6 @@
+08/28/18
+  -Reading a list of tags can now be done with Read(), see README for example
+  
 08/27/18
   -Added Python3 support
   

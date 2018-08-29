@@ -84,7 +84,10 @@ class PLC:
         if not args:
             return "You must provide a tag name"
         elif len(args) == 1:
-            return _readTag(self, args[0], 1)
+            if isinstance(args[0], list):
+                return _multiRead(self, args[0])
+            else:
+                return _readTag(self, args[0], 1)
         elif len(args) == 2:
             return _readTag(self, args[0], args[1])
         else:
@@ -1056,11 +1059,13 @@ def _getReplyValues(self, tag, elements, data):
                 # gotta handle strings a little different
                 index = 54+(counter*dataSize)
                 NameLength = unpack_from('<L', data, index)[0]
-                vals.append(data[index+4:index+4+NameLength].decode('utf-8'))
+                s = data[index+4:index+4+NameLength]
+                vals.append(str(s.decode('utf-8')))
             elif datatype == 218:
                 index = 52+(counter*dataSize)
                 NameLength = unpack_from('<B', data, index)[0]
-                vals.append(data[index+1:index+1+NameLength])
+                s = data[index+1:index+1+NameLength]
+                vals.append(str(s.decode('utf-8')))
             else:
                 returnvalue = unpack_from(CIPFormat, data, index)[0]
                 vals.append(returnvalue)
@@ -1235,7 +1240,8 @@ def MultiParser(self, tags, data):
                 reply.append(bitState)
             elif dataTypeValue == 160:
                 strlen = unpack_from('<B', stripped, offset+8)[0]
-                reply.append(stripped[offset+12:offset+12+strlen])
+                s = stripped[offset+12:offset+12+strlen]
+                reply.append(str(s.decode('utf-8')))
             else:
                 dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                 reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
