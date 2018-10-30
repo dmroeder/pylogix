@@ -482,21 +482,19 @@ def _connect(self):
         self.Socket = socket.socket()
         self.Socket.settimeout(5.0)
         self.Socket.connect((self.IPAddress, self.Port))
-    except:
+    except(socket.error):
         self.SocketConnected = False
         self.SequenceCounter = 1
         self.Socket.close()
-        return False
+        raise
 
-    #retData = _getBytes(self, _buildRegisterSession(self))
     self.Socket.send(_buildRegisterSession(self))
     retData = self.Socket.recv(1024)
     if retData:
         self.SessionHandle = unpack_from('<I', retData, 4)[0]
     else:
         self.SocketConnected = False
-        print("Failed to register session")
-        return False
+        raise Exception("Failed to register session")
 
     self.Socket.send(_buildForwardOpenPacket(self))
     retData = self.Socket.recv(1024)
@@ -505,9 +503,8 @@ def _connect(self):
         self.SocketConnected = True
     else:
         self.SocketConnected = False
-        print("Forward Open Failed")
-        return False
-    
+        raise Exception("Forward Open Failed")
+
     return True
 
 def _closeConnection(self):
