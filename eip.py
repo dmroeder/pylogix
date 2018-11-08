@@ -123,11 +123,39 @@ class PLC:
         '''
         return _setPLCTime(self)
 
-    def GetTagList(self):
+    def GetTagList(self, allTags = False):
         '''
         Retrieves the tag list from the PLC
+        Optional parameter allTags set to False
+        If is set to True, it will return controller, and
+        program tags, otherwise just controller tags.
         '''
-        return _getTagList(self)
+        if allTags:
+            _getTagList(self)
+            _getAllProgramsTags(self)
+        else:
+            _getTagList(self)
+        
+        return taglist
+
+    def GetProgramTagList(self, programName):
+        '''
+        Retrieves a program tag list from the PLC
+        programName = "Program:ExampleProgram"
+        '''
+        
+        return _getProgramTagList(self, programName)
+
+    def GetProgramsList(self):
+        '''
+        Retrieves a program names list from the PLC
+        NB: Need to call GetTagList() first for this list to be generated!
+        Calling GetTagList() with default parameter of False will be faster,
+        since it only pulls controller tags including program names.
+        '''
+        if not programNames:
+            return None
+        return programNames
 
     def Discover(self):
         '''
@@ -385,7 +413,7 @@ def _getTagList(self):
     self.Offset = 0
     del programNames[:]
     del taglist[:]
-    
+
     request = _buildTagListRequest(self, programName=None)
     eipHeader = _buildEIPHeader(self, request)
     status, retData = _getBytes(self, eipHeader)
@@ -399,19 +427,25 @@ def _getTagList(self):
         extractTagPacket(self, retData, programName=None)
         time.sleep(0.25)
 
+    return taglist
+
+def _getAllProgramsTags(self):
     '''
-    When we're done with the controller scoped tags,
-    request the program scoped tags
+    Requests all programs tag list and appends to taglist (LgxTag type)
     '''
+    if not _connect(self): return None
+
+    self.Offset = 0
+
     for programName in programNames:
 
         self.Offset = 0
-        
+
         request = _buildTagListRequest(self, programName)
         eipHeader = _buildEIPHeader(self, request)
         status, retData = _getBytes(self, eipHeader)
         extractTagPacket(self, retData, programName)
-        
+
         while status == 6:
             self.Offset += 1
             request = _buildTagListRequest(self, programName)
@@ -419,7 +453,30 @@ def _getTagList(self):
             status, retData = _getBytes(self, eipHeader)
             extractTagPacket(self, retData, programName)
             time.sleep(0.25)
-    
+
+    return taglist
+
+def _getProgramTagList(self, programName):
+    '''
+    Requests tag list for a specific program and returns a list of LgxTag type
+    '''
+    if not _connect(self): return None
+
+    self.Offset = 0
+
+    request = _buildTagListRequest(self, programName)
+    eipHeader = _buildEIPHeader(self, request)
+    status, retData = _getBytes(self, eipHeader)
+    extractTagPacket(self, retData, programName)
+
+    while status == 6:
+        self.Offset += 1
+        request = _buildTagListRequest(self, programName)
+        eipHeader = _buildEIPHeader(self, request)
+        status, retData = _getBytes(self, eipHeader)
+        extractTagPacket(self, retData, programName)
+        time.sleep(0.25)
+
     return taglist
     
 def _discover():
