@@ -149,12 +149,11 @@ class PLC:
     def GetProgramsList(self):
         '''
         Retrieves a program names list from the PLC
-        NB: Need to call GetTagList() first for this list to be generated!
-        Calling GetTagList() with default parameter of False will be faster,
-        since it only pulls controller tags including program names.
+        Sanity check: checks if programNames is empty
+        and runs _getTagList
         '''
         if not programNames:
-            return None
+            _getTagList(self)
         return programNames
 
     def Discover(self):
