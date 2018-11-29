@@ -123,12 +123,12 @@ class PLC:
         '''
         return _setPLCTime(self)
 
-    def GetTagList(self, allTags = False):
+    def GetTagList(self, allTags = True):
         '''
         Retrieves the tag list from the PLC
-        Optional parameter allTags set to False
-        If is set to True, it will return controller, and
-        program tags, otherwise just controller tags.
+        Optional parameter allTags set to True
+        If is set to False, it will return only controller
+        otherwise controller tags and program tags.
         '''
         if allTags:
             _getTagList(self)
