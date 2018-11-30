@@ -143,8 +143,18 @@ class PLC:
         Retrieves a program tag list from the PLC
         programName = "Program:ExampleProgram"
         '''
+
+        # Ensure programNames is not empty 
+        if not programNames:
+            _getTagList(self)
         
-        return _getProgramTagList(self, programName)
+        # Get a single program tags if progragName exists
+        if programName in programNames:
+            return _getProgramTagList(self, programName)
+        if programName not in programNames:
+            print("Program not found, please check name!")
+            return None
+
 
     def GetProgramsList(self):
         '''
@@ -462,6 +472,7 @@ def _getProgramTagList(self, programName):
     if not _connect(self): return None
 
     self.Offset = 0
+    del taglist[:]
 
     request = _buildTagListRequest(self, programName)
     eipHeader = _buildEIPHeader(self, request)
