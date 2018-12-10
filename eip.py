@@ -76,34 +76,24 @@ class PLC:
         '''
         return _closeConnection(self)
 
-    def Read(self, *args):
+    def Read(self, tag, count=1, datatype=None):
         '''
         We have two options for reading depending on
         the arguments, read a single tag, or read an array
         '''
-        if not args:
-            return "You must provide a tag name"
-        elif len(args) == 1:
-            if isinstance(args[0], list):
-                return _multiRead(self, args[0])
-            else:
-                return _readTag(self, args[0], 1)
-        elif len(args) == 2:
-            return _readTag(self, args[0], args[1])
+        if isinstance(tag, list):
+            if datatype:
+                raise Exception('Datatype should be set to None when reading lists')
+            return _multiRead(self, tag)
         else:
-            return "You provided too many arguments for a read"
+            return _readTag(self, tag, count, datatype)
     
-    def Write(self, *args):
+    def Write(self, tag, value, datatype=None):
         '''
         We have two options for writing depending on
         the arguments, write a single tag, or write an array
         '''
-        if not args or args == 1:
-            return "You must provide a tag name and value"
-        elif len(args) == 2:
-            _writeTag(self, args[0], args[1])
-        else:
-            return "You provided too many arguments, not sure what you want to do"
+        return _writeTag(self, tag, value, datatype)
 
     def MultiRead(self, *args):
         '''
@@ -185,7 +175,7 @@ class LGXTag():
         self.Offset = 0
         self.DataType = ""
 
-def _readTag(self, tag, elements):
+def _readTag(self, tag, elements, dt):
     '''
     processes the read request
     '''
@@ -194,7 +184,7 @@ def _readTag(self, tag, elements):
     if not _connect(self): return None
 
     t,b,i = TagNameParser(tag, 0)
-    InitialRead(self, t, b)
+    InitialRead(self, t, b, dt)
 
     datatype = self.KnownTags[b][0]
     bitCount = self.CIPTypes[datatype][0] * 8
@@ -231,7 +221,7 @@ def _readTag(self, tag, elements):
             err = 'Unknown error'
         raise Exception('Read failed, ' + err)       
 
-def _writeTag(self, tag, value):
+def _writeTag(self, tag, value, dt):
     '''
     Processes the write request
     '''
@@ -241,7 +231,7 @@ def _writeTag(self, tag, value):
     if not _connect(self): return None
 
     t,b,i = TagNameParser(tag, 0)
-    InitialRead(self, t, b)
+    InitialRead(self, t, b, dt)
 
     dataType = self.KnownTags[b][0]
 
@@ -296,7 +286,7 @@ def _multiRead(self, args):
 
     for i in range(tagCount):
         tag,base,ind = TagNameParser(args[i], 0)
-        InitialRead(self, tag, base)
+        InitialRead(self, tag, base, None)
     
         dataType = self.KnownTags[base][0]
         if dataType == 211:
@@ -1216,13 +1206,17 @@ def _getWordCount(start, length, bits):
         wordCount += 1
     return wordCount
 
-def InitialRead(self, tag, baseTag):
+def InitialRead(self, tag, baseTag, dt):
     '''
     Store each unique tag read in a dict so that we can retreive the
     data type or data length (for STRING) later
     '''
     # if a tag alread exists, return True
     if baseTag in self.KnownTags:
+        return True
+    
+    if dt:
+        self.KnownTags[baseTag] = (dt, 0)
         return True
     
     tagData = _buildTagIOI(self, baseTag, isBoolArray=False)

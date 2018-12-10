@@ -1,5 +1,6 @@
 12/10/18
   -Check status of ForwardOpen rather than assume that it was successful
+  -Allow users to provide the data type to eliminate the initial read
 
 12/01/18
   -Merged pull request #31 from kodaman2

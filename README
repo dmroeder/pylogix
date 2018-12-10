@@ -17,11 +17,13 @@ USAGE - Python 2.7.x or 3.5.x
     Read a value:  value = test.Read("tagname")
 	ex: value = test.Read("MyTimer.ACC")
 		    print(value)
-	
+    *Reading a unique tag can be sped up by specifying the data type
+        ahead of time: test.Read("MyDINT", datatype=196)
+        
     Read an array: value = test.Read("tagname", length)
 	ex: value = test.Read("MyDINT", 10)
 		    print(value(3))
-		    
+    
     Read multiple tags at once: test.MultiRead("tag1", "tag2", "tag3")
 	ex: values = test.MultiRead("MyDINT", "MyTimer.ACC", "AnotherDINT")
 	    print values
@@ -34,6 +36,8 @@ USAGE - Python 2.7.x or 3.5.x
 		    
     Write a value: test.Write("tagname", value)
 	ex: test.Write("MyDINT", 1337)
+    *Writing a unique tag can be sped up by specifying the data type
+        ahead of time: test.Wtite("MyDINT", 1337, datatype=196)
 	
 	Write an array of values:
 	vals = [1234, 56789]
