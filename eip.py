@@ -565,7 +565,8 @@ def _connect(self):
 
     self.Socket.send(_buildForwardOpenPacket(self))
     retData = self.Socket.recv(1024)
-    if retData:
+    sts = unpack_from('<b', retData, 42)[0]
+    if not sts:
         self.OTNetworkConnectionID = unpack_from('<I', retData, 44)[0]
         self.SocketConnected = True
     else:

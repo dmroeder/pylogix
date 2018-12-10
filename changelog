@@ -1,3 +1,9 @@
+12/10/18
+  -Check status of ForwardOpen rather than assume that it was successful
+
+12/01/18
+  -Merged pull request #31 from kodaman2
+  
 08/28/18
   -Reading a list of tags can now be done with Read(), see README for example
   
