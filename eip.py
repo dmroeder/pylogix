@@ -162,6 +162,12 @@ class PLC:
         '''
         return _discover()
 
+    def GetModuleProperties(self, slot):
+        '''
+        Get the properties of module in specified slot
+        '''
+        return _getModuleProperties(self, slot)
+
     def Close(self):
         '''
         Close the connection to the PLC
@@ -528,6 +534,49 @@ def _discover():
 
     return devices   
 
+def _getModuleProperties(self, slot):
+    '''
+    Request the properties of a module in a particular
+    slot.  Returns LgxDevice
+    '''
+    if not _connect(self): return None
+         
+    AttributeService = 0x01
+    AttributeSize = 0x02
+    AttributeClassType = 0x20
+    AttributeClass = 0x01
+    AttributeInstanceType = 0x24
+    AttributeInstance = 0x01
+    PathRouteSize = 0x01
+    Reserved = 0x00
+    Backplane = 0x01
+    LinkAddress = slot
+        
+    AttributePacket = pack('<10B',
+                            AttributeService,
+                            AttributeSize,
+                            AttributeClassType,
+                            AttributeClass,
+                            AttributeInstanceType,
+                            AttributeInstance,
+                            PathRouteSize,
+                            Reserved,
+                            Backplane,
+                            LinkAddress)
+
+    frame = _buildCIPUnconnectedSend() + AttributePacket
+    eipHeader = _buildEIPSendRRDataHeader(self, len(frame)) + frame
+    pad = pack('<I', 0x00)
+    self.Socket.send(eipHeader)
+    retData = pad + self.Socket.recv(1024)
+    status = unpack_from('<B', retData, 46)[0]
+    
+    if status == 0:
+        return _parseIdentityResponse(retData)
+    else:
+        return LGXDevice()
+
+
 def _connect(self):
     '''
     Open a connection to the PLC
@@ -792,6 +841,33 @@ def _buildEIPSendRRDataHeader(self, frameLen):
                 EIPItem1Length,
                 EIPItem2Type,
                 EIPItem2Length)   
+
+def _buildCIPUnconnectedSend():
+    '''
+    build unconnected send to request tag database
+    '''
+    CIPService = 0x52
+    CIPPathSize = 0x02
+    CIPClassType = 0x20
+
+    CIPClass = 0x06
+    CIPInstanceType = 0x24
+
+    CIPInstance = 0x01
+    CIPPriority = 0x0A
+    CIPTimeoutTicks = 0x0e
+    ServiceSize = 0x06
+    
+    return pack('<BBBBBBBBH',
+                CIPService,
+                CIPPathSize,
+                CIPClassType,
+                CIPClass,
+                CIPInstanceType,
+                CIPInstance,
+                CIPPriority,
+                CIPTimeoutTicks,
+                ServiceSize)
 
 def _buildTagIOI(self, tagName, isBoolArray):
     '''
@@ -1396,7 +1472,7 @@ def _parseIdentityResponse(data):
     resp.Status = unpack_from('<H', data, 56)[0]
     resp.SerialNumber = hex(unpack_from('<I', data, 58)[0])
     resp.ProductNameLength = unpack_from('<B', data, 62)[0]
-    resp.ProductName = data[63:63+resp.ProductNameLength]
+    resp.ProductName = data[63:63+resp.ProductNameLength].decode('utf-8')
 
     state = data[-1:]
     resp.State = unpack_from('<B', state, 0)[0]

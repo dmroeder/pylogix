@@ -15,48 +15,53 @@ USAGE - Python 2.7.x or 3.5.x
 5) Do one of the following:
 
     Read a value:  value = test.Read("tagname")
-	ex: value = test.Read("MyTimer.ACC")
-		    print(value)
+    x: value = test.Read("MyTimer.ACC")
+        print(value)
     *Reading a unique tag can be sped up by specifying the data type
         ahead of time: test.Read("MyDINT", datatype=196)
         
     Read an array: value = test.Read("tagname", length)
-	ex: value = test.Read("MyDINT", 10)
-		    print(value(3))
+    ex: value = test.Read("MyDINT", 10)
+        print(value(3))
     
     Read multiple tags at once: test.MultiRead("tag1", "tag2", "tag3")
-	ex: values = test.MultiRead("MyDINT", "MyTimer.ACC", "AnotherDINT")
-	    print values
-	    
+    ex: values = test.MultiRead("MyDINT", "MyTimer.ACC", "AnotherDINT")
+        print values
+
     You can also read multiple tags now by passing a list of tags to Read()
     ex: tags = ["MyDint", "AnotherDINT', "ThisREAL"]
         values = test.Read(tags)
         print(values)
     *MultiRead still works, but will probably go away eventually.
-		    
+
     Write a value: test.Write("tagname", value)
-	ex: test.Write("MyDINT", 1337)
+    ex: test.Write("MyDINT", 1337)
     *Writing a unique tag can be sped up by specifying the data type
         ahead of time: test.Wtite("MyDINT", 1337, datatype=196)
-	
-	Write an array of values:
-	vals = [1234, 56789]
-	test.Write("MyDint[0]", vals)
-	
+
+    Write an array of values:
+    vals = [1234, 56789]
+    test.Write("MyDint[0]", vals)
+
     Get the controller scoped tags
-	ex: tags = test.GetTagList()
-	    (returns a structure of .TagName, .DataType and .Offset)
-	
+    ex: tags = test.GetTagList()
+        (returns a structure of .TagName, .DataType and .Offset)
+
     Get all Ethernet I/P devices on the network test.Discover()
-	ex:  stuff = test.Discover()
-	     print(stuff(1).IPAddress) # prints the first devices IP Address
-	     
+    ex:  stuff = test.Discover()
+        print(stuff[1].IPAddress) # prints the first devices IP Address
+
+    Get properties of a module in a particular slot
+        thing = test.GetModuleProperties(0)
+        print(thing.ProductName, thing.SerialNumber)
+        (returns LGXDevice(), though not all members apply)
+
     Get or Set the PLC clock: test.GetPLCTime() or test.SetPLCTime()
     Note:  SetPLCTime() will use your computers clock to set the PLC
-		    
+
 6) Close the connection with test.Close().  This should be called when you are
     completely done reading/writing, not with each exchange of data.
-		    
+
 So a complete script to read a tag would look like this:
 
 from eip import PLC
