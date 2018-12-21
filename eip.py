@@ -198,7 +198,7 @@ def _readTag(self, tag, elements, dt):
     if datatype == 211:
         # bool array
         tagData = _buildTagIOI(self, tag, isBoolArray=True)
-        words = _getWordCount(i, elements, bitCount)
+        words = _getWordCount(elements, bitCount)
         readRequest = _addReadIOI(self, tagData, words)
     elif BitofWord(t):
         # bits of word
@@ -207,7 +207,7 @@ def _readTag(self, tag, elements, dt):
         bitPos = int(bitPos)
 
         tagData = _buildTagIOI(self, tag, isBoolArray=False)
-        words = _getWordCount(bitPos, elements, bitCount)
+        words = _getWordCount(elements, bitCount)
 
         readRequest = _addReadIOI(self, tagData, words)
     else:
@@ -1150,13 +1150,13 @@ def _parseReply(self, tag, elements, data):
         bitPos = split_tag[len(split_tag)-1]
         bitPos = int(bitPos)
 
-        wordCount = _getWordCount(bitPos, elements, bitCount)
+        wordCount = _getWordCount(elements, bitCount)
         words = _getReplyValues(self, tag, wordCount, data)
         vals = _wordsToBits(self, tag, words, count=elements)
     elif datatype == 211:
-        wordCount = _getWordCount(index, elements, bitCount)
+        wordCount = _getWordCount(elements, bitCount)
         words = _getReplyValues(self, tag, wordCount, data)
-        vals = _wordsToBits(self, tag, words, count=elements)        
+        vals = _wordsToBits(self, tag, words, count=elements)
     else:
         vals = _getReplyValues(self, tag, elements, data)
     
@@ -1258,7 +1258,7 @@ def _wordsToBits(self, tag, value, count=0):
     bitCount = self.CIPTypes[datatype][0] * 8
 
     if datatype == 211:
-        bitPos = index
+        bitPos = index%32
     else:
         split_tag = tag.split('.')
         bitPos = split_tag[len(split_tag)-1]
@@ -1271,16 +1271,12 @@ def _wordsToBits(self, tag, value, count=0):
 
     return ret[bitPos:bitPos+count]
 
-def _getWordCount(start, length, bits):
+def _getWordCount(length, bits):
     '''
     Returns the number of words reqired to accomodate
     all the bits requested.
     '''
-    totalBits = start+length
-    wordCount = totalBits / bits
-    if totalBits % 32 > 0:
-        wordCount += 1
-    return wordCount
+    return int(length/bits)+1
 
 def InitialRead(self, tag, baseTag, dt):
     '''

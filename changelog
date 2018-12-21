@@ -1,3 +1,6 @@
+12/20/18
+  -Fix for reading BOOL's in an array
+
 12/13/18
   -Added GetModuleProperties()
 
