@@ -1501,9 +1501,9 @@ def parseLgxTag(packet, programName):
     tag = LGXTag()
     length = unpack_from('<H', packet, 8)[0]
     if programName:
-        tag.TagName = programName + '.' + packet[10:length+10].decode('utf-8')
+        tag.TagName = str(programName + '.' + packet[10:length+10].decode('utf-8'))
     else:
-        tag.TagName = packet[10:length+10].decode('utf-8')
+        tag.TagName = str(packet[10:length+10].decode('utf-8'))
     tag.Offset = unpack_from('<H', packet, 0)[0]
     tag.DataType = unpack_from('<B', packet, 4)[0]
 
