@@ -1,6 +1,7 @@
 12/29/18
   -Make sure ProductName is str type
-
+  -Removed example.py, added examples directory
+  
 12/28/18
   -Make sure TagName is str type
 
