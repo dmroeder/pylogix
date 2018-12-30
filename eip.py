@@ -1468,7 +1468,7 @@ def _parseIdentityResponse(data):
     resp.Status = unpack_from('<H', data, 56)[0]
     resp.SerialNumber = hex(unpack_from('<I', data, 58)[0])
     resp.ProductNameLength = unpack_from('<B', data, 62)[0]
-    resp.ProductName = data[63:63+resp.ProductNameLength].decode('utf-8')
+    resp.ProductName = str(data[63:63+resp.ProductNameLength].decode('utf-8'))
 
     state = data[-1:]
     resp.State = unpack_from('<B', state, 0)[0]
