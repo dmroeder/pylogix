@@ -28,6 +28,7 @@ import time
 programNames = []
 taglist = []
 
+
 class PLC:
 
     def __init__(self):
@@ -52,6 +53,7 @@ class PLC:
         self.Offset = 0
         self.KnownTags = {}
         self.StructIdentifier = 0x0fCE
+        self.Version = '0.1.0'
         self.CIPTypes = {160:(88 ,"STRUCT", 'B'),
                          193:(1, "BOOL", '?'),
                          194:(1, "SINT", 'b'),
@@ -198,7 +200,7 @@ def _readTag(self, tag, elements, dt):
     if datatype == 211:
         # bool array
         tagData = _buildTagIOI(self, tag, isBoolArray=True)
-        words = _getWordCount(elements, bitCount)
+        words = _getWordCount(i, elements, bitCount)
         readRequest = _addReadIOI(self, tagData, words)
     elif BitofWord(t):
         # bits of word
@@ -207,7 +209,7 @@ def _readTag(self, tag, elements, dt):
         bitPos = int(bitPos)
 
         tagData = _buildTagIOI(self, tag, isBoolArray=False)
-        words = _getWordCount(elements, bitCount)
+        words = _getWordCount(bitPos, elements, bitCount)
 
         readRequest = _addReadIOI(self, tagData, words)
     else:
@@ -1150,11 +1152,11 @@ def _parseReply(self, tag, elements, data):
         bitPos = split_tag[len(split_tag)-1]
         bitPos = int(bitPos)
 
-        wordCount = _getWordCount(elements, bitCount)
+        wordCount = _getWordCount(bitPos, elements, bitCount)
         words = _getReplyValues(self, tag, wordCount, data)
         vals = _wordsToBits(self, tag, words, count=elements)
     elif datatype == 211:
-        wordCount = _getWordCount(elements, bitCount)
+        wordCount = _getWordCount(index, elements, bitCount)
         words = _getReplyValues(self, tag, wordCount, data)
         vals = _wordsToBits(self, tag, words, count=elements)
     else:
@@ -1271,12 +1273,18 @@ def _wordsToBits(self, tag, value, count=0):
 
     return ret[bitPos:bitPos+count]
 
-def _getWordCount(length, bits):
+def _getWordCount(start, length, bits):
     '''
-    Returns the number of words reqired to accomodate
-    all the bits requested.
+    Get the number of words that the requested
+    bits would occupy.  We have to take into account
+    how many bits are in a word and the fact that the
+    number of requested bits can span multipe words.
     '''
-    return int(length/bits)+1
+    newStart = start % bits
+    newEnd = newStart + length
+    
+    totalWords = (newEnd-1) / bits
+    return totalWords + 1
 
 def InitialRead(self, tag, baseTag, dt):
     '''
