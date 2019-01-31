@@ -2,7 +2,7 @@
    Originally created by Burt Peterson
    Updated and maintained by Dustin Roeder (dmroeder@gmail.com) 
 
-   Copyright 2018 Dustin Roeder
+   Copyright 2019 Dustin Roeder
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ class PLC:
         self.KnownTags = {}
         self.TagList = []
         self.StructIdentifier = 0x0fCE
-        self.Version = '0.1.0'
+        self.Version = '0.2.0'
         self.CIPTypes = {160:(88 ,"STRUCT", 'B'),
                          193:(1, "BOOL", '?'),
                          194:(1, "SINT", 'b'),
