@@ -1,5 +1,6 @@
 01/31/19
   -GetTagList gets UDT names so the tag list can contain the name of the data types
+  -Added more examples
 
 01/07/19
   -Another fix for dealing with bool arrays
