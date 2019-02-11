@@ -53,7 +53,7 @@ class PLC:
         self.KnownTags = {}
         self.TagList = []
         self.StructIdentifier = 0x0fCE
-        self.Version = '0.2.0'
+        self.Version = '0.2.1'
         self.CIPTypes = {160:(88 ,"STRUCT", 'B'),
                          193:(1, "BOOL", '?'),
                          194:(1, "SINT", 'b'),
@@ -433,14 +433,28 @@ def _getTagList(self):
     request = _buildTagListRequest(self, programName=None)
     eipHeader = _buildEIPHeader(self, request)
     status, retData = _getBytes(self, eipHeader)
-    extractTagPacket(self, retData, programName=None)
+    if status == 0 or status == 6:
+        extractTagPacket(self, retData, programName=None)
+    else:
+        if status in cipErrorCodes.keys():
+            err = cipErrorCodes[status]
+        else:
+            err = 'Unknown error'
+        raise Exception('Failed to get tag list, ' + err)
 
     while status == 6:
         self.Offset += 1
         request = _buildTagListRequest(self, programName=None)
         eipHeader = _buildEIPHeader(self, request)
         status, retData = _getBytes(self, eipHeader)
-        extractTagPacket(self, retData, programName=None)
+        if status == 0 or status == 6:
+            extractTagPacket(self, retData, programName=None)
+        else:
+            if status in cipErrorCodes.keys():
+                err = cipErrorCodes[status]
+            else:
+                err = 'Unknown error'
+            raise Exception('Failed to get tag list, ' + err)
 
     return
 
@@ -459,14 +473,28 @@ def _getAllProgramsTags(self):
         request = _buildTagListRequest(self, programName)
         eipHeader = _buildEIPHeader(self, request)
         status, retData = _getBytes(self, eipHeader)
-        extractTagPacket(self, retData, programName)
+        if status == 0 or status == 6:
+            extractTagPacket(self, retData, programName)
+        else:
+            if status in cipErrorCodes.keys():
+                err = cipErrorCodes[status]
+            else:
+                err = 'Unknown error'
+            raise Exception('Failed to get program tag list, ' + err)
 
         while status == 6:
             self.Offset += 1
             request = _buildTagListRequest(self, programName)
             eipHeader = _buildEIPHeader(self, request)
             status, retData = _getBytes(self, eipHeader)
-            extractTagPacket(self, retData, programName)
+            if status == 0 or status == 6:
+                extractTagPacket(self, retData, programName)
+            else:
+                if status in cipErrorCodes.keys():
+                    err = cipErrorCodes[status]
+                else:
+                    err = 'Unknown error'
+                raise Exception('Failed to get program tag list, ' + err)
 
     return
 
@@ -482,14 +510,28 @@ def _getProgramTagList(self, programName):
     request = _buildTagListRequest(self, programName)
     eipHeader = _buildEIPHeader(self, request)
     status, retData = _getBytes(self, eipHeader)
-    extractTagPacket(self, retData, programName)
+    if status == 0 or status == 6:
+        extractTagPacket(self, retData, programName)
+    else:
+        if status in cipErrorCodes.keys():
+            err = cipErrorCodes[status]
+        else:
+            err = 'Unknown error'
+        raise Exception('Failed to get program tag list, ' + err)
 
     while status == 6:
         self.Offset += 1
         request = _buildTagListRequest(self, programName)
         eipHeader = _buildEIPHeader(self, request)
         status, retData = _getBytes(self, eipHeader)
-        extractTagPacket(self, retData, programName)
+        if status == 0 or status == 6:
+            extractTagPacket(self, retData, programName)
+        else:
+            if status in cipErrorCodes.keys():
+                err = cipErrorCodes[status]
+            else:
+                err = 'Unknown error'
+            raise Exception('Failed to get program tag list, ' + err)
 
     return
 
