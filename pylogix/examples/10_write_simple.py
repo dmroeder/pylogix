@@ -12,7 +12,7 @@ NOTE: You only need to call .Close() after you are done exchanging
 data with the PLC.  If you were going to read/write in a loop or read/write
 more tags, you wouldn't want to call .Close() every time.
 '''
-from eip import PLC
+from pylogix import PLC
 comm = PLC()
 comm.IPAddress = '192.168.1.9'
 comm.Write('CurrentScreen', 10)

@@ -9,7 +9,7 @@ We're going to log a tag value 10
 times to a text file
 '''
 import csv
-from eip import PLC
+from pylogix import PLC
 import time
 
 with PLC() as comm:

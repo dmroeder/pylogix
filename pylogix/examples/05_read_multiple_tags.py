@@ -23,7 +23,7 @@ DINT's for example.
 
 I'll usually read no more than 5 strings at once, or 10 DINT's)
 '''
-from eip import PLC
+from pylogix import PLC
 
 tag_list = ['Zone1ASpeed', 'Zone1BSpeed', 'Zone2ASpeed', 'Zone2BSpeed', 'Zone3ASpeed', 'Zone3BSpeed',
             'Zone4ASpeed', 'ZOne4BSpeed', 'Zone1Case', 'Zone2Case']

@@ -15,7 +15,7 @@ NOTE: This actually reads all of the tags from the
 PLC, it returns only the list of tags from the
 program you specified.
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'

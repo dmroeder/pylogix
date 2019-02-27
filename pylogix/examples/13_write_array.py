@@ -13,7 +13,7 @@ We can write a list of values all at once to be more efficient.
 You should be careful not to exceed the ~500 byte limit of
 the packet.  You can pack quite a few values into 500 bytes.
 '''
-from eip import PLC
+from pylogix import PLC
 
 values = [8,6,7,5,3,0,9]
 

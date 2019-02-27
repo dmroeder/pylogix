@@ -13,7 +13,7 @@ Linux distributions, so you may need to install it.
 
 For Ubuntu: sudo apt-get install python-tk
 '''
-from eip import PLC
+from pylogix import PLC
 from Tkinter import *
 
 tagName = 'Time.Second'

@@ -4,7 +4,7 @@ the following import is only necessary because eip is not in this directory
 import sys
 sys.path.append('..')
 
-from eip import PLC
+from pylogix import PLC
 
 def getDevices():
     '''

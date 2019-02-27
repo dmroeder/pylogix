@@ -8,7 +8,7 @@ sys.path.append('..')
 We're going to log a tag value 10
 times to a text file
 '''
-from eip import PLC
+from pylogix import PLC
 import time
 
 with PLC() as comm:

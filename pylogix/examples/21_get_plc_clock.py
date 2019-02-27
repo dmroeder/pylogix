@@ -9,7 +9,7 @@ Get the PLC time
 
 returns datetime.datetime type
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'

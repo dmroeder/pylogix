@@ -18,7 +18,7 @@
 '''
 
 from datetime import datetime, timedelta
-from lgxDevice import *
+from .lgxDevice import *
 import math
 from random import randrange
 import socket
@@ -53,7 +53,7 @@ class PLC:
         self.KnownTags = {}
         self.TagList = []
         self.StructIdentifier = 0x0fCE
-        self.Version = '0.2.1'
+        self.Version = '0.3.0'
         self.CIPTypes = {160:(88 ,"STRUCT", 'B'),
                          193:(1, "BOOL", '?'),
                          194:(1, "SINT", 'b'),

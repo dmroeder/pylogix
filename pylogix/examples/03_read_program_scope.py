@@ -17,7 +17,7 @@ example will look like this:
 
 Program:MiscHMI.TimeArray[0]
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm = PLC()

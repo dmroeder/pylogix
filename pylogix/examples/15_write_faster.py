@@ -21,7 +21,7 @@ then write the value, which is extra overhead.
 If you pass the data type up front, it will skip that
 initial read...
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm = PLC()

@@ -23,7 +23,7 @@ will keep reading until the value goes False.
 This will make sure that we only call the function
 once per True result.
 '''
-from eip import PLC
+from pylogix import PLC
 import time
 
 def FaultHappend():

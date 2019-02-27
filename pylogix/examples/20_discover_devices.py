@@ -25,7 +25,7 @@ ProductNameLength
 ProductName
 State
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     devices = comm.Discover()

@@ -12,7 +12,7 @@ One advantage of using a with statement is that
 you don't have to call .Close() when you are done,
 this is handled automatically.
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm = PLC()

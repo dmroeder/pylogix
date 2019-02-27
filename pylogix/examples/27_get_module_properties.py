@@ -10,7 +10,7 @@ Get the properties of a module in the specified slot
 In this example, we're getting the slot 0 module
 properties
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'

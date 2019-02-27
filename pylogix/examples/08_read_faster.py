@@ -22,7 +22,7 @@ then the value, which is quite a bit of overhead.
 If you pass the data type up front, it will skip that
 initial read...
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm = PLC()

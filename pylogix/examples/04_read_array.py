@@ -16,7 +16,7 @@ Read will handle multi-packet replies.
 We're going to pass Read() the tag and the number
 to read.
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm = PLC()

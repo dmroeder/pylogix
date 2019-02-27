@@ -14,7 +14,7 @@ catch the KeyboardInterrupt, which will stop the
 loop. The time sleep interval is 1 second,
 so we'll be reading every 1 second.
 '''
-from eip import PLC
+from pylogix import PLC
 import time
 
 with PLC() as comm:

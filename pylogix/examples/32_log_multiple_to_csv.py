@@ -12,7 +12,7 @@ For the first row, we'll write tag names,
 then log each set of values with each read
 '''
 import csv
-from eip import PLC
+from pylogix import PLC
 import time
 
 with PLC() as comm:

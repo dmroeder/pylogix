@@ -16,7 +16,7 @@ In this case, we're going to write some text to the tag
 String20, which is a custom string STRING20.  We not only
 have to write the data, we have to also write the length.
 '''
-from eip import PLC
+from pylogix import PLC
 
 with PLC() as comm:
     comm = PLC()
