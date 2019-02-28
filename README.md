@@ -64,7 +64,7 @@ Pylogix has features other than simply reading/writing.  You can see all of them
 * **Burt Peterson** - *Initial work*
 * **Dustin Roeder** - *Maintainer* - [dmroeder](https://github.com/dmroeder)
 * **Fernando B.** - *Contributor* - [kodaman2](https://github.com/kodaman2)
-* **Ottowayi** - *Contributor* - [kodaman2](https://github.com/ottowayi)
+* **Ottowayi** - *Contributor* - [ottowayi](https://github.com/ottowayi)
 
 ## License
 
