@@ -64,12 +64,14 @@ Pylogix has features other than simply reading/writing.  You can see all of them
 * **Burt Peterson** - *Initial work*
 * **Dustin Roeder** - *Maintainer* - [dmroeder](https://github.com/dmroeder)
 * **Fernando B.** - *Contributor* - [kodaman2](https://github.com/kodaman2)
+* **Ottowayi** - *Contributor* - [kodaman2](https://github.com/ottowayi)
 
 ## License
 
-This project is licensed under Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under Apache 2.0 License - see the [LICENSE](LICENSE.txt) file for details.
 
 ## Acknowledgements
 
 * Archie of AdvancedHMI for all kinds pointers and suggestions.
+* Thanks to ottowayi for general python and good practice advice
 * Thanks to all of the users that have tested and provided feedback.
