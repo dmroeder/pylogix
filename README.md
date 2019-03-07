@@ -22,8 +22,8 @@ To verify the installation on Linux, open the terminal and use the following com
 
 ```
 python
-from pylogix import PLC
-print(PLC().Version)
+import pylogix
+pylogix.__version__
 ```
 
 ### Your First Script:
