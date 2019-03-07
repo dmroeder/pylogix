@@ -1,2 +1,2 @@
 from .lgxDevice import LGXDevice
-from .pylogix import PLC
+from .eip import PLC
