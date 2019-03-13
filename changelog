@@ -1,3 +1,9 @@
+03/13/19
+  -Update for more consistant catching of errors, formatting
+
+03/07/19
+  -Restructured project, added setup.py for install
+
 02/10/19
   -Check status before parsing tag list packets
 

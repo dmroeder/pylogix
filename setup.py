@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
     
 setuptools.setup(
     name="pylogix",
-    version="0.3.0",
+    version="0.3.1",
     author="Dustin Roeder",
     author_email="dmroeder@gmail.com",
     description="Read/Write Rockwell Automation Logix based PLC's",

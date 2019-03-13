@@ -84,7 +84,7 @@ class PLC:
         '''
         if isinstance(tag, list):
             if datatype:
-                raise Exception('Datatype should be set to None when reading lists')
+                raise TypeError('Datatype should be set to None when reading lists')
             return _multiRead(self, tag)
         else:
             return _readTag(self, tag, count, datatype)
@@ -234,8 +234,8 @@ def _readTag(self, tag, elements, dt):
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
-            err = 'Unknown error'
-        raise Exception('Read failed, ' + err)       
+            err = 'Unknown error {}'.format(status)
+        raise ValueError('Read failed: {}'.format(err))       
 
 def _writeTag(self, tag, value, dt):
     '''
@@ -286,8 +286,8 @@ def _writeTag(self, tag, value, dt):
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
-            err = 'Unknown error'
-        raise Exception('Write failed, ' + err)
+            err = 'Unknown error {}'.format(status)
+        raise ValueError('Write Failed: {}'.format(err))
     
 def _multiRead(self, args):
     '''
@@ -338,8 +338,8 @@ def _multiRead(self, args):
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
-            err = 'Unknown error'
-        raise Exception('Multi-read failed, ' + err)
+            err = 'Unknown error {}'.format(status)
+        raise ValueError('Multi-read failed: {}'.format(err))
 
 def _getPLCTime(self):
     '''
@@ -378,8 +378,8 @@ def _getPLCTime(self):
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
-            err = 'Unknown error'
-        raise Exception('Failed to get PLC time, ' + err)
+            err = 'Unknown error {}'.format(status)
+        raise ValueError('Failed to get PLC time: {}'.format(err))
 
 def _setPLCTime(self):
     '''
@@ -416,8 +416,8 @@ def _setPLCTime(self):
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
-            err = 'Unknown error'
-        raise Exception('Failed to set PLC time, ' + err)
+            err = 'Unknown error {}'.format(status)
+        raise ValueError('Failed to set PLC time: {}'.format(err))
 
 def _getTagList(self):
     '''
@@ -438,8 +438,8 @@ def _getTagList(self):
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
-            err = 'Unknown error'
-        raise Exception('Failed to get tag list, ' + err)
+            err = 'Unknown error {}'.format(status)
+        raise ValueError('Failed to get tag list {}'.format(err))
 
     while status == 6:
         self.Offset += 1
@@ -452,8 +452,8 @@ def _getTagList(self):
             if status in cipErrorCodes.keys():
                 err = cipErrorCodes[status]
             else:
-                err = 'Unknown error'
-            raise Exception('Failed to get tag list, ' + err)
+                err = 'Unknown error {}'.format(status)
+            raise ValueError('Failed to get tag list: {}'.format(err))
 
     return
 
@@ -478,8 +478,8 @@ def _getAllProgramsTags(self):
             if status in cipErrorCodes.keys():
                 err = cipErrorCodes[status]
             else:
-                err = 'Unknown error'
-            raise Exception('Failed to get program tag list, ' + err)
+                err = 'Unknown error {}'.format(status)
+            raise ValueError('Failed to get program tag list: {}'.format(err))
 
         while status == 6:
             self.Offset += 1
@@ -492,8 +492,8 @@ def _getAllProgramsTags(self):
                 if status in cipErrorCodes.keys():
                     err = cipErrorCodes[status]
                 else:
-                    err = 'Unknown error'
-                raise Exception('Failed to get program tag list, ' + err)
+                    err = 'Unknown error {}'.format(status)
+                raise ValueError('Failed to get program tag list: {}'.format(err))
 
     return
 
@@ -515,8 +515,8 @@ def _getProgramTagList(self, programName):
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
-            err = 'Unknown error'
-        raise Exception('Failed to get program tag list, ' + err)
+            err = 'Unknown error {}'.format(status)
+        raise ValueError('Failed to get program tag list: {}'.format(err))
 
     while status == 6:
         self.Offset += 1
@@ -529,8 +529,8 @@ def _getProgramTagList(self, programName):
             if status in cipErrorCodes.keys():
                 err = cipErrorCodes[status]
             else:
-                err = 'Unknown error'
-            raise Exception('Failed to get program tag list, ' + err)
+                err = 'Unknown error {}'.format(status)
+            raise ValueError('Failed to get program tag list: {}'.format(err))
 
     return
 
@@ -1404,7 +1404,7 @@ def _getReplyValues(self, tag, elements, data):
             err = cipErrorCodes[status]
         else:
             err = 'Unknown error'
-        return "Failed to read tag: " + tag + ' - ' + err  
+        return 'Failed to read tag: {} - {}'.format(tag, err)  
 
 def _getBitOfWord(tag, value):
     '''
@@ -1491,9 +1491,10 @@ def InitialRead(self, tag, baseTag, dt):
         return True
     else:
         if status in cipErrorCodes.keys():
-            raise ValueError(cipErrorCodes[status])
+            err = cipErrorCodes[status]
         else:
-            raise ValueError("Failed to read tag: " + tag + ' - unknown error ' + str(status))
+            err = 'Unknown error {}'.format(status)
+        raise ValueError('Failed to read tag: {}'.format(err))
 
 def TagNameParser(tag, offset):
     '''
