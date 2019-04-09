@@ -1,3 +1,6 @@
+04/08/19
+  -Return the raw bytes when a UDT is read, added example
+
 03/13/19
   -Update for more consistant catching of errors, formatting
 

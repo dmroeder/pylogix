@@ -1366,11 +1366,16 @@ def _getReplyValues(self, tag, elements, data):
         for i in range(elements):
             index = 52+(counter*dataSize)
             if datatype == 160:
-                # gotta handle strings a little different
-                index = 54+(counter*dataSize)
-                NameLength = unpack_from('<L', data, index)[0]
-                s = data[index+4:index+4+NameLength]
-                vals.append(str(s.decode('utf-8')))
+                tmp = unpack_from('<h', data, 52)[0]
+                if tmp == self.StructIdentifier:
+                    # gotta handle strings a little different
+                    index = 54+(counter*dataSize)
+                    NameLength = unpack_from('<L', data, index)[0]
+                    s = data[index+4:index+4+NameLength]
+                    vals.append(str(s.decode('utf-8')))
+                else:
+                    d = data[index:index+len(data)]
+                    vals.append(d)
             elif datatype == 218:
                 index = 52+(counter*dataSize)
                 NameLength = unpack_from('<B', data, index)[0]
