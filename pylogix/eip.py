@@ -96,11 +96,11 @@ class PLC:
         '''
         return _writeTag(self, tag, value, datatype)
 
-    def MultiRead(self, *args):
+    def MultiRead(self, tags):
         '''
         Read multiple tags in one request
         '''
-        return _multiRead(self, args)
+        return _multiRead(self, tags)
 
     def GetPLCTime(self):
         '''
@@ -289,26 +289,30 @@ def _writeTag(self, tag, value, dt):
             err = 'Unknown error {}'.format(status)
         raise ValueError('Write Failed: {}'.format(err))
     
-def _multiRead(self, args):
+def _multiRead(self, tags):
     '''
     Processes the multiple read request
     '''
     serviceSegments = []
     segments = b""
-    tagCount = len(args)
+    tagCount = len(tags)
     self.Offset = 0
 
     if not _connect(self): return None
 
-    for i in range(tagCount):
-        tag,base,ind = TagNameParser(args[i], 0)
-        InitialRead(self, tag, base, None)
+    for tag in tags:
+        if isinstance(tag, (list, tuple)):
+            tag_name, base, ind = TagNameParser(tag[0], 0)
+            InitialRead(self, tag_name, base, tag[1])
+        else:
+            tag_name, base, ind = TagNameParser(tag, 0)
+            InitialRead(self, tag_name, base, None)
     
         dataType = self.KnownTags[base][0]
         if dataType == 211:
-            tagIOI = _buildTagIOI(self, tag, isBoolArray=True)
+            tagIOI = _buildTagIOI(self, tag_name, isBoolArray=True)
         else:
-            tagIOI = _buildTagIOI(self, tag, isBoolArray=False)
+            tagIOI = _buildTagIOI(self, tag_name, isBoolArray=False)
         readIOI = _addReadIOI(self, tagIOI, 1)
         serviceSegments.append(readIOI)
 
@@ -333,7 +337,7 @@ def _multiRead(self, args):
     status, retData = _getBytes(self, eipHeader)
 
     if status == 0:
-        return MultiParser(self, args, retData)
+        return MultiParser(self, tags, retData)
     else:
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
@@ -1540,7 +1544,9 @@ def MultiParser(self, tags, data):
     
     # get the offset values for each of the tags in the packet
     reply = []
-    for i in range(tagCount):
+    for i, tag in enumerate(tags):
+        if isinstance(tag, (list, tuple)):
+            tag = tag[0]
         loc = 2+(i*2)
         offset = unpack_from('<H', stripped, loc)[0]
         replyStatus = unpack_from('<b', stripped, offset+2)[0]
@@ -1550,15 +1556,15 @@ def MultiParser(self, tags, data):
         if replyStatus == 0 and replyExtended == 0:
             dataTypeValue = unpack_from('<B', stripped, offset+4)[0]
             # if bit of word was requested
-            if BitofWord(tags[i]):
+            if BitofWord(tag):
                 dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                 val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
-                bitState = _getBitOfWord(tags[i], val)
+                bitState = _getBitOfWord(tag, val)
                 reply.append(bitState)
             elif dataTypeValue == 211:
                 dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                 val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
-                bitState = _getBitOfWord(tags[i], val)
+                bitState = _getBitOfWord(tag, val)
                 reply.append(bitState)
             elif dataTypeValue == 160:
                 strlen = unpack_from('<B', stripped, offset+8)[0]
