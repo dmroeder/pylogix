@@ -26,6 +26,7 @@ from struct import *
 import sys
 import time
 
+MAX_SOCKET_SIZE = 8192
 programNames = []
 
 class PLC:
@@ -49,6 +50,7 @@ class PLC:
         self.SerialNumber = 0
         self.OriginatorSerialNumber = 42
         self.SequenceCounter = 1
+        self.ConnectionSize = 500
         self.Offset = 0
         self.KnownTags = {}
         self.TagList = []
@@ -182,14 +184,14 @@ class PLC:
 class LgxTag:
     
     def __init__(self):
-        self.TagName = ''
-        self.InstanceID = 0x00
-        self.SymbolType = 0x00
-        self.DataTypeValue = 0x00
-        self.DataType = ''
-        self.Array = 0x00
-        self.Struct = 0x00
-        self.Size = 0x00
+        self.TagName 		= ''
+        self.InstanceID 	= 0x00
+        self.SymbolType 	= 0x00
+        self.DataTypeValue 	= 0x00
+        self.DataType 		= ''
+        self.Array 			= 0x00
+        self.Struct 		= 0x00
+        self.Size 			= 0x00
 
 def _readTag(self, tag, elements, dt):
     '''
@@ -687,7 +689,7 @@ def _discover():
             s.sendto(request, ('255.255.255.255', 44818))
             try:
                 while(1):
-                    ret = s.recv(1024)
+                    ret = s.recv(MAX_SOCKET_SIZE)
                     context = unpack_from('<Q', ret, 14)[0]
                     if context == 0x006d6f4d6948:
                         device = _parseIdentityResponse(ret)
@@ -706,7 +708,7 @@ def _discover():
           s.sendto(request, ('255.255.255.255', 44818))
           try:
               while(1):
-                ret = s.recv(1024)
+                ret = s.recv(MAX_SOCKET_SIZE)
                 context = unpack_from('<Q', ret, 14)[0]
                 if context == 0x006d6f4d6948:
                     device = _parseIdentityResponse(ret)
@@ -751,7 +753,7 @@ def _getModuleProperties(self, slot):
     eipHeader = _buildEIPSendRRDataHeader(self, len(frame)) + frame
     pad = pack('<I', 0x00)
     self.Socket.send(eipHeader)
-    retData = pad + self.Socket.recv(1024)
+    retData = pad + self.Socket.recv(MAX_SOCKET_SIZE)
     status = unpack_from('<B', retData, 46)[0]
     
     if status == 0:
@@ -778,7 +780,7 @@ def _connect(self):
         raise
 
     self.Socket.send(_buildRegisterSession(self))
-    retData = self.Socket.recv(1024)
+    retData = self.Socket.recv(MAX_SOCKET_SIZE)
     if retData:
         self.SessionHandle = unpack_from('<I', retData, 4)[0]
     else:
@@ -786,7 +788,7 @@ def _connect(self):
         raise Exception("Failed to register session")
 
     self.Socket.send(_buildForwardOpenPacket(self))
-    retData = self.Socket.recv(1024)
+    retData = self.Socket.recv(MAX_SOCKET_SIZE)
     sts = unpack_from('<b', retData, 42)[0]
     if not sts:
         self.OTNetworkConnectionID = unpack_from('<I', retData, 44)[0]
@@ -806,9 +808,9 @@ def _closeConnection(self):
     unregPacket = _buildUnregisterSession(self)
     try:
         self.Socket.send(closePacket)
-        retData = self.Socket.recv(1024)
+        retData = self.Socket.recv(MAX_SOCKET_SIZE)
         self.Socket.send(unregPacket)
-        retData = self.Socket.recv(1024)
+        retData = self.Socket.recv(MAX_SOCKET_SIZE)
         self.Socket.close()
     except:
         pass
@@ -820,7 +822,7 @@ def _getBytes(self, data):
     '''
     try:
         self.Socket.send(data)
-        retData = self.Socket.recv(1024)
+        retData = self.Socket.recv(MAX_SOCKET_SIZE)
         if retData:
             status = unpack_from('<B', retData, 48)[0]
             return status, retData
@@ -892,34 +894,64 @@ def _buildForwardClosePacket(self):
 def _buildCIPForwardOpen(self):
     '''
     Forward Open happens after a connection is made,
-    this will sequp the CIP connection parameters
+    this will setup the CIP connection parameters
     '''
-    CIPService = 0x54
-    CIPPathSize = 0x02
-    CIPClassType = 0x20
+    #might as well use 500 bytes if using standard forward open
+    if self.ConnectionSize < 500: 
+		self.ConnectionSize = 500
+    elif self.ConnectionSize > 4002:
+		self.ConnectionSize = 4002
+    #per standard over 504 bytes is an extended (large) forward open
+    exForwardOpen = (self.ConnectionSize > 504)
+    CIPService 					= 0x54 if not exForwardOpen else 0x5B #forward open
+    CIPPathSize 				= 0x02
+    CIPClassType 				= 0x20
+			
+    CIPClass 					= 0x06
+    CIPInstanceType 			= 0x24
+		
+    CIPInstance 				= 0x01
+    CIPPriority 				= 0x0A
+    CIPTimeoutTicks 			= 0x0E
+    CIPOTConnectionID 			= 0x20000002
+    CIPTOConnectionID 			= 0x20000001
+    self.SerialNumber 			= randrange(65000)
+    CIPConnectionSerialNumber 	= self.SerialNumber
+    CIPVendorID 				= self.VendorID
+    CIPOriginatorSerialNumber 	= self.OriginatorSerialNumber
+    CIPMultiplier 				= 0x03
+    CIPOTRPI 					= 0x00201234
+    #3-5.5.1.1 Network Connection Parameters
+    #default to 500,True,0,2,True 0x43f4 0b0100001111110100
+    self.VariableConnectionSize = True 	#allow for variable connection size
+    self.Priority 				= 0 	#low priority by default. 00 = Low Priority, 01 = High Priority, 10 = Scheduled, 11 = Urgent
+    self.ConnectionType 		= 2 	#point to point by default 00 = Null (may be used to reconfigure a connection), 01 = Multicast, 10 = Point to Point, 11 = Reserved
+    self.RedundantOwner			= False #multiple connections allowed
 
-    CIPClass = 0x06
-    CIPInstanceType = 0x24
-
-    CIPInstance = 0x01
-    CIPPriority = 0x0A
-    CIPTimeoutTicks = 0x0e
-    CIPOTConnectionID = 0x20000002
-    CIPTOConnectionID = 0x20000001
-    self.SerialNumber = randrange(65000)
-    CIPConnectionSerialNumber = self.SerialNumber
-    CIPVendorID = self.VendorID
-    CIPOriginatorSerialNumber = self.OriginatorSerialNumber
-    CIPMultiplier = 0x03
-    CIPOTRPI = 0x00201234
-    CIPOTNetworkConnectionParameters = 0x43f4
-
+    netParams = ((self.VariableConnectionSize << 9) | 
+				(self.Priority << 10) |
+				(self.ConnectionType << 13) |
+				(self.RedundantOwner << 15))
+				
+    #if using the extended forward open we need more bits for the connection size 
+    #so add another word	
+    if exForwardOpen: 
+        netParams = ((self.ConnectionSize & 0xFFFF) | netParams << 16)
+        print 'Using extended forward open of size %d bytes' %	self.ConnectionSize	
+    else:
+        netParams = ((self.ConnectionSize & 0x01FF) | netParams)
+    self.NetworkConnectionParameters = netParams
+	#self.NetworkConnectionParameters = 0x43f4
+    #print hex(self.NetworkConnectionParameters)
+    CIPOTNetworkConnectionParameters = self.NetworkConnectionParameters
+	
     CIPTORPI = 0x00204001
-    CIPTONetworkConnectionParameters = 0x43f4
+    CIPTONetworkConnectionParameters = self.NetworkConnectionParameters
 
     CIPTransportTrigger = 0xA3
-
-    ForwardOpen = pack('<BBBBBBBBIIHHIIIhIhB',
+	
+    pack_format = '<BBBBBBBBIIHHIIIIIIB' if exForwardOpen else '<BBBBBBBBIIHHIIIHIHB'
+    ForwardOpen = pack(pack_format,
                        CIPService,
                        CIPPathSize,
                        CIPClassType,
@@ -946,7 +978,7 @@ def _buildCIPForwardOpen(self):
     else:
         ConnectionPath = [0x01, self.ProcessorSlot, 0x20, 0x02, 0x24, 0x01]
     
-    ConnectionPathSize = int(len(ConnectionPath)/2)
+    ConnectionPathSize = int(len(ConnectionPath)/2) #add number of 16-bit words
     pack_format = '<B' + str(len(ConnectionPath)) + 'B'
     CIPConnectionPath = pack(pack_format, ConnectionPathSize, *ConnectionPath)
     
@@ -1402,7 +1434,7 @@ def _getReplyValues(self, tag, elements, data):
                 eipHeader = _buildEIPHeader(self, readIOI)
 
                 self.Socket.send(eipHeader)
-                data = self.Socket.recv(1024)
+                data = self.Socket.recv(MAX_SOCKET_SIZE)
                 status = unpack_from('<B', data, 48)[0]
                 numbytes = len(data)-dataSize
 
