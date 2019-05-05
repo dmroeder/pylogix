@@ -1156,8 +1156,7 @@ def _addPartialReadIOI(self, tagIOI, elements):
     readIOI = pack('<BB', RequestService, RequestPathSize)
     readIOI += tagIOI
     readIOI += pack('<H', int(elements))
-    readIOI += pack('<H', self.Offset)
-    readIOI += pack('<H', 0x0000)
+    readIOI += pack('<I', self.Offset)
     return readIOI
 
 def _addWriteIOI(self, tagIOI, writeData, dataType):
