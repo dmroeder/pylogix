@@ -768,6 +768,10 @@ def _connect(self):
     if self.SocketConnected:
         return True
     
+    # Make sure the connection size is correct
+    if not 500 <= self.ConnectionSize <= 4000:
+        raise ValueError("ConnectionSize must be an integer between 500 and 4000")
+
     try:
         self.Socket = socket.socket()
         self.Socket.settimeout(5.0)

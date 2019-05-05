@@ -2,6 +2,7 @@
   -Pulled extneded forward open support from aansel-plenty
   -Did a little code cleaup
   -Fixed crash reading large chunks of data
+  -Make sure connection size is correct
 
 04/08/19
   -Return the raw bytes when a UDT is read, added example
