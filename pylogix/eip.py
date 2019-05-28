@@ -807,17 +807,16 @@ def _closeConnection(self):
     Close the connection to the PLC (forward close, unregister session)
     '''
     self.SocketConnected = False
-    closePacket = _buildForwardClosePacket(self)
-    unregPacket = _buildUnregisterSession(self)
+    close_packet = _buildForwardClosePacket(self)
+    unreg_packet = _buildUnregisterSession(self)
     try:
-        self.Socket.send(closePacket)
-        retData = recv_data(self)
-        self.Socket.send(unregPacket)
-        retData = recv_data(self)
+        self.Socket.send(close_packet)
+        self.Socket.send(unreg_packet)
         self.Socket.close()
     except:
+        self.Socket.close()
+    finally:
         pass
-
 
 def _getBytes(self, data):
     '''

@@ -1,3 +1,6 @@
+05/28/19
+  -Fixed closing socket, suggested by Derriick
+
 05/05/19
   -Pulled extneded forward open support from aansel-plenty
   -Did a little code cleaup
