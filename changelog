@@ -1,3 +1,6 @@
+05/31/19
+  -Fixed connection parameters that cause Micro8xx to fail forwrad open
+
 05/28/19
   -Fixed closing socket, suggested by Derriick
 

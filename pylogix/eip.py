@@ -915,7 +915,7 @@ def _buildCIPForwardOpen(self):
     CIPOriginatorSerialNumber = self.OriginatorSerialNumber
     CIPMultiplier = 0x03
     CIPOTRPI = 0x00201234
-    CIPConnectionParameters = 0xC200
+    CIPConnectionParameters = 0x4200
     CIPTORPI = 0x00204001
     CIPTransportTrigger = 0xA3
 
