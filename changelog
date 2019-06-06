@@ -1,3 +1,7 @@
+13/06/19
+  -Fixed reading a list of a single item
+  -Do not fail when reading one or more tags that do not exist in the PLC
+
 05/31/19
   -Fixed connection parameters that cause Micro8xx to fail forwrad open
 

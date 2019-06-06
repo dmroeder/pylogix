@@ -84,6 +84,8 @@ class PLC:
         the arguments, read a single tag, or read an array
         '''
         if isinstance(tag, list):
+            if len(tag) == 1:
+                return [ _readTag(self, tag[0], count, datatype) ]
             if datatype:
                 raise TypeError('Datatype should be set to None when reading lists')
             return _multiRead(self, tag)
@@ -201,7 +203,10 @@ def _readTag(self, tag, elements, dt):
     if not _connect(self): return None
 
     t,b,i = TagNameParser(tag, 0)
-    InitialRead(self, t, b, dt)
+    try:
+        InitialRead(self, t, b, dt)
+    except:
+        return None
 
     datatype = self.KnownTags[b][0]
     bitCount = self.CIPTypes[datatype][0] * 8
@@ -294,21 +299,26 @@ def _multiRead(self, tags):
     '''
     Processes the multiple read request
     '''
+    tags_to_read = []
     serviceSegments = []
     segments = b""
-    tagCount = len(tags)
     self.Offset = 0
 
     if not _connect(self): return None
 
     for tag in tags:
-        if isinstance(tag, (list, tuple)):
-            tag_name, base, ind = TagNameParser(tag[0], 0)
-            InitialRead(self, tag_name, base, tag[1])
-        else:
-            tag_name, base, ind = TagNameParser(tag, 0)
-            InitialRead(self, tag_name, base, None)
-    
+        try:
+            if isinstance(tag, (list, tuple)):
+                tag_name, base, ind = TagNameParser(tag[0], 0)
+                InitialRead(self, tag_name, base, tag[1])
+            else:
+                tag_name, base, ind = TagNameParser(tag, 0)
+                InitialRead(self, tag_name, base, None)
+
+            tags_to_read.append(tag)
+        except:
+            continue
+
         dataType = self.KnownTags[base][0]
         if dataType == 211:
             tagIOI = _buildTagIOI(self, tag_name, isBoolArray=True)
@@ -317,34 +327,54 @@ def _multiRead(self, tags):
         readIOI = _addReadIOI(self, tagIOI, 1)
         serviceSegments.append(readIOI)
 
-    header = _buildMultiServiceHeader()
-    segmentCount = pack('<H', tagCount)
-        
-    temp = len(header)
-    if tagCount > 2:
-        temp += (tagCount-2)*2
-    offsets = pack('<H', temp)
+    tagCount = len(tags_to_read)
 
-    # assemble all the segments
-    for i in range(tagCount):
-        segments += serviceSegments[i]
+    if tagCount == 0:
+        return [ None ] * len(tags)
+    elif tagCount == 1:
+        tag_to_read = tags_to_read[0]
 
-    for i in range(tagCount-1):	
-        temp += len(serviceSegments[i])
-        offsets += pack('<H', temp)
+        try:
+            value = _readTag(self, tag_to_read, 1, None)
+        except Exception as exc:
+            print(exc)
+            value = None
 
-    readRequest = header+segmentCount+offsets+segments
-    eipHeader = _buildEIPHeader(self, readRequest)
-    status, retData = _getBytes(self, eipHeader)
-
-    if status == 0:
-        return MultiParser(self, tags, retData)
+        return [ value if tag == tag_to_read else None for tag in tags ]
     else:
-        if status in cipErrorCodes.keys():
-            err = cipErrorCodes[status]
-        else:
-            err = 'Unknown error {}'.format(status)
-        raise ValueError('Multi-read failed: {}'.format(err))
+        header = _buildMultiServiceHeader()
+        segmentCount = pack('<H', tagCount)
+
+        temp = len(header)
+        if tagCount > 2:
+            temp += (tagCount-2)*2
+        offsets = pack('<H', temp)
+
+        # assemble all the segments
+        for i in range(tagCount):
+            segments += serviceSegments[i]
+
+        for i in range(tagCount-1):
+            temp += len(serviceSegments[i])
+            offsets += pack('<H', temp)
+
+        readRequest = header+segmentCount+offsets+segments
+        eipHeader = _buildEIPHeader(self, readRequest)
+        status, retData = _getBytes(self, eipHeader)
+
+        if status != 0:
+            if status in cipErrorCodes.keys():
+                err = cipErrorCodes[status]
+            else:
+                err = 'Unknown error {}'.format(status)
+            print('Multi-read failed: %s' % (err))
+
+        try:
+            results = MultiParser(self, tags_to_read, retData)
+            results.reverse()
+            return [ results.pop() if tag in tags_to_read else None for tag in tags ]
+        except:
+            return [ None ] * len(tags)
 
 def _getPLCTime(self):
     '''
@@ -372,7 +402,7 @@ def _getPLCTime(self):
                            TimeAttribute)
     
     eipHeader = _buildEIPHeader(self, AttributePacket)
-    status, retData = _getBytes(self, eipHeader)
+    status, retData = __to_readgetBytes(self, eipHeader)
 
     if status == 0:
         # get the time from the packet
@@ -1608,7 +1638,7 @@ def MultiParser(self, tags, data):
                 dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                 reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
         else:
-            reply.append("Error")
+            reply.append(None)
 
     return reply
 
