@@ -84,6 +84,8 @@ class PLC:
         the arguments, read a single tag, or read an array
         '''
         if isinstance(tag, list):
+            if len(tag) == 1:
+                return [ _readTag(self, tag[0], count, datatype) ]
             if datatype:
                 raise TypeError('Datatype should be set to None when reading lists')
             return _multiRead(self, tag)
