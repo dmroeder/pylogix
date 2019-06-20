@@ -84,8 +84,6 @@ class PLC:
         the arguments, read a single tag, or read an array
         '''
         if isinstance(tag, list):
-            if len(tag) == 1:
-                return [ _readTag(self, tag[0], count, datatype) ]
             if datatype:
                 raise TypeError('Datatype should be set to None when reading lists')
             return _multiRead(self, tag)
@@ -104,6 +102,12 @@ class PLC:
         Read multiple tags in one request
         '''
         return _multiRead(self, tags)
+
+    def GetRawPLCTime(self):
+        '''
+        Get the PLC's clock time
+        '''
+        return _getRawPLCTime(self)
 
     def GetPLCTime(self):
         '''
@@ -348,10 +352,11 @@ def _multiRead(self, tags):
             err = 'Unknown error {}'.format(status)
         raise ValueError('Multi-read failed: {}'.format(err))
 
-def _getPLCTime(self):
+def _getRawPLCTime(self):
     '''
-    Requests the PLC clock time
-    ''' 
+    Requests the PLC clock time in raw format
+    '''
+
     if not _connect(self): return None
 
     AttributeService = 0x03
@@ -379,14 +384,23 @@ def _getPLCTime(self):
     if status == 0:
         # get the time from the packet
         plcTime = unpack_from('<Q', retData, 56)[0]
-        humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
-        return humanTime
+        return plcTime
     else:
         if status in cipErrorCodes.keys():
             err = cipErrorCodes[status]
         else:
             err = 'Unknown error {}'.format(status)
         raise ValueError('Failed to get PLC time: {}'.format(err))
+
+def _getPLCTime(self):
+    '''
+    Requests the PLC clock time in human-readable format
+    '''
+
+    plcTime = _getRawPLCTime()
+    humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
+    return humanTime
+
 
 def _setPLCTime(self):
     '''
