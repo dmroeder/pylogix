@@ -397,7 +397,7 @@ def _getPLCTime(self):
     Requests the PLC clock time in human-readable format
     '''
 
-    plcTime = _getRawPLCTime()
+    plcTime = _getRawPLCTime(self)
     humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
     return humanTime
 
