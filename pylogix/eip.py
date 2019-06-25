@@ -105,11 +105,11 @@ class PLC:
         '''
         return _multiRead(self, tags)
 
-    def GetPLCTime(self):
+    def GetPLCTime(self, raw=False):
         '''
-        Get the PLC's clock time
+        Get the PLC's clock time, return as human readable (default) or raw if raw=True
         '''
-        return _getPLCTime(self)
+        return _getPLCTime(self, raw)
 
     def SetPLCTime(self):
         '''
@@ -348,7 +348,7 @@ def _multiRead(self, tags):
             err = 'Unknown error {}'.format(status)
         raise ValueError('Multi-read failed: {}'.format(err))
 
-def _getPLCTime(self):
+def _getPLCTime(self, raw=False):
     '''
     Requests the PLC clock time
     ''' 
@@ -379,6 +379,8 @@ def _getPLCTime(self):
     if status == 0:
         # get the time from the packet
         plcTime = unpack_from('<Q', retData, 56)[0]
+        if raw:
+            return plcTime
         humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
         return humanTime
     else:
