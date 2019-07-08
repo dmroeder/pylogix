@@ -553,22 +553,21 @@ def _getUDT(self):
 
     template = {}
     for u in unique:
-        y = _getTemplateAttribute(self, u.DataTypeValue)
+        temp = _getTemplateAttribute(self, u.DataTypeValue)
         
-        val = unpack_from('<I', y[46:], 10)[0]
-        x = (val * 4) - 23
-        size = int(math.ceil(x / 4.0)) * 4
-        member_count = int(unpack_from('<H', y[46:], 24)[0])
+        val = unpack_from('<I', temp[46:], 10)[0]
+        words = (val * 4) - 23
+        member_count = int(unpack_from('<H', temp[46:], 24)[0])
         
-        template[u.DataTypeValue] = [size, '', member_count]
+        template[u.DataTypeValue] = [words, '', member_count]
 
     for key,value in template.items():
         t = _getTemplate(self, key, value[0])
         size = value[2] * 8
         p = t[50:]
-        memberBytes = p[size:]
+        member_bytes = p[size:]
         split_char = pack('<b', 0x00)
-        members =  memberBytes.split(split_char)
+        members =  member_bytes.split(split_char)
         split_char = pack('<b', 0x3b)
         name = members[0].split(split_char)[0]
         template[key][1] = str(name.decode('utf-8'))
@@ -630,27 +629,6 @@ def _buildTemplateAttributes(instance):
                 Attrib3,
                 Attrib2,
                 Attrib1)
-
-def _buildTemplateService(instance, dataLen):
-
-    TemplateService = 0x4c
-    TemplateLength = 0x03
-    TemplateClassType = 0x20
-    TemplateClass = 0x6c
-    TemplateInstanceType = 0x25
-    TemplateInstance = instance
-    TemplateOffset = 0x00
-    DataLength = dataLen
-    
-    return pack('<BBBBHHIH',
-                TemplateService,
-                TemplateLength,
-                TemplateClassType,
-                TemplateClass,
-                TemplateInstanceType,
-                TemplateInstance,
-                TemplateOffset,
-                DataLength)
 
 def _readTemplateService(instance, dataLen):
 
