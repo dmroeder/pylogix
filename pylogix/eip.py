@@ -17,13 +17,14 @@
    limitations under the License.
 '''
 
-from datetime import datetime, timedelta
-from .lgxDevice import *
-from random import randrange
 import socket
-from struct import *
 import sys
 import time
+
+from datetime import datetime, timedelta
+from .lgxDevice import LGXDevice
+from random import randrange
+from struct import pack, unpack_from
 
 programNames = []
 
@@ -82,7 +83,7 @@ class PLC:
         We have two options for reading depending on
         the arguments, read a single tag, or read an array
         '''
-        if isinstance(tag, list):
+        if isinstance(tag, (list, tuple)):
             if len(tag) == 1:
                 return [ self._readTag(tag[0], count, datatype) ]
             if datatype:
