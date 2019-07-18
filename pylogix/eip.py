@@ -22,7 +22,7 @@ import sys
 import time
 
 from datetime import datetime, timedelta
-from .lgxDevice import LGXDevice
+from .lgxDevice import LGXDevice, GetDevice, GetVendor
 from random import randrange
 from struct import pack, unpack_from
 
@@ -146,7 +146,7 @@ class PLC:
         
         # Get a single program tags if progragName exists
         if programName in programNames:
-            program_tags = self._getProgramTagList(programName)
+            self._getProgramTagList(programName)
             self._getUDT()
             return self.TagList
         if programName not in programNames:
@@ -507,7 +507,7 @@ class PLC:
         eipHeader = self._buildEIPHeader(request)
         status, retData = self._getBytes(eipHeader)
         if status == 0 or status == 6:
-            self._extractTagPacket(self, retData, programName)
+            self._extractTagPacket(retData, programName)
         else:
             if status in cipErrorCodes.keys():
                 err = cipErrorCodes[status]
@@ -521,7 +521,7 @@ class PLC:
             eipHeader = self._buildEIPHeader(request)
             status, retData = self._getBytes(eipHeader)
             if status == 0 or status == 6:
-                self.extractTagPacket(retData, programName)
+                self._extractTagPacket(retData, programName)
             else:
                 if status in cipErrorCodes.keys():
                     err = cipErrorCodes[status]
