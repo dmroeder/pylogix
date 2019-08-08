@@ -250,7 +250,7 @@ class PLC:
             value = [value]
 
         for v in value:
-            if dataType == 202:
+            if dataType == 202 or dataType == 203:
                 writeData.append(float(v))
             elif dataType == 160 or dataType == 218:
                 writeData.append(self._makeString(v))
