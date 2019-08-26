@@ -105,6 +105,8 @@ venv.bak/
 
 # other
 pylogix/testing/
+.directory
+.vscode/
 
 # PyCharm
 .idea/
