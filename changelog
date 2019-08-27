@@ -1,5 +1,6 @@
 08/26/19
   -Updated gitignore
+  -Lowered default connection size to support older hardware/firmware by default
 
 08/08/19
   -Fixed writing LREAL data types

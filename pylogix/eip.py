@@ -49,7 +49,7 @@ class PLC:
         self.SerialNumber = 0
         self.OriginatorSerialNumber = 42
         self.SequenceCounter = 1
-        self.ConnectionSize = 511
+        self.ConnectionSize = 508
         self.Offset = 0
         self.KnownTags = {}
         self.TagList = []
