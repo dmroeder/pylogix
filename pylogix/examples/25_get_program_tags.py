@@ -21,6 +21,6 @@ with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
     tags = comm.GetProgramTagList('Program:MiscHMI')
     
-    for t in tags.value:
+    for t in tags.Value:
         print(t.TagName, t.DataType)
 

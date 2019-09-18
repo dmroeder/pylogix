@@ -19,5 +19,5 @@ with PLC() as comm:
         csv_file = csv.writer(csv_file, delimiter=',', quotechar='/', quoting=csv.QUOTE_MINIMAL)
         for i in range(10):
             ret = comm.Read('LargeArray[5]')
-            csv_file.writerow([ret.value])
+            csv_file.writerow([ret.Value])
             time.sleep(1)

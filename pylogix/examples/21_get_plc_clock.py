@@ -16,6 +16,6 @@ with PLC() as comm:
     ret = comm.GetPLCTime()
 
     # print the whole value
-    print(ret.value)
+    print(ret.Value)
     # print each pice of time
     print(ret.year, ret.month, ret.day, ret.hour, ret.minute, ret.second, ret.microsecond)

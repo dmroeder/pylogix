@@ -38,9 +38,9 @@ with PLC() as comm:
         try:
             ret = comm.Read('PE040')
             time.sleep(1)
-            if ret.value:
+            if ret.Value:
                 FaultHappend()
-                while ret.value:
+                while ret.Value:
                     ret = comm.Read('PE040')
                     time.sleep(1)
         except KeyboardInterrupt:

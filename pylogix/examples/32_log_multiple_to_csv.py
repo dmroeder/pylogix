@@ -23,6 +23,6 @@ with PLC() as comm:
         csv_file.writerow(tags)
         for i in range(10):
             ret = comm.Read(tags)
-            row = [x.value for x in ret]
+            row = [x.Value for x in ret]
             csv_file.writerow(row)
             time.sleep(1)

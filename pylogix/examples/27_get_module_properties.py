@@ -15,4 +15,4 @@ from pylogix import PLC
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
     prop = comm.GetModuleProperties(0)
-    print(prop.value.ProductName, prop.value.Revision)
+    print(prop.Value.ProductName, prop.Value.Revision)

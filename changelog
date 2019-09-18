@@ -1,3 +1,6 @@
+09/18/19
+  -Changed the case of Response to match the rest of the project, minimizing the impact of the new change
+
 09/17/19
   -Rewrote all methods to return Response class, which includes tag_name, value and status
 

@@ -29,7 +29,7 @@ from pylogix import PLC
 
 with PLC() as comm:
     devices = comm.Discover()
-    for device in devices.value:
+    for device in devices.Value:
         print(device.IPAddress)
         print('  Product Code: ' + device.ProductName + ' ' + str(device.ProductCode))
         print('  Vendor/Device ID:' + device.Vendor + ' ' + str(device.DeviceID))

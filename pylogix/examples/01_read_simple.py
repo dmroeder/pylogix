@@ -17,5 +17,5 @@ from pylogix import PLC
 comm = PLC()
 comm.IPAddress = '192.168.1.9'
 ret = comm.Read('CurrentScreen')
-print(ret.value)
+print(ret.Value)
 comm.Close()

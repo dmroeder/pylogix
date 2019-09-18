@@ -18,7 +18,7 @@ def audit_plcs(devices):
     Parse out any devices that are a PLC, then audit
     the rack for all of the modules
     '''
-    for d in devices.value:
+    for d in devices.Value:
         if d.DeviceID == 14:
             audit_rack(d)
         else:

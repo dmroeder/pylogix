@@ -17,5 +17,5 @@ from pylogix import PLC
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
     comm.ConnectionSize = 4000
-    values = comm.Read('YugeArray[0]', 20000)
+    ret = comm.Read('YugeArray[0]', 20000)
     

@@ -17,5 +17,5 @@ with PLC() as comm:
     with open('30_log.txt', 'w') as txt_file:
         for i in range(10):
             ret = comm.Read('LargeArray[50]')
-            txt_file.write(str(ret.value)+'\n')
+            txt_file.write(str(ret.Value)+'\n')
             time.sleep(1)

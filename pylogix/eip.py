@@ -1690,9 +1690,9 @@ class LgxTag:
 class Response:
 
     def __init__(self, tag_name, value, status):
-        self.tag_name = tag_name
-        self.value = value
-        self.status = get_error_code(status)
+        self.TagName = tag_name
+        self.Value = value
+        self.Status = get_error_code(status)
 
 def get_error_code(status):
     '''

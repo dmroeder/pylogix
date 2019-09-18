@@ -30,4 +30,4 @@ with PLC() as comm:
     tags = ['BaseINT', ['BaseDINT', 196], ('BaseBOOL', 193), ['BaseSTRING', 160]]
     ret = comm.Read(tags)
     for r in ret:
-        print(r.value)
+        print(r.Value)
