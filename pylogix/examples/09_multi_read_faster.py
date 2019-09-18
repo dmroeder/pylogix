@@ -28,5 +28,6 @@ with PLC() as comm:
     comm = PLC()
     comm.IPAddress = '192.168.1.9'
     tags = ['BaseINT', ['BaseDINT', 196], ('BaseBOOL', 193), ['BaseSTRING', 160]]
-    #value = comm.Read(tags)
-    print(value)
+    ret = comm.Read(tags)
+    for r in ret:
+        print(r.value)

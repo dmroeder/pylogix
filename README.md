@@ -34,14 +34,14 @@ pylogix.__version__
 
 ### Your First Script:
 
-The cloned repository will come with many examples, I'll give one here.  We'll read one simple tag and print out the value.
+The cloned repository will come with many examples, I'll give one here.  We'll read one simple tag and print out the value.  All methods will return the Response class, which contains tag_name, value and status.
 
 ```
 from pylogix import PLC
 with comm as PLC()
     comm.IPAddress = '192.168.1.9'
-    value = comm.Read('MyTagName')
-    print(value)
+    ret = comm.Read('MyTagName')
+    print(ret.tag_name, ret.value, ret.status)
 ```
 
 NOTE: If your PLC is in a slot other than zero (like can be done with ControLogix), then you can specify the slot with the following:

@@ -26,8 +26,6 @@ from .lgxDevice import LGXDevice, GetDevice, GetVendor
 from random import randrange
 from struct import pack, unpack_from
 
-programNames = []
-
 class PLC:
 
     def __init__(self):
@@ -53,6 +51,7 @@ class PLC:
         self.Offset = 0
         self.KnownTags = {}
         self.TagList = []
+        self.ProgramNames = []
         self.StructIdentifier = 0x0fCE
         self.CIPTypes = {160:(88 ,"STRUCT", 'B'),
                          193:(1, "BOOL", '?'),
@@ -124,15 +123,10 @@ class PLC:
         If is set to False, it will return only controller
         otherwise controller tags and program tags.
         '''
-        if allTags:
-            self._getTagList()
-            self._getAllProgramsTags()
-        else:
-            self._getTagList()
-            
-        self._getUDT()
+        tag_list = self._getTagList(allTags)
+        updated_list = self._getUDT(tag_list.value)
         
-        return self.TagList
+        return Response(None, updated_list, tag_list.status)
 
     def GetProgramTagList(self, programName):
         '''
@@ -140,19 +134,16 @@ class PLC:
         programName = "Program:ExampleProgram"
         '''
 
-        # Ensure programNames is not empty 
-        if not programNames:
-            self._getTagList()
+        if not self.ProgramNames:
+            tags = self._getTagList(False)
         
         # Get a single program tags if progragName exists
-        if programName in programNames:
-            self._getProgramTagList(programName)
-            self._getUDT()
-            return self.TagList
-        if programName not in programNames:
-            print("Program not found, please check name!")
-            return None
-
+        if programName in self.ProgramNames:
+            program_tags = self._getProgramTagList(programName)
+            program_tags = self._getUDT(program_tags[1])
+            return Response(None, program_tags, tags[2])
+        else:
+            return Response(None, None, 'Program not found, please check name!')
 
     def GetProgramsList(self):
         '''
@@ -160,9 +151,9 @@ class PLC:
         Sanity check: checks if programNames is empty
         and runs _getTagList
         '''
-        if not programNames:
-            self._getTagList()
-        return programNames
+        if not self.ProgramNames:
+            tag_list = self._getTagList(True)
+        return Response(None, self.ProgramNames, tag_list[2])
 
     def Discover(self):
         '''
@@ -191,7 +182,9 @@ class PLC:
         if not self._connect(): return None
 
         t,b,i = _parseTagName(tag, 0)
-        self._initial_read(t, b, dt)
+        resp = self._initial_read(t, b, dt)
+        if resp[2] != 0 and resp[2] != 6:
+            return Response(tag, None, resp[2])
 
         datatype = self.KnownTags[b][0]
         bitCount = self.CIPTypes[datatype][0] * 8
@@ -220,13 +213,10 @@ class PLC:
         status, retData = self._getBytes(eipHeader)
 
         if status == 0 or status == 6:
-            return self._parseReply(tag, elements, retData)
+            return_value = self._parseReply(tag, elements, retData)
+            return Response(tag, return_value, status)
         else:
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
-            else:
-                err = 'Unknown error {}'.format(status)
-            raise ValueError('Read failed: {}'.format(err))       
+            return Response(tag, None, status)    
 
     def _writeTag(self, tag, value, dt):
         '''
@@ -238,7 +228,9 @@ class PLC:
         if not self._connect(): return None
 
         t,b,i = _parseTagName(tag, 0)
-        self._initial_read(t, b, dt)
+        resp = self._initial_read(t, b, dt)
+        if resp[2] != 0 and resp[2] != 6:
+            return Response(tag, None, status)
 
         dataType = self.KnownTags[b][0]
 
@@ -271,14 +263,7 @@ class PLC:
         eipHeader = self._buildEIPHeader(writeRequest)
         status, retData = self._getBytes(eipHeader)
 
-        if status == 0:
-            return
-        else:
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
-            else:
-                err = 'Unknown error {}'.format(status)
-            raise ValueError('Write Failed: {}'.format(err))
+        return Response(tag, value, status)
     
     def _multiRead(self, tags):
         '''
@@ -298,8 +283,10 @@ class PLC:
             else:
                 tag_name, base, ind = _parseTagName(tag, 0)
                 self._initial_read(tag_name, base, None)
-        
-            dataType = self.KnownTags[base][0]
+            if base in self.KnownTags.keys():
+                dataType = self.KnownTags[base][0]
+            else:
+                dataType = None
             if dataType == 211:
                 tagIOI = self._buildTagIOI(tag_name, isBoolArray=True)
             else:
@@ -327,14 +314,7 @@ class PLC:
         eipHeader = self._buildEIPHeader(readRequest)
         status, retData = self._getBytes(eipHeader)
 
-        if status == 0:
-            return self._multiParser(tags, retData)
-        else:
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
-            else:
-                err = 'Unknown error {}'.format(status)
-            raise ValueError('Multi-read failed: {}'.format(err))
+        return self._multiParser(tags, retData)
 
     def _getPLCTime(self, raw=False):
         '''
@@ -368,15 +348,13 @@ class PLC:
             # get the time from the packet
             plcTime = unpack_from('<Q', retData, 56)[0]
             if raw:
-                return plcTime
+                value = plcTime
             humanTime = datetime(1970, 1, 1) + timedelta(microseconds=plcTime)
-            return humanTime
+            value = humanTime
         else:
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
-            else:
-                err = 'Unknown error {}'.format(status)
-            raise ValueError('Failed to get PLC time: {}'.format(err))
+            value = None
+
+        return Response(None, value, status)
 
     def _setPLCTime(self):
         '''
@@ -407,36 +385,24 @@ class PLC:
         eipHeader = self._buildEIPHeader(AttributePacket)
         status, retData = self._getBytes(eipHeader)
 
-        if status == 0:
-            return
-        else:
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
-            else:
-                err = 'Unknown error {}'.format(status)
-            raise ValueError('Failed to set PLC time: {}'.format(err))
+        return Response(None, Time, status)
 
-    def _getTagList(self):
+    def _getTagList(self, allTags):
         '''
         Requests the controller tag list and returns a list of LgxTag type
         '''
         if not self._connect(): return None
 
         self.Offset = 0
-        del programNames[:]
-        del self.TagList[:]
+        tags = []
 
         request = self._buildTagListRequest(programName=None)
         eipHeader = self._buildEIPHeader(request)
         status, retData = self._getBytes(eipHeader)
         if status == 0 or status == 6:
-            self._extractTagPacket(retData, programName=None)
+            tags += self._extractTagPacket(retData, programName=None)
         else:
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
-            else:
-                err = 'Unknown error {}'.format(status)
-            raise ValueError('Failed to get tag list {}'.format(err))
+            return Response(None, None, status)
 
         while status == 6:
             self.Offset += 1
@@ -444,55 +410,34 @@ class PLC:
             eipHeader = self._buildEIPHeader(request)
             status, retData = self._getBytes(eipHeader)
             if status == 0 or status == 6:
-                self._extractTagPacket(retData, programName=None)
+                tags += self._extractTagPacket(retData, programName=None)
             else:
-                if status in cipErrorCodes.keys():
-                    err = cipErrorCodes[status]
-                else:
-                    err = 'Unknown error {}'.format(status)
-                raise ValueError('Failed to get tag list: {}'.format(err))
+                return Response(None, None, status)
 
-        return
+        if allTags:
+            for program_name in self.ProgramNames:
 
-    def _getAllProgramsTags(self):
-        '''
-        Requests all programs tag list and appends to taglist (LgxTag type)
-        '''
-        if not self._connect(): return None
+                self.Offset = 0
 
-        self.Offset = 0
-
-        for programName in programNames:
-
-            self.Offset = 0
-
-            request = self._buildTagListRequest(programName)
-            eipHeader = self._buildEIPHeader(request)
-            status, retData = self._getBytes(eipHeader)
-            if status == 0 or status == 6:
-                self._extractTagPacket(retData, programName)
-            else:
-                if status in cipErrorCodes.keys():
-                    err = cipErrorCodes[status]
-                else:
-                    err = 'Unknown error {}'.format(status)
-                raise ValueError('Failed to get program tag list: {}'.format(err))
-
-            while status == 6:
-                self.Offset += 1
-                request = self._buildTagListRequest(programName)
+                request = self._buildTagListRequest(program_name)
                 eipHeader = self._buildEIPHeader(request)
                 status, retData = self._getBytes(eipHeader)
                 if status == 0 or status == 6:
-                    self._extractTagPacket(retData, programName)
+                    tags += self._extractTagPacket(retData, program_name)
                 else:
-                    if status in cipErrorCodes.keys():
-                        err = cipErrorCodes[status]
-                    else:
-                        err = 'Unknown error {}'.format(status)
-                    raise ValueError('Failed to get program tag list: {}'.format(err))
+                    return Response(None, None, status)
 
-        return
+                while status == 6:
+                    self.Offset += 1
+                    request = self._buildTagListRequest(program_name)
+                    eipHeader = self._buildEIPHeader(request)
+                    status, retData = self._getBytes(eipHeader)
+                    if status == 0 or status == 6:
+                        tags += self._extractTagPacket(retData, program_name)
+                    else:
+                        return Response(None, None, status)
+
+        return Response(None, tags, status)
 
     def _getProgramTagList(self, programName):
         '''
@@ -501,19 +446,15 @@ class PLC:
         if not self._connect(): return None
 
         self.Offset = 0
-        del self.TagList[:]
+        tags = []
 
         request = self._buildTagListRequest(programName)
         eipHeader = self._buildEIPHeader(request)
         status, retData = self._getBytes(eipHeader)
         if status == 0 or status == 6:
-            self._extractTagPacket(retData, programName)
+            tags += self._extractTagPacket(retData, programName)
         else:
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
-            else:
-                err = 'Unknown error {}'.format(status)
-            raise ValueError('Failed to get program tag list: {}'.format(err))
+            return Response(None, None, status)
 
         while status == 6:
             self.Offset += 1
@@ -521,20 +462,16 @@ class PLC:
             eipHeader = self._buildEIPHeader(request)
             status, retData = self._getBytes(eipHeader)
             if status == 0 or status == 6:
-                self._extractTagPacket(retData, programName)
+                tags += self._extractTagPacket(retData, programName)
             else:
-                if status in cipErrorCodes.keys():
-                    err = cipErrorCodes[status]
-                else:
-                    err = 'Unknown error {}'.format(status)
-                raise ValueError('Failed to get program tag list: {}'.format(err))
+                return Response(None, None, status)
 
-        return
+        return Response(None, tags, status)
 
-    def _getUDT(self):
+    def _getUDT(self, tag_list):
         
         # get only tags that are a struct
-        struct_tags = [x for x in self.TagList if x.Struct == 1]
+        struct_tags = [x for x in tag_list if x.Struct == 1]
         # reduce our struct tag list to only unique instances
         seen = set() 
         unique = [obj for obj in struct_tags if obj.DataTypeValue not in seen and not seen.add(obj.DataTypeValue)]
@@ -560,12 +497,12 @@ class PLC:
             name = members[0].split(split_char)[0]
             template[key][1] = str(name.decode('utf-8'))
             
-        for tag in self.TagList:
+        for tag in tag_list:
             if tag.DataTypeValue in template:
                 tag.DataType = template[tag.DataTypeValue][1]
             elif tag.SymbolType in self.CIPTypes:
                 tag.DataType = self.CIPTypes[tag.SymbolType][1]
-        return
+        return tag_list
 
     def _getTemplateAttribute(self, instance):
         '''
@@ -686,7 +623,7 @@ class PLC:
             except:
                 pass
 
-        return devices   
+        return Response(None, devices, 0)
 
     def _getModuleProperties(self, slot):
         '''
@@ -726,9 +663,9 @@ class PLC:
         status = unpack_from('<B', retData, 46)[0]
         
         if status == 0:
-            return _parseIdentityResponse(retData)
+            return Response(None, _parseIdentityResponse(retData), status)
         else:
-            return LGXDevice()
+            return Response(None, LGXDevice(), status)
 
 
     def _connect(self):
@@ -1426,11 +1363,12 @@ class PLC:
         '''
         # if a tag alread exists, return True
         if baseTag in self.KnownTags:
-            return True
-        
+            #return True
+            return tag, None, 0
         if dt:
             self.KnownTags[baseTag] = (dt, 0)
-            return True
+            #return True
+            return tag, None, 0 
         
         tagData = self._buildTagIOI(baseTag, isBoolArray=False)
         readRequest = self._addPartialReadIOI(tagData, 1)
@@ -1442,15 +1380,11 @@ class PLC:
         # make sure it was successful
         if status == 0 or status == 6:
             dataType = unpack_from('<B', retData, 50)[0]
-            dataLen = unpack_from('<H', retData, 2)[0] # this is really just used for STRING
+            dataLen = unpack_from('<H', retData, 2)[0]
             self.KnownTags[baseTag] = (dataType, dataLen)
-            return True
+            return tag, None, 0
         else:
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
-            else:
-                err = 'Unknown error {}'.format(status)
-            raise ValueError('Failed to read tag: {}'.format(err))
+            return tag, None, status
 
     def _wordsToBits(self, tag, value, count=0):
         '''
@@ -1500,21 +1434,28 @@ class PLC:
                     dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                     val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
                     bitState = _getBitOfWord(tag, val)
-                    reply.append(bitState)
+                    #reply.append(bitState)
+                    response = Response(tag, bitState, replyStatus)
                 elif dataTypeValue == 211:
                     dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                     val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
                     bitState = _getBitOfWord(tag, val)
-                    reply.append(bitState)
+                    #reply.append(bitState)
+                    response = Response(tag, bitState, replyStatus)
                 elif dataTypeValue == 160:
                     strlen = unpack_from('<B', stripped, offset+8)[0]
                     s = stripped[offset+12:offset+12+strlen]
-                    reply.append(str(s.decode('utf-8')))
+                    value = str(s.decode('utf-8'))
+                    response = Response(tag, value, replyStatus)
                 else:
                     dataTypeFormat = self.CIPTypes[dataTypeValue][2]
-                    reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
+                    #reply.append(unpack_from(dataTypeFormat, stripped, offset+6)[0])
+                    value = unpack_from(dataTypeFormat, stripped, offset+6)[0]
+                    response = Response(tag, value, replyStatus)
             else:
-                reply.append("Error")
+                #reply.append("Error")
+                response = Response(tag, None, replyStatus)
+            reply.append(response)
 
         return reply
 
@@ -1547,6 +1488,7 @@ class PLC:
     def _extractTagPacket(self, data, programName):
         # the first tag in a packet starts at byte 50
         packetStart = 50
+        tag_list = []
 
         while packetStart < len(data):
             # get the length of the tag name
@@ -1568,12 +1510,14 @@ class PLC:
             elif 'Task:' in tag.TagName:
                 pass
             else:
-                self.TagList.append(tag)
+                tag_list.append(tag)
             if not programName:
                 if 'Program:' in tag.TagName:
-                    programNames.append(tag.TagName)
+                    self.ProgramNames.append(tag.TagName)
             # increment ot the next tag in the packet
             packetStart = packetStart+tagLen+20
+
+        return tag_list
 
     def _makeString(self, string):
         work = []
@@ -1743,51 +1687,68 @@ class LgxTag:
         self.Struct = 0x00
         self.Size = 0x00
 
-cipErrorCodes = {0x00: 'Success',
-                 0x01: 'Connection failure',
-                 0x02: 'Resource unavailable',
-                 0x03: 'Invalid parameter value',
-                 0x04: 'Path segment error',
-                 0x05: 'Path destination unknown',
-                 0x06: 'Partial transfer',
-                 0x07: 'Connection lost',
-                 0x08: 'Service not supported',
-                 0x09: 'Invalid Attribute',
-                 0x0A: 'Attribute list error',
-                 0x0B: 'Already in requested mode/state',
-                 0x0C: 'Object state conflict',
-                 0x0D: 'Object already exists',
-                 0x0E: 'Attribute not settable',
-                 0x0F: 'Privilege violation',
-                 0x10: 'Device state conflict',
-                 0x11: 'Reply data too large',
-                 0x12: 'Fragmentation of a premitive value',
-                 0x13: 'Not enough data',
-                 0x14: 'Attribute not supported',
-                 0x15: 'Too much data',
-                 0x16: 'Object does not exist',
-                 0x17: 'Service fragmentation sequence not in progress',
-                 0x18: 'No stored attribute data',
-                 0x19: 'Store operation failure',
-                 0x1A: 'Routing failure, request packet too large',
-                 0x1B: 'Routing failure, response packet too large',
-                 0x1C: 'Missing attribute list entry data',
-                 0x1D: 'Invalid attribute value list',
-                 0x1E: 'Embedded service error',
-                 0x1F: 'Vendor specific',
-                 0x20: 'Invalid Parameter',
-                 0x21: 'Write once value or medium already written',
-                 0x22: 'Invalid reply received',
-                 0x23: 'Buffer overflow',
-                 0x24: 'Invalid message format',
-                 0x25: 'Key failure in path',
-                 0x26: 'Path size invalid',
-                 0x27: 'Unexpected attribute in list',
-                 0x28: 'Invalid member ID',
-                 0x29: 'Member not settable',
-                 0x2A: 'Group 2 only server general failure',
-                 0x2B: 'Unknown Modbus error',
-                 0x2C: 'Attribute not gettable'}
+class Response:
+
+    def __init__(self, tag_name, value, status):
+        self.tag_name = tag_name
+        self.value = value
+        self.status = get_error_code(status)
+
+def get_error_code(status):
+    '''
+    Get the CIP error code string
+    '''
+    if status in cip_error_codes.keys():
+        err = cip_error_codes[status]
+    else:
+        err = 'Unknown error {}'.format(status)
+    return err
+
+cip_error_codes = {0x00: 'Success',
+                   0x01: 'Connection failure',
+                   0x02: 'Resource unavailable',
+                   0x03: 'Invalid parameter value',
+                   0x04: 'Path segment error',
+                   0x05: 'Path destination unknown',
+                   0x06: 'Partial transfer',
+                   0x07: 'Connection lost',
+                   0x08: 'Service not supported',
+                   0x09: 'Invalid Attribute',
+                   0x0A: 'Attribute list error',
+                   0x0B: 'Already in requested mode/state',
+                   0x0C: 'Object state conflict',
+                   0x0D: 'Object already exists',
+                   0x0E: 'Attribute not settable',
+                   0x0F: 'Privilege violation',
+                   0x10: 'Device state conflict',
+                   0x11: 'Reply data too large',
+                   0x12: 'Fragmentation of a premitive value',
+                   0x13: 'Not enough data',
+                   0x14: 'Attribute not supported',
+                   0x15: 'Too much data',
+                   0x16: 'Object does not exist',
+                   0x17: 'Service fragmentation sequence not in progress',
+                   0x18: 'No stored attribute data',
+                   0x19: 'Store operation failure',
+                   0x1A: 'Routing failure, request packet too large',
+                   0x1B: 'Routing failure, response packet too large',
+                   0x1C: 'Missing attribute list entry data',
+                   0x1D: 'Invalid attribute value list',
+                   0x1E: 'Embedded service error',
+                   0x1F: 'Vendor specific',
+                   0x20: 'Invalid Parameter',
+                   0x21: 'Write once value or medium already written',
+                   0x22: 'Invalid reply received',
+                   0x23: 'Buffer overflow',
+                   0x24: 'Invalid message format',
+                   0x25: 'Key failure in path',
+                   0x26: 'Path size invalid',
+                   0x27: 'Unexpected attribute in list',
+                   0x28: 'Invalid member ID',
+                   0x29: 'Member not settable',
+                   0x2A: 'Group 2 only server general failure',
+                   0x2B: 'Unknown Modbus error',
+                   0x2C: 'Attribute not gettable'}
 
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,

@@ -39,6 +39,6 @@ def get_bit(value, bit_number):
 with PLC() as comm:
     comm.IPAddress = '192.168.1.10'
     ret = comm.Read('TimerTest')
-    t = Timer(ret)
+    t = Timer(ret.value)
     print(t.PRE, t.ACC, t.EN, t.TT, t.DN)
 

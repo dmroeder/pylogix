@@ -22,6 +22,7 @@ with PLC() as comm:
         csv_file = csv.writer(csv_file, delimiter=',', lineterminator='\n', quotechar='/', quoting=csv.QUOTE_MINIMAL)
         csv_file.writerow(tags)
         for i in range(10):
-            values = comm.Read(tags)
-            csv_file.writerow(values)
+            ret = comm.Read(tags)
+            row = [x.value for x in ret]
+            csv_file.writerow(row)
             time.sleep(1)

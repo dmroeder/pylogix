@@ -53,7 +53,7 @@ def UpdateValue():
     '''
     Call ourself to update the screen
     '''
-    ProductionCount['text'] = comm.Read(tagName) 
+    ProductionCount['text'] = comm.Read(tagName).value 
     root.after(500, UpdateValue)
 
 if __name__=='__main__':

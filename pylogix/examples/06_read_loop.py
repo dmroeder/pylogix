@@ -22,8 +22,8 @@ with PLC() as comm:
     read = True
     while read:
         try:
-            value = comm.Read('LargeArray[0]')
-            print(value)
+            ret = comm.Read('LargeArray[0]')
+            print(ret.value)
             time.sleep(1)
         except KeyboardInterrupt:
             print('exiting')

@@ -1,3 +1,6 @@
+09/17/19
+  -Rewrote all methods to return Response class, which includes tag_name, value and status
+
 08/26/19
   -Updated gitignore
   -Lowered default connection size to support older hardware/firmware by default

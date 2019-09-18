@@ -18,6 +18,6 @@ with PLC() as comm:
     with open('31_log.csv', 'w') as csv_file:
         csv_file = csv.writer(csv_file, delimiter=',', quotechar='/', quoting=csv.QUOTE_MINIMAL)
         for i in range(10):
-            value = comm.Read('LargeArray[5]')
-            csv_file.writerow([value])
+            ret = comm.Read('LargeArray[5]')
+            csv_file.writerow([ret.value])
             time.sleep(1)
