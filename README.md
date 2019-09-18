@@ -56,6 +56,14 @@ NOTE: If you are working with a Micro8xx PLC, you must set the Micro800 flag sin
 comm.Micro800 = True
 ```
 
+If you want to query module information for modules under a nested bus / backplane:
+```
+# Uses custom CIP routing path
+comm.GetModuleProperties(custom_routing_path=[(1, 0), (7, 2)])
+```
+The above code will fetch module information for slot 2 of a CompactLogix CPU CompactBus virtual backplane.
+
+
 ### Other Features
 
 Pylogix has features other than simply reading/writing.  You can see all of them in the examples, I'll also list them here
@@ -71,6 +79,7 @@ Pylogix has features other than simply reading/writing.  You can see all of them
 * **Dustin Roeder** - *Maintainer* - [dmroeder](https://github.com/dmroeder)
 * **Fernando B.** - *Contributor* - [kodaman2](https://github.com/kodaman2)
 * **Ottowayi** - *Contributor* - [ottowayi](https://github.com/ottowayi)
+* **Daniel Leicht** - *Contributor* - [daniel-leicht](https://github.com/daniel-leicht)
 
 ## License
 

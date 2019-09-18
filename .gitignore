@@ -110,3 +110,6 @@ pylogix/testing/
 
 # PyCharm
 .idea/
+
+# Testfile
+testfile.py*

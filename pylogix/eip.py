@@ -161,11 +161,11 @@ class PLC:
         '''
         return self._discover()
 
-    def GetModuleProperties(self, slot):
+    def GetModuleProperties(self, slot=None, custom_routing_path=None):
         '''
         Get the properties of module in specified slot
         '''
-        return self._getModuleProperties(slot)
+        return self._getModuleProperties(slot=slot, custom_routing_path=custom_routing_path)
 
     def Close(self):
         '''
@@ -625,12 +625,15 @@ class PLC:
 
         return Response(None, devices, 0)
 
-    def _getModuleProperties(self, slot):
+    def _getModuleProperties(self, slot, custom_routing_path=None):
         '''
         Request the properties of a module in a particular
-        slot.  Returns LgxDevice
+        slot or module that is located in specific routing path.  Returns Response object.
         '''
         if not self._connect(): return None
+
+        if (slot == None) and (custom_routing_path == None):
+            raise ValueError("Either slot number or a routing path should be specified")
             
         AttributeService = 0x01
         AttributeSize = 0x02
@@ -642,18 +645,39 @@ class PLC:
         Reserved = 0x00
         Backplane = 0x01
         LinkAddress = slot
-            
-        AttributePacket = pack('<10B',
-                                AttributeService,
-                                AttributeSize,
-                                AttributeClassType,
-                                AttributeClass,
-                                AttributeInstanceType,
-                                AttributeInstance,
-                                PathRouteSize,
-                                Reserved,
-                                Backplane,
-                                LinkAddress)
+
+        AttributePacket = pack('<6B',
+                               AttributeService,
+                               AttributeSize,
+                               AttributeClassType,
+                               AttributeClass,
+                               AttributeInstanceType,
+                               AttributeInstance)
+
+        if not custom_routing_path:
+            AttributePacket += pack('<4B',
+                                    PathRouteSize,
+                                    Reserved,
+                                    Backplane,
+                                    LinkAddress)
+        else:
+            """
+                Use custom routing -> it should be a list with tuples containing pairs of port number & slot address. 
+            """
+            custom_route_path_size = len(custom_routing_path)
+            route_path = pack('<2B',
+                                custom_route_path_size,
+                                Reserved)
+
+            for routing_pair in custom_routing_path:
+                assert len(routing_pair) == 2, "Routing path should be list of 2-tuples."
+                port_segment = 0b00001111 & routing_pair[0]
+                link_address = routing_pair[1]
+                route_path += pack("<2B",
+                                   port_segment,
+                                   link_address)
+
+            AttributePacket += route_path
 
         frame = self._buildCIPUnconnectedSend() + AttributePacket
         eipHeader = self._buildEIPSendRRDataHeader(len(frame)) + frame
