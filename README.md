@@ -19,7 +19,7 @@ python setup.py install --user
 Or you can install with pip:
 
 ```
-pip install git+https://github.com/dmroeder/pylogix
+pip install pylogix
 ```
 
 ### Verifying Installation

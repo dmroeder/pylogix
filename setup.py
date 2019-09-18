@@ -5,14 +5,14 @@ with open("README.md", "r") as fh:
     
 setuptools.setup(
     name="pylogix",
-    version="0.5.0",
+    version="0.5.1",
     author="Dustin Roeder",
     author_email="dmroeder@gmail.com",
     description="Read/Write Rockwell Automation Logix based PLC's",
     long_description=long_description,
     long_description_content_type="text/markdown",
     license="Apache License 2.0",
-    url="https://github.com/dmroeder/pylogix",
+    url="https://github.com/daniel-leicht/pylogix",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 2.7",
