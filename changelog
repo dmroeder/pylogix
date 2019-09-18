@@ -3,6 +3,7 @@
 
 09/17/19
   -Rewrote all methods to return Response class, which includes tag_name, value and status
+  -Updated README
 
 08/26/19
   -Updated gitignore
