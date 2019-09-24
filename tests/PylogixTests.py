@@ -1,3 +1,22 @@
+'''
+   Originally created by Burt Peterson
+   Updated and maintained by Dustin Roeder (dmroeder@gmail.com) 
+
+   Copyright 2019 Dustin Roeder
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+'''
+
 from pylogix import PLC
 import time
 import unittest
@@ -22,6 +41,10 @@ class PylogixTests(unittest.TestCase):
         comm.Write(tag, value)
         response = comm.Read(tag)
         self.assertEqual(response.Value, value, response.Status)
+
+    def array_result(self, tagname, arraylen):
+        response = comm.Read(tagname, arraylen)
+        self.assertGreaterEqual(len(response.Value), arraylen, response.Status)
 
     def basic_fixture(self, prefix=''):
         self.compare_bool(prefix + 'BaseBool')
@@ -57,7 +80,7 @@ class PylogixTests(unittest.TestCase):
         self.compare_tag(prefix + 'BaseTimerArray[0].PRE', abs(r.Int()))
         self.compare_tag(prefix + 'BaseTimerArray[31].PRE', abs(r.Int()))
 
-    def basic_udt_fixture(self, prefix=''):
+    def udt_basic_fixture(self, prefix=''):
         self.compare_bool(prefix + 'UDTBasic.b_BOOL')
         self.compare_bool(prefix + 'UDTBasic.b_BITS.0')
         self.compare_bool(prefix + 'UDTBasic.b_BITS.31')
@@ -134,18 +157,166 @@ class PylogixTests(unittest.TestCase):
         self.compare_tag(
             prefix + 'UDTArray2[31].b_Timer[31].PRE', abs(r.Int()))
 
+    def udt_combined_fixture(self, prefix=''):
+        self.compare_bool(prefix + 'UDTCombined.c_Array.b_BOOL[0]')
+        self.compare_bool(prefix + 'UDTCombined.c_Array.b_BOOL[31]')
+        self.compare_bool(prefix + 'UDTCombined.c_Array.b_BITS[0].0')
+        self.compare_bool(prefix + 'UDTCombined.c_Array.b_BITS[0].31')
+        self.compare_bool(prefix + 'UDTCombined.c_Array.b_BITS[31].0')
+        self.compare_bool(prefix + 'UDTCombined.c_Array.b_BITS[31].31')
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_SINT[0]', r.Sint())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_SINT[31]', r.Sint())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_INT[0]', r.Int())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_INT[31]', r.Int())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_DINT[0]', r.Dint())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_DINT[31]', r.Dint())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_LINT[0]', r.Dint())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_LINT[31]', r.Dint())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_REAL[0]', r.Sint())
+        self.compare_tag(prefix + 'UDTCombined.c_Array.b_REAL[31]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombined.c_Array.b_STRING[0]', r.String())
+        self.compare_tag(
+            prefix + 'UDTCombined.c_Array.b_STRING[31]', r.String())
+        self.compare_tag(
+            prefix + 'UDTCombined.c_Array.b_Timer[0].PRE', abs(r.Int()))
+        self.compare_tag(
+            prefix + 'UDTCombined.c_Array.b_Timer[31].PRE', abs(r.Int()))
+
+    def udt_combined_array_fixture(self, prefix=''):
+        self.compare_bool(prefix + 'UDTCombinedArray[0].c_Array.b_BOOL[0]')
+        self.compare_bool(prefix + 'UDTCombinedArray[0].c_Array.b_BOOL[31]')
+        self.compare_bool(prefix + 'UDTCombinedArray[0].c_Array.b_BITS[0].0')
+        self.compare_bool(prefix + 'UDTCombinedArray[0].c_Array.b_BITS[0].31')
+        self.compare_bool(prefix + 'UDTCombinedArray[0].c_Array.b_BITS[31].0')
+        self.compare_bool(prefix + 'UDTCombinedArray[0].c_Array.b_BITS[31].31')
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_SINT[0]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_SINT[31]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_INT[0]', r.Int())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_INT[31]', r.Int())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_DINT[0]', r.Dint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_DINT[31]', r.Dint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_LINT[0]', r.Dint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_LINT[31]', r.Dint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_REAL[0]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_REAL[31]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_STRING[0]', r.String())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_STRING[31]', r.String())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_Timer[0].PRE', abs(r.Int()))
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[0].c_Array.b_Timer[31].PRE', abs(r.Int()))
+        self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BOOL[0]')
+        self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BOOL[31]')
+        self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BITS[0].0')
+        self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BITS[0].31')
+        self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BITS[31].0')
+        self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BITS[31].31')
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_SINT[0]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_SINT[31]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_INT[0]', r.Int())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_INT[31]', r.Int())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_DINT[0]', r.Dint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_DINT[31]', r.Dint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_LINT[0]', r.Dint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_LINT[31]', r.Dint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_REAL[0]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_REAL[31]', r.Sint())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_STRING[0]', r.String())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_STRING[31]', r.String())
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_Timer[0].PRE', abs(r.Int()))
+        self.compare_tag(
+            prefix + 'UDTCombinedArray[9].c_Array.b_Timer[31].PRE', abs(r.Int()))
+
+    def read_array_fixture(self, prefix=''):
+        self.array_result('BaseBOOLArray[0]', 10)
+        self.array_result('BaseSINTArray[0]', 10)
+        self.array_result('BaseINTArray[0]', 10)
+        self.array_result('BaseDINTArray[0]', 10)
+        self.array_result('BaseLINTArray[0]', 10)
+        self.array_result('BaseREALArray[0]', 10)
+        self.array_result('BaseSTRINGArray[0]', 10)
+        self.array_result('BaseBOOLArray[10]', 10)
+        self.array_result('BaseSINTArray[10]', 10)
+        self.array_result('BaseINTArray[10]', 10)
+        self.array_result('BaseDINTArray[10]', 10)
+        self.array_result('BaseLINTArray[10]', 10)
+        self.array_result('BaseREALArray[10]', 10)
+        self.array_result('BaseSTRINGArray[10]', 10)
+
+    def multi_read_fixture(self, tags):
+        response = comm.Read(tags)
+        self.assertEqual(len(response), len(
+            tags), 'Unable to read multiple tags!')
+
     def setUp(self):
-        comm.IPAddress = '192.168.0.26'
+        comm.IPAddress = '192.168.176.1'
         comm.ProcessorSlot = 1
 
     def test_basic(self):
         self.basic_fixture()
         self.basic_array_fixture()
+        self.basic_fixture('PROGRAM:MainProgram.p')
+        self.basic_array_fixture('PROGRAM:MainProgram.p')
 
     def test_udt(self):
-        self.basic_udt_fixture()
+        self.udt_basic_fixture()
         self.udt_array_fixture_01()
         self.udt_array_fixture_02()
+        self.udt_basic_fixture('PROGRAM:MainProgram.p')
+        self.udt_array_fixture_01('PROGRAM:MainProgram.p')
+        self.udt_array_fixture_02('PROGRAM:MainProgram.p')
+
+    def test_combined(self):
+        self.udt_combined_fixture()
+        self.udt_combined_array_fixture()
+        self.udt_combined_fixture('PROGRAM:MainProgram.p')
+        self.udt_combined_array_fixture('PROGRAM:MainProgram.p')
+
+    def test_array(self):
+        self.read_array_fixture()
+        self.read_array_fixture('PROGRAM:MainProgram.p')
+
+    def test_multi_read(self):
+        tags = ['BaseDINT', 'BaseINT', 'BaseSTRING']
+        self.multi_read_fixture(tags)
+
+    def test_discover(self):
+        devices = comm.Discover()
+        self.assertEqual(devices.Status, 'Success', devices.Status)
+
+    def test_time(self):
+        comm.SetPLCTime()
+        time = comm.GetPLCTime().Value
+
+    def test_get_tags(self):
+        tags = comm.GetTagList()
+        self.assertGreater(len(tags.Value), 1, tags.Status)
 
     def tearDown(self):
         comm.Close()
