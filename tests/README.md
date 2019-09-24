@@ -1,6 +1,6 @@
 ## Unit Test for Pylogix (CLX, CompactLogix)
 
-In order to ensure code quality, every PR/Commit should ensure that all tests are passed. If the change is covered by tests that are already written then just ensure everything passes and paste results within PR to increase approval.
+In order to ensure code quality, every PR/Commit should ensure that all tests are passed. If the code change is covered by tests that are already written then just ensure everything passes and paste results within PR to increase approval.
 
 Output sample:
 
@@ -22,7 +22,25 @@ OK
 
 ## Adding new tests
 
-It is recommended to create a fixture when the test is easily repeatable by different arguments, then call that from a test. If is something that doesn't need to be repeated more than once, then just do a test. If is something that is hard to setup then do a complete unittest class, and add a results.txt with passed tests.
+The followings paths should guide you when deciding to create new tests:
+
+- Fix a bug, for an existing test (Use PylogixTests.py)
+- Fix a bug, for a non existing test, with a basic PLC setup. (Use PylogixTests.py)
+- Adding a new feature, with a basic PLC setup (Use PylogixTests.py)
+- Adding a new feature, with a difficult PLC setup. i.e. not easy to reproduce. (See folder structure below)
+
+It is recommended to create a fixture when the test is easily repeatable by different arguments following (DRY) concepts, then call that fixture from a test. If is something that doesn't need to be repeated more than once, then just do a test.
+
+If is something that is hard to setup then do a complete unittest class, and add a Results.txt with passed tests. This will ensure the code works, but at the same time not add extra tests to the basic tests PylogixTests.py. In the end most code should be easy to test, but is understandable to add custom code once proven it works.
+
+Sample new feature folder tree with difficult setup:
+
+```
+-- NewFeatureNameTests
+  |__ NewFeatureNameTests.py
+  |__ NewFeatureNameResults.txt
+
+```
 
 Sample fixture:
 
