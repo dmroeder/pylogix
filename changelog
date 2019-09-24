@@ -1,3 +1,6 @@
+09/23/19
+  - Addressed GetProgramsList and GetProgramTagList issues. (FAB)
+
 09/18/19
   -Changed the case of Response to match the rest of the project, minimizing the impact of the new change
 
