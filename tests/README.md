@@ -22,7 +22,7 @@ OK
 
 ## Adding new tests
 
-It is recommended to create a fixture when the test is easily repeatable by different arguments, then call that from a test. If is something that doesn't need to be repeated more than once, then just do a test.
+It is recommended to create a fixture when the test is easily repeatable by different arguments, then call that from a test. If is something that doesn't need to be repeated more than once, then just do a test. If is something that is hard to setup then do a complete unittest class, and add a results.txt with passed tests.
 
 Sample fixture:
 
