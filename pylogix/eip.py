@@ -26,8 +26,16 @@ from .lgxDevice import LGXDevice, GetDevice, GetVendor
 from random import randrange
 from struct import pack, unpack_from
 
-class PLC:
 
+class RouteAddressToSelfError(IOError):
+    pass
+
+
+class CIPConnectionError(IOError):
+    pass
+
+
+class PLC:
     def __init__(self):
         '''
         Initialize our parameters
@@ -161,11 +169,36 @@ class PLC:
         '''
         return self._discover()
 
-    def GetModuleProperties(self, slot=None, custom_routing_path=None):
+    def GetModuleProperties(self, slot=None, custom_routing_path=None, basic=False):
         '''
-        Get the properties of module in specified slot
+            Get the properties of module in specified slot
+            If CIP routing path is known it can be specified in custom_routing_path as a list of tuples: (port, slot)
+            By default GetModuleProperties used "GetAttributeAll" to retrive the identity, some modules
+            (such as DeviceNet modules) will only answer to "GetAttributeSingle", use basic=True to query the basic
+            attibutes using "GetAttributeSingle".
         '''
-        return self._getModuleProperties(slot=slot, custom_routing_path=custom_routing_path)
+        if basic:
+            IDENTITY_ATTRIBUTES = {
+                "VendorID": (0x01, "word"),
+                "DeviceID": (0x02, "word"),
+                "ProductCode": (0x03, "word"),
+                "Revision": (0x04, "revision"),
+                "Status": (0x05, "word"),
+                "SerialNumber": (0x06, "dword"),
+                "ProductName": (0x07, "string"),
+                "State": (0x08, "word"),
+            }
+            module_object = LGXDevice()
+            value_list = list()
+            for attribute_name, attribute_info in IDENTITY_ATTRIBUTES.items():
+                attr_value = self._getModuleProperty(attribute_info, slot=slot, custom_routing_path=custom_routing_path)
+                if (attribute_name == "VendorID") and (attr_value == None):
+                    return Response(None, LGXDevice(), 1)
+                value_list.append(attr_value)
+                setattr(module_object, attribute_name, attr_value)
+            return Response(None, module_object, 0)
+        else:
+            return self._getModuleProperties(slot=slot, custom_routing_path=custom_routing_path)
 
     def Close(self):
         '''
@@ -178,7 +211,7 @@ class PLC:
         processes the read request
         '''
         self.Offset = 0
-        
+
         if not self._connect(): return None
 
         t,b,i = _parseTagName(tag, 0)
@@ -208,7 +241,7 @@ class PLC:
             # everything else
             tagData = self._buildTagIOI(tag, isBoolArray=False)
             readRequest = self._addReadIOI(tagData, elements)
-            
+
         eipHeader = self._buildEIPHeader(readRequest)
         status, retData = self._getBytes(eipHeader)
 
@@ -216,7 +249,7 @@ class PLC:
             return_value = self._parseReply(tag, elements, retData)
             return Response(tag, return_value, status)
         else:
-            return Response(tag, None, status)    
+            return Response(tag, None, status)
 
     def _writeTag(self, tag, value, dt):
         '''
@@ -248,7 +281,7 @@ class PLC:
                 writeData.append(self._makeString(v))
             else:
                 writeData.append(int(v))
-            
+
         # write a bit of a word, boolean array or everything else
         if BitofWord(tag):
             tagData = self._buildTagIOI(tag, isBoolArray=False)
@@ -259,12 +292,12 @@ class PLC:
         else:
             tagData = self._buildTagIOI(tag, isBoolArray=False)
             writeRequest = self._addWriteIOI(tagData, writeData, dataType)
-        
+
         eipHeader = self._buildEIPHeader(writeRequest)
         status, retData = self._getBytes(eipHeader)
 
         return Response(tag, value, status)
-    
+
     def _multiRead(self, tags):
         '''
         Processes the multiple read request
@@ -296,7 +329,7 @@ class PLC:
 
         header = self._buildMultiServiceHeader()
         segmentCount = pack('<H', tagCount)
-            
+
         temp = len(header)
         if tagCount > 2:
             temp += (tagCount-2)*2
@@ -306,7 +339,7 @@ class PLC:
         for i in range(tagCount):
             segments += serviceSegments[i]
 
-        for i in range(tagCount-1):	
+        for i in range(tagCount-1):
             temp += len(serviceSegments[i])
             offsets += pack('<H', temp)
 
@@ -319,7 +352,7 @@ class PLC:
     def _getPLCTime(self, raw=False):
         '''
         Requests the PLC clock time
-        ''' 
+        '''
         if not self._connect(): return None
 
         AttributeService = 0x03
@@ -330,7 +363,7 @@ class PLC:
         AttributeInstance = 0x01
         AttributeCount = 0x01
         TimeAttribute = 0x0B
-        
+
         AttributePacket = pack('<BBBBBBH1H',
                             AttributeService,
                             AttributeSize,
@@ -340,7 +373,7 @@ class PLC:
                             AttributeInstance,
                             AttributeCount,
                             TimeAttribute)
-        
+
         eipHeader = self._buildEIPHeader(AttributePacket)
         status, retData = self._getBytes(eipHeader)
 
@@ -359,7 +392,7 @@ class PLC:
     def _setPLCTime(self):
         '''
         Requests the PLC clock time
-        ''' 
+        '''
         if not self._connect(): return None
 
         AttributeService = 0x04
@@ -469,21 +502,21 @@ class PLC:
         return Response(None, tags, status)
 
     def _getUDT(self, tag_list):
-        
+
         # get only tags that are a struct
         struct_tags = [x for x in tag_list if x.Struct == 1]
         # reduce our struct tag list to only unique instances
-        seen = set() 
+        seen = set()
         unique = [obj for obj in struct_tags if obj.DataTypeValue not in seen and not seen.add(obj.DataTypeValue)]
 
         template = {}
         for u in unique:
             temp = self._getTemplateAttribute(u.DataTypeValue)
-            
+
             val = unpack_from('<I', temp[46:], 10)[0]
             words = (val * 4) - 23
             member_count = int(unpack_from('<H', temp[46:], 24)[0])
-            
+
             template[u.DataTypeValue] = [words, '', member_count]
 
         for key,value in template.items():
@@ -496,7 +529,7 @@ class PLC:
             split_char = pack('<b', 0x3b)
             name = members[0].split(split_char)[0]
             template[key][1] = str(name.decode('utf-8'))
-            
+
         for tag in tag_list:
             if tag.DataTypeValue in template:
                 tag.DataType = template[tag.DataTypeValue][1]
@@ -508,9 +541,9 @@ class PLC:
         '''
         Get the attributes of a UDT
         '''
-        
+
         if not self._connect(): return None
-        
+
         readRequest = self._buildTemplateAttributes(instance)
         eipHeader = self._buildEIPHeader(readRequest)
         status, retData = self._getBytes(eipHeader)
@@ -520,16 +553,16 @@ class PLC:
         '''
         Get the members of a UDT so we can get it
         '''
-        
+
         if not self._connect(): return None
 
         readRequest = self._readTemplateService(instance, dataLen)
         eipHeader = self._buildEIPHeader(readRequest)
         status, retData = self._getBytes(eipHeader)
-        return retData 
+        return retData
 
     def _buildTemplateAttributes(self, instance):
-        
+
         TemplateService = 0x03
         TemplateLength = 0x03
         TemplateClassType = 0x20
@@ -541,7 +574,7 @@ class PLC:
         Attrib3 = 0x03
         Attrib2 = 0x02
         Attrib1 = 0x01
-    
+
         return pack('<BBBBHHHHHHH',
                     TemplateService,
                     TemplateLength,
@@ -565,7 +598,7 @@ class PLC:
         TemplateInstance = instance
         TemplateOffset = 0x00
         DataLength = dataLen
-        
+
         return pack('<BBBBHHIH',
                     TemplateService,
                     TemplateLength,
@@ -579,7 +612,7 @@ class PLC:
     def _discover(self):
         devices = []
         request = self._buildListIdentity()
-    
+
         # get available ip addresses
         addresses = socket.getaddrinfo(socket.gethostname(), None)
 
@@ -603,9 +636,9 @@ class PLC:
                                 devices.append(device)
                 except:
                     pass
-                    
+
         # added this because looping through addresses above doesn't work on
-        # linux so this is a "just in case".  If we don't get results with the 
+        # linux so this is a "just in case".  If we don't get results with the
         # above code, try one more time without binding to an address
         if len(devices) == 0:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -634,7 +667,7 @@ class PLC:
 
         if (slot == None) and (custom_routing_path == None):
             raise ValueError("Either slot number or a routing path should be specified")
-            
+
         AttributeService = 0x01
         AttributeSize = 0x02
         AttributeClassType = 0x20
@@ -684,13 +717,107 @@ class PLC:
         pad = pack('<I', 0x00)
         self.Socket.send(eipHeader)
         retData = pad + self.recv_data()
-        status = unpack_from('<B', retData, 46)[0]
-        
+        status = retData[46]
+
         if status == 0:
             return Response(None, _parseIdentityResponse(retData), status)
         else:
+            if status == 1:
+                if retData[47] == 0x01:  # Extended status bit
+                    extended_status = unpack_from("<H",retData, 48)[0]
+                    if extended_status == 0x0318:  # Link address to self!
+                        raise RouteAddressToSelfError
             return Response(None, LGXDevice(), status)
 
+    def _getModuleProperty(self, attribute_info, slot, custom_routing_path=None):
+        '''
+        Request the properties of a module in a particular
+        slot or module that is located in specific routing path.  Returns Response object.
+        '''
+        if not self._connect(): return None
+
+        if (slot == None) and (custom_routing_path == None):
+            raise ValueError("Either slot number or a routing path should be specified")
+
+        attribute_id, attribute_type = attribute_info
+
+        Service = 0x0e  # Get attribute Single
+        RequestPathSize = 0x05  # length in words
+
+        # Class is Identity
+        AttributeClassType = 0x0021
+        AttributeClass = 0x0001
+
+        # Class Instance = 1
+        AttributeInstanceType = 0x0025
+        AttributeInstance = 0x0001
+
+        # Single Attribute:
+        AttributeType = 0x30
+        Attribute = attribute_id
+
+        PathRouteSize = 0x01
+        Reserved = 0x00
+        Backplane = 0x01
+        LinkAddress = slot
+
+        AttributePacket = pack('<2B4H2B',
+                               Service,
+                               RequestPathSize,
+                               AttributeClassType,
+                               AttributeClass,
+                               AttributeInstanceType,
+                               AttributeInstance,
+                               AttributeType,
+                               Attribute)
+
+        if not custom_routing_path:
+            AttributePacket += pack('<4B',
+                                    PathRouteSize,
+                                    Reserved,
+                                    Backplane,
+                                    LinkAddress)
+        else:
+            """
+                Use custom routing -> it should be a list with tuples containing pairs of port number & slot address. 
+            """
+            custom_route_path_size = len(custom_routing_path)
+            route_path = pack('<2B',
+                              custom_route_path_size,
+                              Reserved)
+
+            for routing_pair in custom_routing_path:
+                assert len(routing_pair) == 2, "Routing path should be list of 2-tuples."
+                port_segment = 0b00001111 & routing_pair[0]
+                link_address = routing_pair[1]
+                route_path += pack("<2B",
+                                   port_segment,
+                                   link_address)
+
+            AttributePacket += route_path
+
+        frame = self._buildCIPUnconnectedSend(ServiceSize=12) + AttributePacket
+        eipHeader = self._buildEIPSendRRDataHeader(len(frame)) + frame
+        pad = pack('<I', 0x00)
+        self.Socket.send(eipHeader)
+        retData = pad + self.recv_data()
+        status = unpack_from('<B', retData, 46)[0]
+        if status == 0:
+            if attribute_type == "word":
+                return unpack_from("<H", retData[-2:])[0]
+            elif attribute_type == "dword":
+                int_value = unpack_from("<I", retData[-4:])[0]
+                return hex(int_value)[2:].upper().rjust(8, "0")
+            elif attribute_type == "revision":
+                return "%s.%s" % (retData[-2], retData[-1])
+            elif attribute_type == "string":
+                value = retData[48:]
+                str_size = value[0]
+                return unpack_from("%ss" % str_size, value[1:])[0].decode("utf-8")
+            else:
+                raise TypeError("Unknown attribute type %s" % attribute_type)
+        else:
+            return None
 
     def _connect(self):
         '''
@@ -698,7 +825,7 @@ class PLC:
         '''
         if self.SocketConnected:
             return True
-        
+
         # Make sure the connection size is correct
         if not 500 <= self.ConnectionSize <= 4000:
             raise ValueError("ConnectionSize must be an integer between 500 and 4000")
@@ -719,7 +846,7 @@ class PLC:
             self.SessionHandle = unpack_from('<I', retData, 4)[0]
         else:
             self.SocketConnected = False
-            raise Exception("Failed to register session")
+            raise CIPConnectionError("Failed to register session")
 
         self.Socket.send(self._buildForwardOpenPacket())
         retData = self.recv_data()
@@ -729,7 +856,7 @@ class PLC:
             self.SocketConnected = True
         else:
             self.SocketConnected = False
-            raise Exception("Forward Open Failed")
+            raise CIPConnectionError("Forward Open Failed")
 
         return True
 
@@ -767,7 +894,7 @@ class PLC:
         except (IOError):
             self.SocketConnected = False
             return 7, None
-        
+
     def _buildRegisterSession(self):
         '''
         Register our CIP connection
@@ -796,7 +923,7 @@ class PLC:
         EIPCommand = 0x66
         EIPLength = 0x0
         EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x0000 
+        EIPStatus = 0x0000
         EIPContext = self.Context
         EIPOptions = 0x0000
 
@@ -828,7 +955,7 @@ class PLC:
         '''
         Forward Open happens after a connection is made,
         this will sequp the CIP connection parameters
-        '''   
+        '''
         CIPPathSize = 0x02
         CIPClassType = 0x20
 
@@ -861,7 +988,7 @@ class PLC:
             CIPConnectionParameters = CIPConnectionParameters << 16
             CIPConnectionParameters += self.ConnectionSize
             pack_format = '<BBBBBBBBIIHHIIIIIIB'
-            
+
         CIPOTNetworkConnectionParameters = CIPConnectionParameters
         CIPTONetworkConnectionParameters = CIPConnectionParameters
 
@@ -885,17 +1012,17 @@ class PLC:
                         CIPTORPI,
                         CIPTONetworkConnectionParameters,
                         CIPTransportTrigger)
-        
+
         # add the connection path
         if self.Micro800:
             ConnectionPath = [0x20, 0x02, 0x24, 0x01]
         else:
             ConnectionPath = [0x01, self.ProcessorSlot, 0x20, 0x02, 0x24, 0x01]
-        
+
         ConnectionPathSize = int(len(ConnectionPath)/2)
         pack_format = '<B' + str(len(ConnectionPath)) + 'B'
         CIPConnectionPath = pack(pack_format, ConnectionPathSize, *ConnectionPath)
-        
+
         return ForwardOpen + CIPConnectionPath
 
     def _buildForwardClose(self):
@@ -927,24 +1054,24 @@ class PLC:
                             CIPConnectionSerialNumber,
                             CIPVendorID,
                             CIPOriginatorSerialNumber)
-        
+
         # add the connection path
         if self.Micro800:
             ConnectionPath = [0x20, 0x02, 0x24, 0x01]
         else:
             ConnectionPath = [0x01, self.ProcessorSlot, 0x20, 0x02, 0x24, 0x01]
-        
+
         ConnectionPathSize = int(len(ConnectionPath)/2)
         pack_format = '<H' + str(len(ConnectionPath)) + 'B'
         CIPConnectionPath = pack(pack_format, ConnectionPathSize, *ConnectionPath)
-            
-        return ForwardClose + CIPConnectionPath 
-  
+
+        return ForwardClose + CIPConnectionPath
+
     def _buildEIPSendRRDataHeader(self, frameLen):
         EIPCommand = 0x6F
         EIPLength = 16+frameLen
         EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x00 
+        EIPStatus = 0x00
         EIPContext = self.Context
         EIPOptions = 0x00
 
@@ -969,9 +1096,9 @@ class PLC:
                     EIPItem1Type,
                     EIPItem1Length,
                     EIPItem2Type,
-                    EIPItem2Length)   
+                    EIPItem2Length)
 
-    def _buildCIPUnconnectedSend(self):
+    def _buildCIPUnconnectedSend(self, ServiceSize=0x06):
         '''
         build unconnected send to request tag database
         '''
@@ -985,7 +1112,6 @@ class PLC:
         CIPInstance = 0x01
         CIPPriority = 0x0A
         CIPTimeoutTicks = 0x0e
-        ServiceSize = 0x06
         
         return pack('<BBBBBBBBH',
                     CIPService,
@@ -1666,7 +1792,7 @@ def _parseIdentityResponse(data):
     resp.Revision = str(major) + '.' + str(minor)
           
     resp.Status = unpack_from('<H', data, 56)[0]
-    resp.SerialNumber = hex(unpack_from('<I', data, 58)[0])
+    resp.SerialNumber = hex(unpack_from('<I', data, 58)[0])[2:].upper().rjust(8, "0")
     resp.ProductNameLength = unpack_from('<B', data, 62)[0]
     resp.ProductName = str(data[63:63+resp.ProductNameLength].decode('utf-8'))
 

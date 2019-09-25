@@ -11,7 +11,7 @@ There are currently no dependencies so you can get going quickly without having 
 You can clone the repo with the following:
 
 ```
-git clone https://github.com/dmroeder/pylogix.git
+git clone https://github.com/daniel-leicht/pylogix.git
 cd pylogix
 python setup.py install --user
 ```
