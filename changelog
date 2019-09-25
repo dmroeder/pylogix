@@ -1,3 +1,9 @@
+09/23/19 - kodaman2
+  - Addressed GetProgramsList and GetProgramTagList issues.
+
+09/23/19 - ambersnow
+  - Fixed GetTagList() AtributeError
+
 09/18/19
   -Changed the case of Response to match the rest of the project, minimizing the impact of the new change
 

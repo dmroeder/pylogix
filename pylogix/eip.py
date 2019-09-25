@@ -134,14 +134,14 @@ class PLC:
         programName = "Program:ExampleProgram"
         '''
 
+        # If ProgramNames is empty then _getTagList hasn't been called
         if not self.ProgramNames:
-            tags = self._getTagList(False)
+            self._getTagList(False)
         
-        # Get a single program tags if progragName exists
+        # Get single program tags if progragName exists
         if programName in self.ProgramNames:
             program_tags = self._getProgramTagList(programName)
-            program_tags = self._getUDT(program_tags[1])
-            return Response(None, program_tags, tags[2])
+            return Response(None, program_tags.Value, program_tags.Status)
         else:
             return Response(None, None, 'Program not found, please check name!')
 
@@ -152,8 +152,8 @@ class PLC:
         and runs _getTagList
         '''
         if not self.ProgramNames:
-            tag_list = self._getTagList(True)
-        return Response(None, self.ProgramNames, tag_list[2])
+            self._getTagList(False)
+        return Response(None, self.ProgramNames, 'Success')
 
     def Discover(self):
         '''
