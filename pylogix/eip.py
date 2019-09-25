@@ -124,9 +124,9 @@ class PLC:
         otherwise controller tags and program tags.
         '''
         tag_list = self._getTagList(allTags)
-        updated_list = self._getUDT(tag_list.value)
+        updated_list = self._getUDT(tag_list.Value)
         
-        return Response(None, updated_list, tag_list.status)
+        return Response(None, updated_list, tag_list.Status)
 
     def GetProgramTagList(self, programName):
         '''
