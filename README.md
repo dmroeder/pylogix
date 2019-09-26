@@ -16,10 +16,16 @@ cd pylogix
 python setup.py install --user
 ```
 
-Or you can install with pip:
+Or you can install with pip (Latest version):
 
 ```
 pip install git+https://github.com/dmroeder/pylogix
+```
+
+To install previous version before major changes (0.3.7):
+
+```
+pip install git+https://github.com/dmroeder/pylogix@v0.3.7
 ```
 
 ### Verifying Installation
