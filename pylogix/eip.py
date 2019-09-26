@@ -230,7 +230,7 @@ class PLC:
         t,b,i = _parseTagName(tag, 0)
         resp = self._initial_read(t, b, dt)
         if resp[2] != 0 and resp[2] != 6:
-            return Response(tag, None, status)
+            return Response(tag, None, resp[2])
 
         dataType = self.KnownTags[b][0]
 

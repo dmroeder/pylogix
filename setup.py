@@ -2,10 +2,10 @@ import setuptools
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
-    
+
 setuptools.setup(
     name="pylogix",
-    version="0.4.3",
+    version="0.4.4",
     author="Dustin Roeder",
     author_email="dmroeder@gmail.com",
     description="Read/Write Rockwell Automation Logix based PLC's",
@@ -19,5 +19,5 @@ setuptools.setup(
         "Programming Language :: Python :: 3.6",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
-        ],
-    )
+    ],
+)
