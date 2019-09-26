@@ -1,8 +1,11 @@
 09/25/19 - kodaman2
+  - Fixed _writeTag to non existent tags exception error
+
+09/25/19 - kodaman2
   - Updated README with old installation instructions
 
 09/23/19 - kodaman2
-  - Addressed GetProgramsList and GetProgramTagList issues.
+  - Addressed GetProgramsList and GetProgramTagList issues
 
 09/23/19 - ambersnow
   - Fixed GetTagList() AtributeError
