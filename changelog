@@ -1,4 +1,7 @@
 09/25/19 - kodaman2
+  - Path for GetProgramTagList to return LGXTag properly
+
+09/25/19 - kodaman2
   - Fixed _writeTag to non existent tags exception error
 
 09/25/19 - kodaman2
