@@ -318,6 +318,14 @@ class PylogixTests(unittest.TestCase):
         tags = comm.GetTagList()
         self.assertGreater(len(tags.Value), 1, tags.Status)
 
+    def test_unexistent_tags(self):
+        response = comm.Read('DumbTag')
+        self.assertEqual(
+            response.Status, 'Path segment error', response.Status)
+        write_reponse = comm.Write('DumbTag', 10)
+        self.assertEqual(
+            write_reponse.Status, 'Path segment error', write_reponse.Status)
+
     def tearDown(self):
         comm.Close()
 
