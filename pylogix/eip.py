@@ -141,7 +141,8 @@ class PLC:
         # Get single program tags if progragName exists
         if programName in self.ProgramNames:
             program_tags = self._getProgramTagList(programName)
-            return Response(None, program_tags.Value, program_tags.Status)
+            program_tags = self._getUDT(program_tags.Value)
+            return Response(None, program_tags, 0)
         else:
             return Response(None, None, 'Program not found, please check name!')
 
@@ -153,7 +154,7 @@ class PLC:
         '''
         if not self.ProgramNames:
             self._getTagList(False)
-        return Response(None, self.ProgramNames, 'Success')
+        return Response(None, self.ProgramNames, 0)
 
     def Discover(self):
         '''
