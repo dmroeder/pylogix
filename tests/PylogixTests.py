@@ -326,6 +326,15 @@ class PylogixTests(unittest.TestCase):
         self.assertEqual(
             write_reponse.Status, 'Path segment error', write_reponse.Status)
 
+    def test_lgx_tag(self):
+        pass
+
+    def test_program_list(self):
+        pass
+
+    def test_program_tag_list(self):
+        pass
+
     def tearDown(self):
         comm.Close()
 

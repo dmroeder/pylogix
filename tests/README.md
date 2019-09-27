@@ -36,9 +36,11 @@ If is something that is hard to setup then do a complete unittest class, and add
 Sample new feature folder tree with difficult setup:
 
 ```
--- NewFeatureNameTests
-  |__ NewFeatureNameTests.py
-  |__ NewFeatureNameResults.txt
+tests/
+   |
+   -- NewFeatureNameTests/
+     |__ NewFeatureNameTests.py
+     |__ NewFeatureNameResults.txt
 
 ```
 
