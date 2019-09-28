@@ -155,9 +155,16 @@ class PLC:
         Sanity check: checks if programNames is empty
         and runs _getTagList
         '''
+        tags = ''
         if not self.ProgramNames:
             tags = self._getTagList(False)
-        return Response(None, self.ProgramNames, tags.Status)
+        if tags:
+            status = tags.Status
+        if self.ProgramNames:
+            status = 0
+        else:
+            status = "Unable to retrieve programs list"
+        return Response(None, self.ProgramNames, status)
 
     def Discover(self):
         '''
