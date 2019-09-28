@@ -1,3 +1,21 @@
+09/27/19 - kodaman2
+  - Modified to return correct return status, when nesting Response.Status to another Response object
+
+09/25/19 - kodaman2
+  - Path for GetProgramTagList to return LGXTag properly
+
+09/25/19 - kodaman2
+  - Fixed _writeTag to non existent tags exception error
+
+09/25/19 - kodaman2
+  - Updated README with old installation instructions
+
+09/23/19 - kodaman2
+  - Addressed GetProgramsList and GetProgramTagList issues
+
+09/23/19 - ambersnow
+  - Fixed GetTagList() AtributeError
+
 09/18/19
   -Changed the case of Response to match the rest of the project, minimizing the impact of the new change
 

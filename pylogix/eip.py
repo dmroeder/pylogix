@@ -124,9 +124,9 @@ class PLC:
         otherwise controller tags and program tags.
         '''
         tag_list = self._getTagList(allTags)
-        updated_list = self._getUDT(tag_list.value)
+        updated_list = self._getUDT(tag_list.Value)
         
-        return Response(None, updated_list, tag_list.status)
+        return Response(None, updated_list, tag_list.Status)
 
     def GetProgramTagList(self, programName):
         '''
@@ -134,14 +134,18 @@ class PLC:
         programName = "Program:ExampleProgram"
         '''
 
+        # If ProgramNames is empty then _getTagList hasn't been called
         if not self.ProgramNames:
-            tags = self._getTagList(False)
+            self._getTagList(False)
         
-        # Get a single program tags if progragName exists
+        # Get single program tags if progragName exists
         if programName in self.ProgramNames:
             program_tags = self._getProgramTagList(programName)
-            program_tags = self._getUDT(program_tags[1])
-            return Response(None, program_tags, tags[2])
+            # Getting status from program_tags Response object
+            # _getUDT returns a list of LGXTags might need rework in the future
+            status = program_tags.Status
+            program_tags = self._getUDT(program_tags.Value)
+            return Response(None, program_tags, status)
         else:
             return Response(None, None, 'Program not found, please check name!')
 
@@ -152,8 +156,8 @@ class PLC:
         and runs _getTagList
         '''
         if not self.ProgramNames:
-            tag_list = self._getTagList(True)
-        return Response(None, self.ProgramNames, tag_list[2])
+            tags = self._getTagList(False)
+        return Response(None, self.ProgramNames, tags.Status)
 
     def Discover(self):
         '''
@@ -230,7 +234,7 @@ class PLC:
         t,b,i = _parseTagName(tag, 0)
         resp = self._initial_read(t, b, dt)
         if resp[2] != 0 and resp[2] != 6:
-            return Response(tag, None, status)
+            return Response(tag, None, resp[2])
 
         dataType = self.KnownTags[b][0]
 
@@ -1696,8 +1700,18 @@ class Response:
 
 def get_error_code(status):
     '''
-    Get the CIP error code string
+    Get the CIP error code string, if the status is a string it will be returned
     '''
+    # hack to check if status string for both py2 and py3
+    # because of nesting Response.Status to another Response obj constr
+    # some Success results are shown as 'Unknown error Success'
+    if sys.version_info.major == 3:
+        if isinstance(status, str):
+            return status
+    if sys.version_info.major == 2:
+        if isinstance(status, basestring):
+            return status
+
     if status in cip_error_codes.keys():
         err = cip_error_codes[status]
     else:
