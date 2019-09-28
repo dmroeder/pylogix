@@ -17,10 +17,17 @@
    limitations under the License.
 '''
 
+import sys
+sys.path.append(".")
+
+# Need Classes for type checking
+from pylogix.eip import LgxTag, Response
+
 from pylogix import PLC
 import time
 import unittest
 from Randomizer import Randomizer
+import inspect
 
 comm = PLC()
 r = Randomizer()
@@ -326,14 +333,29 @@ class PylogixTests(unittest.TestCase):
         self.assertEqual(
             write_reponse.Status, 'Path segment error', write_reponse.Status)
 
-    def test_lgx_tag(self):
-        pass
+    def test_lgx_tag_class(self):
+        tags = comm.GetTagList()
+        self.assertEqual(isinstance(tags.Value[0], LgxTag), True, "LgxTag not found in GetTagList")        
+
+    def test_response_class(self):
+        one_bool = comm.Read('BaseBool')
+        self.assertEqual(isinstance(one_bool, Response), True, "Reponse class not found in Read")
+        bool_tags = ['BaseBool', 'BaseBits.0', 'BaseBits.31']
+        booleans = comm.Read(bool_tags)
+        self.assertEqual(isinstance(booleans[0], Response), True, "Reponse class not found in Multi Read")
+        bool_write = comm.Write('BaseBool', 1)
+        self.assertEqual(isinstance(bool_write, Response), True, "Reponse class not found in Write")
 
     def test_program_list(self):
-        pass
+        programs = comm.GetProgramsList()
+        self.assertEqual(programs.Status, 'Success', programs.Status)
+        self.assertEqual(isinstance(programs, Response), True, "Reponse class not found in GetProgramsList")
 
     def test_program_tag_list(self):
-        pass
+        program_tags = comm.GetProgramTagList('Program:MainProgram')
+        self.assertEqual(program_tags.Status, 'Success', program_tags.Status)
+        self.assertEqual(isinstance(program_tags, Response), True, "Reponse class not found in GetProgramTagList")
+        self.assertEqual(isinstance(program_tags.Value[0], LgxTag), True, "LgxTag class not found in GetProgramTagList Value")
 
     def tearDown(self):
         comm.Close()
