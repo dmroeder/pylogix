@@ -1,4 +1,7 @@
 09/27/19 - kodaman2
+  - Fixed Multiple paths for status on GetProgramsList
+
+09/27/19 - kodaman2
   - Modified to return correct return status, when nesting Response.Status to another Response object
 
 09/25/19 - kodaman2
