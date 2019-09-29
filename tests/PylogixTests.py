@@ -319,7 +319,8 @@ class PylogixTests(unittest.TestCase):
 
     def test_time(self):
         comm.SetPLCTime()
-        time = comm.GetPLCTime().Value
+        time = comm.GetPLCTime()
+        self.assertEqual(time.Status, 'Success', time.Status)
 
     def test_get_tags(self):
         tags = comm.GetTagList()
