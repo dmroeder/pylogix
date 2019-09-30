@@ -1,4 +1,7 @@
 09/27/19 - kodaman2
+  - Added Repr, and str to Response class as per #77
+
+09/27/19 - kodaman2
   - Fixed Multiple paths for status on GetProgramsList
 
 09/27/19 - kodaman2
