@@ -19,10 +19,8 @@
 
 import sys
 sys.path.append(".")
-
-# Need Classes for type checking
-from pylogix.eip import LgxTag, Response
-import plcConfig # Info: tests\README.md - Setup test configuration file
+from pylogix.eip import LgxTag, Response  # Need Classes for type checking
+import plcConfig  # Info: tests\README.md - Setup test configuration file
 from pylogix import PLC
 import time
 import unittest
@@ -222,9 +220,11 @@ class PylogixTests(unittest.TestCase):
         self.compare_tag(
             prefix + 'UDTCombinedArray[0].c_Array.b_STRING[31]', r.String())
         self.compare_tag(
-            prefix + 'UDTCombinedArray[0].c_Array.b_Timer[0].PRE', abs(r.Int()))
+            prefix + 'UDTCombinedArray[0].c_Array.b_Timer[0].PRE',
+            abs(r.Int()))
         self.compare_tag(
-            prefix + 'UDTCombinedArray[0].c_Array.b_Timer[31].PRE', abs(r.Int()))
+            prefix + 'UDTCombinedArray[0].c_Array.b_Timer[31].PRE',
+            abs(r.Int()))
         self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BOOL[0]')
         self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BOOL[31]')
         self.compare_bool(prefix + 'UDTCombinedArray[9].c_Array.b_BITS[0].0')
@@ -256,9 +256,11 @@ class PylogixTests(unittest.TestCase):
         self.compare_tag(
             prefix + 'UDTCombinedArray[9].c_Array.b_STRING[31]', r.String())
         self.compare_tag(
-            prefix + 'UDTCombinedArray[9].c_Array.b_Timer[0].PRE', abs(r.Int()))
+            prefix + 'UDTCombinedArray[9].c_Array.b_Timer[0].PRE',
+            abs(r.Int()))
         self.compare_tag(
-            prefix + 'UDTCombinedArray[9].c_Array.b_Timer[31].PRE', abs(r.Int()))
+            prefix + 'UDTCombinedArray[9].c_Array.b_Timer[31].PRE',
+            abs(r.Int()))
 
     def read_array_fixture(self, prefix=''):
         self.array_result('BaseBOOLArray[0]', 10)
@@ -337,27 +339,41 @@ class PylogixTests(unittest.TestCase):
 
     def test_lgx_tag_class(self):
         tags = comm.GetTagList()
-        self.assertEqual(isinstance(tags.Value[0], LgxTag), True, "LgxTag not found in GetTagList")        
+        self.assertEqual(
+            isinstance(
+                tags.Value[0], LgxTag), True, "LgxTag not found in GetTagList")        
 
     def test_response_class(self):
         one_bool = comm.Read('BaseBool')
-        self.assertEqual(isinstance(one_bool, Response), True, "Reponse class not found in Read")
+        self.assertEqual(
+            isinstance(one_bool, Response),
+            True, "Reponse class not found in Read")
         bool_tags = ['BaseBool', 'BaseBits.0', 'BaseBits.31']
         booleans = comm.Read(bool_tags)
-        self.assertEqual(isinstance(booleans[0], Response), True, "Reponse class not found in Multi Read")
+        self.assertEqual(
+            isinstance(booleans[0], Response),
+            True, "Reponse class not found in Multi Read")
         bool_write = comm.Write('BaseBool', 1)
-        self.assertEqual(isinstance(bool_write, Response), True, "Reponse class not found in Write")
+        self.assertEqual(
+            isinstance(bool_write, Response),
+            True, "Reponse class not found in Write")
 
     def test_program_list(self):
         programs = comm.GetProgramsList()
         self.assertEqual(programs.Status, 'Success', programs.Status)
-        self.assertEqual(isinstance(programs, Response), True, "Reponse class not found in GetProgramsList")
+        self.assertEqual(
+            isinstance(programs, Response),
+            True, "Reponse class not found in GetProgramsList")
 
     def test_program_tag_list(self):
         program_tags = comm.GetProgramTagList('Program:MainProgram')
         self.assertEqual(program_tags.Status, 'Success', program_tags.Status)
-        self.assertEqual(isinstance(program_tags, Response), True, "Reponse class not found in GetProgramTagList")
-        self.assertEqual(isinstance(program_tags.Value[0], LgxTag), True, "LgxTag class not found in GetProgramTagList Value")
+        self.assertEqual(
+            isinstance(program_tags, Response),
+            True, "Reponse class not found in GetProgramTagList")
+        self.assertEqual(
+            isinstance(program_tags.Value[0], LgxTag),
+            True, "LgxTag class not found in GetProgramTagList Value")
 
     def tearDown(self):
         comm.Close()
