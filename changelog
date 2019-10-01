@@ -1,4 +1,8 @@
 10/01/19
+  - Added tox.ini for automated tests
+
+10/01/19
+  - Added unittest for clx, and compactlogix.
   - eip.py changes were fixed according to PEP8
 
 09/30/19
