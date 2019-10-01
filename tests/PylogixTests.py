@@ -24,7 +24,7 @@ import plcConfig  # Info: tests\README.md - Setup test configuration file
 from pylogix import PLC
 import time
 import unittest
-from randomizer import Randomizer
+from Randomizer import Randomizer
 import inspect
 
 comm = PLC()
