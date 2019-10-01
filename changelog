@@ -1,3 +1,6 @@
+10/01/19
+  - eip.py changes were fixed according to PEP8
+
 09/30/19
   -Fixed format of str & repr in Response
   
