@@ -1706,10 +1706,13 @@ class Response:
         self.Status = get_error_code(status)
       
     def __repr__(self):
-        return f'Response({self.TagName}, {self.Value}, {self.Status})'
+        
+        return 'Response(TagName={}, Value={}, Status={})'.format(
+            self.TagName, self.Value, self.Status)
       
     def __str__(self):
-        return f'{self.TagName}, {self.Value}, {self.Status}'
+
+        return '{} {} {}'.format(self.TagName, self.Value, self.Status)
 
 def get_error_code(status):
     '''
