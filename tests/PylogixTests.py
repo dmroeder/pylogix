@@ -22,11 +22,11 @@ sys.path.append(".")
 
 # Need Classes for type checking
 from pylogix.eip import LgxTag, Response
-
+import plcConfig # Info: tests\README.md - Setup test configuration file
 from pylogix import PLC
 import time
 import unittest
-from Randomizer import Randomizer
+from randomizer import Randomizer
 import inspect
 
 comm = PLC()
@@ -282,8 +282,9 @@ class PylogixTests(unittest.TestCase):
             tags), 'Unable to read multiple tags!')
 
     def setUp(self):
-        comm.IPAddress = '192.168.176.1'
-        comm.ProcessorSlot = 1
+        comm.IPAddress = plcConfig.plc_ip
+        comm.ProcessorSlot = plcConfig.plc_slot
+        comm.Micro800 = plcConfig.isMicro800
 
     def test_basic(self):
         self.basic_fixture()

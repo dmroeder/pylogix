@@ -104,9 +104,12 @@ venv.bak/
 .mypy_cache/
 
 # other
-pylogix/testing/
 .directory
 .vscode/
 
 # PyCharm
 .idea/
+
+# pylogix configuration
+tests/plcConfig.py
+pylogix/testing/

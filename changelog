@@ -1,3 +1,6 @@
+10/01/19
+  - Added unittest for clx, and compactlogix.
+
 09/30/19
   -Fixed format of str & repr in Response
   

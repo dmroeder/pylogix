@@ -66,7 +66,19 @@ In addition to fixtures, and tests, you can add helper methods, if is one or two
 
 ## setUp and tearDown
 
-These are default functions from unittest. Change IP, and Slot in setUp when running local tests. Discard changes when done, unless adding something new to the unittest.
+These are default functions from unittest, they will run before each test. Change IP, and Slot in setUp when running local tests. Discard changes when done, unless adding something new to the unittest.
+
+## Setup test configuration
+
+I've added a `.gitignore` entry for plc configurations in order to avoid having to keep discarding ip, slot changes inside pylogixTests.py.
+
+Inside the tests folder create a file `plcConfig.py`, then copy and paste below variables:
+
+```
+plc_ip = '192.168.0.26'
+plc_slot = 1
+isMicro800 = False
+```
 
 ## Setting up an RSLogix 5000 Project
 
@@ -84,4 +96,6 @@ If for whatever reason your PR is testing something super crazy, then add UDT, a
 
 ## TODO
 
-- Add Micro800 unittest, and plc setup.
+- Create a micro800 project, and export tags
+- Conform `pylogixTests.py` to micro800 based on functions that work with that plc
+- Have the community run the test on micro800
