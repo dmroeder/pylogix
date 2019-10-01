@@ -1,6 +1,6 @@
-'''
+"""
    Originally created by Burt Peterson
-   Updated and maintained by Dustin Roeder (dmroeder@gmail.com) 
+   Updated and maintained by Dustin Roeder (dmroeder@gmail.com)
 
    Copyright 2019 Dustin Roeder
 
@@ -15,7 +15,7 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-'''
+"""
 
 import sys
 sys.path.append(".")
@@ -341,7 +341,7 @@ class PylogixTests(unittest.TestCase):
         tags = comm.GetTagList()
         self.assertEqual(
             isinstance(
-                tags.Value[0], LgxTag), True, "LgxTag not found in GetTagList")        
+                tags.Value[0], LgxTag), True, "LgxTag not found in GetTagList")
 
     def test_response_class(self):
         one_bool = comm.Read('BaseBool')

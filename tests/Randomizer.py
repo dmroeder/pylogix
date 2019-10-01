@@ -1,6 +1,6 @@
 '''
    Originally created by Burt Peterson
-   Updated and maintained by Dustin Roeder (dmroeder@gmail.com) 
+   Updated and maintained by Dustin Roeder (dmroeder@gmail.com)
 
    Copyright 2019 Dustin Roeder
 
@@ -49,4 +49,5 @@ class Randomizer:
          Get a random 8 bit integer
         '''
         integer = random.randint(1, 82)
-        return ''.join(random.choice(string.ascii_letters) for i in range(integer))
+        return ''.join(
+            random.choice(string.ascii_letters) for i in range(integer))
