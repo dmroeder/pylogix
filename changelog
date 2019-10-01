@@ -1,3 +1,6 @@
+09/30/19
+  -Fixed format of str & repr in Response
+  
 09/27/19 - kodaman2
   - Added Repr, and str to Response class as per #77
 
