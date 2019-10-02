@@ -1,4 +1,5 @@
 10/01/19
+  - Added unittest for clx, and compactlogix.
   - eip.py changes were fixed according to PEP8
 
 09/30/19
