@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="20.01" TargetName="Arrays" TargetType="DataType" ContainsContext="true" Owner="CanrigAdmin, Nabors Corporate Services" ExportDate="Tue Sep 24 01:51:37 2019" ExportOptions="References DecoratedData Context Dependencies ForceProtectedEncoding AllProjDocTrans">
+<Controller Use="Context" Name="pylogix_v20">
+<DataTypes Use="Context">
+<DataType Use="Target" Name="Arrays" Family="NoFamily" Class="User">
+<Members>
+<Member Name="b_BOOL" DataType="BOOL" Dimension="32" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="b_BITS" DataType="DINT" Dimension="32" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="b_SINT" DataType="SINT" Dimension="32" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="b_INT" DataType="INT" Dimension="32" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="b_DINT" DataType="DINT" Dimension="32" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="b_LINT" DataType="LINT" Dimension="32" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="b_REAL" DataType="REAL" Dimension="32" Radix="Float" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="b_STRING" DataType="STRING" Dimension="32" Radix="NullType" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="b_Timer" DataType="TIMER" Dimension="32" Radix="NullType" Hidden="false" ExternalAccess="Read/Write"/>
+</Members>
+</DataType>
+</DataTypes>
+</Controller>
+</RSLogix5000Content>
