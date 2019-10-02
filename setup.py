@@ -1,11 +1,12 @@
 import setuptools
+import pylogix
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="pylogix",
-    version="0.4.11",
+    version=pylogix.__version__,
     author="Dustin Roeder",
     author_email="dmroeder@gmail.com",
     description="Read/Write Rockwell Automation Logix based PLC's",

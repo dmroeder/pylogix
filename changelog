@@ -1,3 +1,7 @@
+10/02/19
+  - setup.py imports version from __init__
+  - update tests\readme with tox info
+
 10/01/19
   - Added tox.ini for automated tests
 

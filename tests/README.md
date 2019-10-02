@@ -66,7 +66,7 @@ In addition to fixtures, and tests, you can add helper methods, if is one or two
 
 ## setUp and tearDown
 
-These are default functions from unittest, they will run before each test. Change IP, and Slot in setUp when running local tests. Discard changes when done, unless adding something new to the unittest.
+These are default functions from unittest, they will run before each test.
 
 ## Setup test configuration
 
@@ -93,6 +93,17 @@ Due to the versioning system of Rockwell it is difficult to provide one project 
 - Download test project to PLC, and run unittest.
 
 If for whatever reason your PR is testing something super crazy, then add UDT, and tags but make sure to export new UDTs, and re-export program tags, and controller tags by right clicking in the controller organizer and selecting export tags or Tools/export. Keep in mind the current tags have just about everything so be mindful about adding new tags/udts unless is necessary. As always ask if unsure.
+
+## Tox Integration
+
+The project also leverages tox testing since it supports py2, and every change must be checked against py2 and py3.
+
+To run tox, install tox in your preferred python version, then run tox:
+
+```
+pip install tox
+tox
+```
 
 ## TODO
 
