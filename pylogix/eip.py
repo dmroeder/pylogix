@@ -82,6 +82,8 @@ class PLC:
         """
         We have two options for reading depending on
         the arguments, read a single tag, or read an array
+
+        returns Response class (.TagName, .Value, .Status)
         """
         if isinstance(tag, (list, tuple)):
             if len(tag) == 1:
@@ -96,24 +98,32 @@ class PLC:
         """
         We have two options for writing depending on
         the arguments, write a single tag, or write an array
+
+        returns Response class (.TagName, .Value, .Status)
         """
         return self._writeTag(tag, value, datatype)
 
     def MultiRead(self, tags):
         """
         Read multiple tags in one request
+
+        returns a list of Response class (.TagName, .Value, .Status)
         """
         return self._multiRead(tags)
 
     def GetPLCTime(self, raw=False):
         """
         Get the PLC's clock time, return as human readable (default) or raw if raw=True
+
+        returns Response class (.TagName, .Value, .Status)
         """
         return self._getPLCTime(raw)
 
     def SetPLCTime(self):
         """
         Sets the PLC's clock time
+
+        returns Response class (.TagName, .Value, .Status)
         """
         return self._setPLCTime()
 
@@ -123,6 +133,8 @@ class PLC:
         Optional parameter allTags set to True
         If is set to False, it will return only controller
         otherwise controller tags and program tags.
+
+        returns Response class (.TagName, .Value, .Status)
         """
         tag_list = self._getTagList(allTags)
         updated_list = self._getUDT(tag_list.Value)
@@ -133,6 +145,8 @@ class PLC:
         """
         Retrieves a program tag list from the PLC
         programName = "Program:ExampleProgram"
+
+        returns Response class (.TagName, .Value, .Status)
         """
 
         # If ProgramNames is empty then _getTagList hasn't been called
@@ -155,6 +169,8 @@ class PLC:
         Retrieves a program names list from the PLC
         Sanity check: checks if programNames is empty
         and runs _getTagList
+
+        returns Response class (.TagName, .Value, .Status)
         """
         tags = ''
         if not self.ProgramNames:
@@ -170,12 +186,16 @@ class PLC:
     def Discover(self):
         """
         Query all the EIP devices on the network
+
+        returns Response class (.TagName, .Value, .Status)
         """
         return self._discover()
 
     def GetModuleProperties(self, slot):
         """
         Get the properties of module in specified slot
+
+        returns Response class (.TagName, .Value, .Status)
         """
         return self._getModuleProperties(slot)
 
