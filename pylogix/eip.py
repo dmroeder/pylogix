@@ -29,12 +29,12 @@ from struct import pack, unpack_from
 
 class PLC:
 
-    def __init__(self):
+    def __init__(self, ip_address="", slot=0):
         """
         Initialize our parameters
         """
-        self.IPAddress = ""
-        self.ProcessorSlot = 0
+        self.IPAddress = ip_address
+        self.ProcessorSlot = slot
         self.Micro800 = False
         self.Port = 44818
         self.VendorID = 0x1337

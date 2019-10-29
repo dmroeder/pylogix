@@ -1,6 +1,8 @@
 10/29/19
   - Moved examples from pylogix to root directory
-  - Added comments about how data is returned.
+  - Added comments about how data is returned
+  - Added IP address and slot as parameters to PLC
+  - Upped version to 0.4.12
 
 10/02/19
   - setup.py imports version from __init__
