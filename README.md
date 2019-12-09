@@ -44,7 +44,7 @@ The cloned repository will come with many examples, I'll give one here.  We'll r
 
 ```
 from pylogix import PLC
-with comm as PLC()
+with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
     ret = comm.Read('MyTagName')
     print(ret.TagName, ret.Value, ret.Status)
