@@ -257,7 +257,7 @@ class PLC:
         """
         self.Offset = 0
         writeData = []
-
+        
         if not self._connect():
             return None
 
@@ -274,7 +274,8 @@ class PLC:
         else:
             elements = 1
             value = [value]
-
+            
+        # format the values
         for v in value:
             if dataType == 202 or dataType == 203:
                 writeData.append(float(v))
@@ -283,19 +284,37 @@ class PLC:
             else:
                 writeData.append(int(v))
 
-        # write a bit of a word, boolean array or everything else
-        if BitofWord(tag):
-            tagData = self._buildTagIOI(tag, isBoolArray=False)
-            writeRequest = self._addWriteBitIOI(tag, tagData, writeData, dataType)
-        elif dataType == 211:
-            tagData = self._buildTagIOI(tag, isBoolArray=True)
-            writeRequest = self._addWriteBitIOI(tag, tagData, writeData, dataType)
-        else:
-            tagData = self._buildTagIOI(tag, isBoolArray=False)
-            writeRequest = self._addWriteIOI(tagData, writeData, dataType)
+        # save the number of values we are writing
+        element_count = len(writeData)
 
-        eipHeader = self._buildEIPHeader(writeRequest)
-        status, retData = self._getBytes(eipHeader)
+        # convert writeData to packet sized lists
+        writeData = self._convert_write_data(b, dataType, writeData)
+
+        # parse the tag ioi
+        if BitofWord(tag):
+            ioi = self._buildTagIOI(tag, isBoolArray=False)
+        elif dataType == 211:
+            ioi = self._buildTagIOI(tag, isBoolArray=True)
+        else:
+            ioi = self._buildTagIOI(tag, isBoolArray=False)
+
+        # handle sending the write data
+        if len(writeData) > 1:
+            # write requires multiple packets
+            for w in writeData:
+                writeRequest = self._write_fragment_request(element_count, ioi, w, dataType)
+                eipHeader = self._buildEIPHeader(writeRequest)
+                status, retData = self._getBytes(eipHeader)
+                self.Offset += len(w)*self.CIPTypes[dataType][0]
+        else:
+            # write fits in one packet
+            if BitofWord(tag) or dataType == 211:
+                writeRequest = self._addWriteBitIOI(tag, ioi, writeData[0], dataType)
+            else:
+                writeRequest = self._addWriteIOI(ioi, writeData[0], dataType)
+
+            eipHeader = self._buildEIPHeader(writeRequest)
+            status, retData = self._getBytes(eipHeader)
 
         return Response(tag, value, status)
 
@@ -1180,6 +1199,35 @@ class PLC:
 
         return writeIOI
 
+    def _write_fragment_request(self, count, ioi, write_data, data_type):
+        """
+        Add the fragmented write command stuff to the tagIOI
+        """
+        element_size = self.CIPTypes[data_type][0]
+        data_len = len(write_data)
+        path_size = int(len(ioi)/2)
+        service = 0x53
+        request = pack('<BB', service, path_size)
+        request += ioi
+
+        if data_type == 160:
+            request += pack('<BB', data_type, 0x02)
+            request += pack('<H', self.StructIdentifier)
+        else:
+            request += pack('<H', data_type)
+        request += pack('<H', count)
+        request += pack('<I', self.Offset)
+
+        for v in write_data:
+            try:
+                for i in range(len(v)):
+                    el = v[i]
+                    request += pack(self.CIPTypes[data_type][2], el)
+            except Exception:
+                request += pack(self.CIPTypes[data_type][2], v)
+
+        return request
+
     def _buildEIPHeader(self, tagIOI):
         """
         The EIP Header contains the tagIOI and the
@@ -1429,6 +1477,28 @@ class PLC:
             return tag, None, 0
         else:
             return tag, None, status
+
+    def _convert_write_data(self, tag, data_type, write_values):
+        '''
+        In order to handle write requests that are larger than a single
+        packet, we'll break up the values to write into multiple lists
+        of values.  The size of each list will be calculated based on the
+        connection size, length of the tag name and the data type.
+        '''
+        # packet header is always 110 bytes
+        packet_overhead = 110
+        # calculate number of bytes tag name will occupy
+        tag_length = len(tag) + len(tag) % 2
+        # calculate the available space (in bytes) for the write values
+        space_for_payload = self.ConnectionSize - packet_overhead - tag_length
+        
+        # calculate how many bytes per value are required
+        bytes_per_value  = self.CIPTypes[data_type][0]
+        # calculate the limit for values in each request
+        limit = int(space_for_payload / bytes_per_value)
+        # split the list up into multiple smaller lists
+        chunks = [write_values[x:x+limit] for x in range(0, len(write_values), limit)]
+        return chunks
 
     def _wordsToBits(self, tag, value, count=0):
         """

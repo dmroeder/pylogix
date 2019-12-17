@@ -1,3 +1,6 @@
+12/17/19
+  - Added fragmented write for arrays larger than a packet
+
 10/29/19
   - Moved examples from pylogix to root directory
   - Added comments about how data is returned
