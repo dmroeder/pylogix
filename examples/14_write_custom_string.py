@@ -19,7 +19,6 @@ have to write the data, we have to also write the length.
 from pylogix import PLC
 
 with PLC() as comm:
-    comm = PLC()
     comm.IPAddress = '192.168.1.9'
     string_size = 20
     text = 'This is some text'

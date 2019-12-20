@@ -24,6 +24,5 @@ initial read...
 from pylogix import PLC
 
 with PLC() as comm:
-    comm = PLC()
     comm.IPAddress = '192.168.1.9'
     comm.Write('Zone1Case', 10, datatype=196)

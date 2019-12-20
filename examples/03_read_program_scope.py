@@ -20,7 +20,6 @@ Program:MiscHMI.TimeArray[0]
 from pylogix import PLC
 
 with PLC() as comm:
-    comm = PLC()
     comm.IPAddress = '192.168.1.9'
     ret = comm.Read('Program:MiscHMI.TimeArray[0]')
     print(ret.Value)

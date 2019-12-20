@@ -1,5 +1,7 @@
 12/20/19
+  - Implemented multi-write service
   - Just some renaming and cleanup
+  - More cleanup and renaming
 
 12/17/19
   - Added fragmented write for arrays larger than a packet

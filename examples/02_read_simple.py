@@ -15,7 +15,6 @@ this is handled automatically.
 from pylogix import PLC
 
 with PLC() as comm:
-    comm = PLC()
     comm.IPAddress = '192.168.1.9'
     ret = comm.Read('CurrentScreen')
     print(ret.Value)

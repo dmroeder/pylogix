@@ -29,7 +29,6 @@ tag_list = ['Zone1ASpeed', 'Zone1BSpeed', 'Zone2ASpeed', 'Zone2BSpeed', 'Zone3AS
             'Zone4ASpeed', 'ZOne4BSpeed', 'Zone1Case', 'Zone2Case']
 
 with PLC() as comm:
-    comm = PLC()
     comm.IPAddress = '192.168.1.9'
     ret = comm.Read(tag_list)
     for r in ret:

@@ -18,7 +18,6 @@ from pylogix import PLC
 values = [8,6,7,5,3,0,9]
 
 with PLC() as comm:
-    comm = PLC()
     comm.IPAddress = '192.168.1.9'
     comm.Write('LargeArray[10]', values)
     

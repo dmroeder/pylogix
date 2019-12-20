@@ -54,7 +54,8 @@ class PLC:
         self.TagList = []
         self.ProgramNames = []
         self.StructIdentifier = 0x0fCE
-        self.CIPTypes = {160: (88, "STRUCT", 'B'),
+        self.CIPTypes = {0: (0, "UNKNOWN", '?'),
+                         160: (88, "STRUCT", 'B'),
                          193: (1, "BOOL", '?'),
                          194: (1, "SINT", 'b'),
                          195: (2, "INT", 'h'),
@@ -94,14 +95,20 @@ class PLC:
         else:
             return self._readTag(tag, count, datatype)
 
-    def Write(self, tag, value, datatype=None):
+    def Write(self, tag, value=None, datatype=None):
         """
         We have two options for writing depending on
         the arguments, write a single tag, or write an array
 
         returns Response class (.TagName, .Value, .Status)
         """
-        return self._writeTag(tag, value, datatype)
+        if isinstance(tag, (list, tuple)):
+            return self._multiWrite(tag)
+        else:
+            if value == None:
+                raise TypeError('You must provide a value to write')
+            else:
+                return self._writeTag(tag, value, datatype)
 
     def MultiRead(self, tags):
         """
@@ -226,7 +233,7 @@ class PLC:
         if data_type == 211:
             # bool array
             words = _getWordCount(index, elements, bit_count)
-            request = self._addReadIOI(ioi, words)
+            request = self._add_read_service(ioi, words)
         elif BitofWord(tag):
             # bits of word
             split_tag = tag_name.split('.')
@@ -235,10 +242,10 @@ class PLC:
 
             words = _getWordCount(bit_pos, elements, bit_count)
 
-            request = self._addReadIOI(ioi, words)
+            request = self._add_read_service(ioi, words)
         else:
             # everything else
-            request = self._addReadIOI(ioi, elements)
+            request = self._add_read_service(ioi, elements)
 
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
@@ -294,16 +301,16 @@ class PLC:
         if len(write_data) > 1:
             # write requires multiple packets
             for w in write_data:
-                request = self._write_fragment_request(element_count, ioi, w, data_type)
+                request = self._add_frag_write_service(element_count, ioi, w, data_type)
                 eip_header = self._buildEIPHeader(request)
                 status, ret_data = self._getBytes(eip_header)
                 self.Offset += len(w)*self.CIPTypes[data_type][0]
         else:
             # write fits in one packet
             if BitofWord(tag_name) or data_type == 211:
-                request = self._addWriteBitIOI(tag_name, ioi, write_data[0], data_type)
+                request = self._add_mod_write_service(tag_name, ioi, write_data[0], data_type)
             else:
-                request = self._addWriteIOI(ioi, write_data[0], data_type)
+                request = self._add_write_service(ioi, write_data[0], data_type)
 
             eip_header = self._buildEIPHeader(request)
             status, ret_data = self._getBytes(eip_header)
@@ -336,8 +343,8 @@ class PLC:
 
             ioi = self._buildTagIOI(tag_name, data_type)
 
-            readIOI = self._addReadIOI(ioi, 1)
-            serviceSegments.append(readIOI)
+            read_service = self._add_read_service(ioi, 1)
+            serviceSegments.append(read_service)
 
         header = self._buildMultiServiceHeader()
         segmentCount = pack('<H', tag_count)
@@ -359,7 +366,66 @@ class PLC:
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
 
-        return self._multiParser(tags, ret_data)
+        return self._multiReadParser(tags, ret_data)
+
+    def _multiWrite(self, write_data):
+        """
+        Processes the multiple write request
+        """
+        serviceSegments = []
+        segments = b""
+        tag_count = len(write_data)
+        self.Offset = 0
+
+        if not self._connect():
+            return None
+
+        for wd in write_data:
+
+            tag_name, base_tag, index = _parseTagName(wd[0], 0)
+            resp = self._initial_read(tag_name, base_tag, None)
+
+            if base_tag in self.KnownTags.keys():
+                data_type = self.KnownTags[base_tag][0]
+            else:
+                data_type = 0
+
+            ioi = self._buildTagIOI(tag_name, data_type)
+            
+            # format the values
+            if data_type == 202 or data_type == 203:
+                value = float(wd[1])
+            elif data_type == 160 or data_type == 218:
+                value = self._makeString(wd[1])
+            else:
+                value = int(wd[1])
+
+            write_service = self._add_write_service(ioi, [value], data_type)
+            serviceSegments.append(write_service)
+
+        header = self._buildMultiServiceHeader()
+        segmentCount = pack('<H', tag_count)
+
+        temp = len(header)
+        if tag_count > 2:
+            temp += (tag_count-2)*2
+        offsets = pack('<H', temp)
+
+        # assemble all the segments
+        for i in range(tag_count):
+            segments += serviceSegments[i]
+
+        for i in range(tag_count-1):
+            temp += len(serviceSegments[i])
+            offsets += pack('<H', temp)
+
+        request = header + segmentCount + offsets + segments
+        eip_header = self._buildEIPHeader(request)
+        status, ret_data = self._getBytes(eip_header)
+
+        #tags = [t[0] for t in stuff]
+
+        return self._multiWriteParser(write_data, ret_data)
 
     def _getPLCTime(self, raw=False):
         """
@@ -430,7 +496,7 @@ class PLC:
                                Time)
 
         eip_header = self._buildEIPHeader(AttributePacket)
-        status, retData = self._getBytes(eip_header)
+        status, ret_data = self._getBytes(eip_header)
 
         return Response(None, Time, status)
 
@@ -518,7 +584,10 @@ class PLC:
         return Response(None, tags, status)
 
     def _getUDT(self, tag_list):
-
+        """
+        Request information about UDT makeup.
+        Returns the tag list with UDT name appended
+        """
         # get only tags that are a struct
         struct_tags = [x for x in tag_list if x.Struct == 1]
         # reduce our struct tag list to only unique instances
@@ -570,7 +639,6 @@ class PLC:
         """
         Get the members of a UDT so we can get it
         """
-
         if not self._connect():
             return None
 
@@ -1098,74 +1166,69 @@ class PLC:
 
         return ioi
 
-    def _addReadIOI(self, tagIOI, elements):
+    def _add_read_service(self, ioi, elements):
         """
         Add the read service to the tagIOI
         """
         RequestService = 0x4C
-        RequestPathSize = int(len(tagIOI)/2)
-        readIOI = pack('<BB', RequestService, RequestPathSize)
-        readIOI += tagIOI
-        readIOI += pack('<H', int(elements))
-        return readIOI
+        RequestPathSize = int(len(ioi)/2)
+        read_service = pack('<BB', RequestService, RequestPathSize)
+        read_service += ioi
+        read_service += pack('<H', int(elements))
+        return read_service
 
-    def _addPartialReadIOI(self, tagIOI, elements):
+    def _add_partial_read_service(self, ioi, elements):
         """
         Add the partial read service to the tag IOI
         """
         RequestService = 0x52
-        RequestPathSize = int(len(tagIOI)/2)
-        readIOI = pack('<BB', RequestService, RequestPathSize)
-        readIOI += tagIOI
-        readIOI += pack('<H', int(elements))
-        readIOI += pack('<I', self.Offset)
-        return readIOI
+        RequestPathSize = int(len(ioi)/2)
+        read_service = pack('<BB', RequestService, RequestPathSize)
+        read_service += ioi
+        read_service += pack('<H', int(elements))
+        read_service += pack('<I', self.Offset)
+        return read_service
 
-    def _addWriteIOI(self, tagIOI, writeData, dataType):
+    def _add_write_service(self, ioi, write_data, data_type):
         """
         Add the write command stuff to the tagIOI
         """
-        elementSize = self.CIPTypes[dataType][0]
-        dataLen = len(writeData)
-        NumberOfBytes = elementSize*dataLen
-        RequestNumberOfElements = dataLen
-        RequestPathSize = int(len(tagIOI)/2)
+        RequestPathSize = int(len(ioi)/2)
         RequestService = 0x4D
-        CIPWriteRequest = pack('<BB', RequestService, RequestPathSize)
-        CIPWriteRequest += tagIOI
+        write_service = pack('<BB', RequestService, RequestPathSize)
+        write_service += ioi
 
-        if dataType == 160:
+        if data_type == 160:
             RequestNumberOfElements = self.StructIdentifier
             TypeCodeLen = 0x02
-            CIPWriteRequest += pack('<BBHH', dataType, TypeCodeLen, RequestNumberOfElements, len(writeData))
+            write_service += pack('<BBHH', data_type, TypeCodeLen, self.StructIdentifier, len(write_data))
         else:
             TypeCodeLen = 0x00
-            CIPWriteRequest += pack('<BBH', dataType, TypeCodeLen, RequestNumberOfElements)
+            write_service += pack('<BBH', data_type, TypeCodeLen, len(write_data))
 
-        for v in writeData:
+        for v in write_data:
             try:
                 for i in range(len(v)):
                     el = v[i]
-                    CIPWriteRequest += pack(self.CIPTypes[dataType][2], el)
+                    write_service += pack(self.CIPTypes[data_type][2], el)
             except Exception:
-                CIPWriteRequest += pack(self.CIPTypes[dataType][2], v)
+                write_service += pack(self.CIPTypes[data_type][2], v)
 
-        return CIPWriteRequest
+        return write_service
 
-    def _addWriteBitIOI(self, tag_name, ioi, writeData, data_type):
+    def _add_mod_write_service(self, tag_name, ioi, write_data, data_type):
         """
         This will add the bit level request to the tagIOI
         Writing to a bit is handled in a different way than
         other writes
         """
-        elementSize = self.CIPTypes[data_type][0]
-        dataLen = len(writeData)
-        NumberOfBytes = elementSize*dataLen
-        RequestNumberOfElements = dataLen
+        element_size = self.CIPTypes[data_type][0]
+        data_len = len(write_data)
+        byte_count = element_size*data_len
         RequestPathSize = int(len(ioi)/2)
         RequestService = 0x4E
-        writeIOI = pack('<BB', RequestService, RequestPathSize)
-        writeIOI += ioi
+        write_request = pack('<BB', RequestService, RequestPathSize)
+        write_request += ioi
 
         fmt = self.CIPTypes[data_type][2]
         fmt = fmt.upper()
@@ -1178,24 +1241,22 @@ class PLC:
             index = s[len(s)-1]
             index = int(index)
 
-        writeIOI += pack('<h', NumberOfBytes)
-        byte = 2**(NumberOfBytes*8)-1
+        write_request += pack('<h', byte_count)
+        byte = 2**(byte_count*8)-1
         bits = 2**index
-        if writeData[0]:
-            writeIOI += pack(fmt, bits)
-            writeIOI += pack(fmt, byte)
+        if write_data[0]:
+            write_request += pack(fmt, bits)
+            write_request += pack(fmt, byte)
         else:
-            writeIOI += pack(fmt, 0x00)
-            writeIOI += pack(fmt, (byte-bits))
+            write_request += pack(fmt, 0x00)
+            write_request += pack(fmt, (byte-bits))
 
-        return writeIOI
+        return write_request
 
-    def _write_fragment_request(self, count, ioi, write_data, data_type):
+    def _add_frag_write_service(self, count, ioi, write_data, data_type):
         """
         Add the fragmented write command stuff to the tagIOI
         """
-        element_size = self.CIPTypes[data_type][0]
-        data_len = len(write_data)
         path_size = int(len(ioi)/2)
         service = 0x53
         request = pack('<BB', service, path_size)
@@ -1219,7 +1280,7 @@ class PLC:
 
         return request
 
-    def _buildEIPHeader(self, tagIOI):
+    def _buildEIPHeader(self, ioi):
         """
         The EIP Header contains the tagIOI and the
         commands to perform the read or write.  This request
@@ -1228,11 +1289,11 @@ class PLC:
         if self.ContextPointer == 155:
             self.ContextPointer = 0
 
-        EIPPayloadLength = 22+len(tagIOI)
-        EIPConnectedDataLength = len(tagIOI)+2
+        EIPPayloadLength = 22+len(ioi)
+        EIPConnectedDataLength = len(ioi)+2
 
         EIPCommand = 0x70
-        EIPLength = 22 + len(tagIOI)
+        EIPLength = 22 + len(ioi)
         EIPSessionHandle = self.SessionHandle
         EIPStatus = 0x00
         EIPContext = context_dict[self.ContextPointer]
@@ -1266,7 +1327,7 @@ class PLC:
                               EIPItem1,
                               EIPItem2ID, EIPItem2Length, EIPSequence)
 
-        return EIPHeaderFrame+tagIOI
+        return EIPHeaderFrame+ioi
 
     def _buildMultiServiceHeader(self):
         """
@@ -1329,20 +1390,20 @@ class PLC:
 
         tag, base_tag, index = _parseTagName(tag_name, 0)
         data_type = self.KnownTags[base_tag][0]
-        bitCount = self.CIPTypes[data_type][0] * 8
+        bit_count = self.CIPTypes[data_type][0] * 8
 
         # if bit of word was requested
         if BitofWord(tag_name):
             split_tag = tag_name.split('.')
-            bitPos = split_tag[len(split_tag)-1]
-            bitPos = int(bitPos)
+            bit_pos = split_tag[len(split_tag)-1]
+            bit_pos = int(bit_pos)
 
-            wordCount = _getWordCount(bitPos, elements, bitCount)
-            words = self._getReplyValues(tag_name, wordCount, data)
+            word_count = _getWordCount(bit_pos, elements, bit_count)
+            words = self._getReplyValues(tag_name, word_count, data)
             vals = self._wordsToBits(tag_name, words, count=elements)
         elif data_type == 211:
-            wordCount = _getWordCount(index, elements, bitCount)
-            words = self._getReplyValues(tag_name, wordCount, data)
+            word_count = _getWordCount(index, elements, bit_count)
+            words = self._getReplyValues(tag_name, word_count, data)
             vals = self._wordsToBits(tag_name, words, count=elements)
         else:
             vals = self._getReplyValues(tag_name, elements, data)
@@ -1367,33 +1428,33 @@ class PLC:
             CIPFormat = self.CIPTypes[data_type][2]
             vals = []
 
-            dataSize = self.CIPTypes[data_type][0]
-            numbytes = len(data)-dataSize
+            data_size = self.CIPTypes[data_type][0]
+            numbytes = len(data)-data_size
             counter = 0
             self.Offset = 0
             for i in range(elements):
-                index = 52+(counter*dataSize)
+                index = 52+(counter*data_size)
                 if data_type == 160:
                     tmp = unpack_from('<h', data, 52)[0]
                     if tmp == self.StructIdentifier:
                         # gotta handle strings a little different
-                        index = 54+(counter*dataSize)
-                        NameLength = unpack_from('<L', data, index)[0]
-                        s = data[index+4:index+4+NameLength]
+                        index = 54+(counter*data_size)
+                        name_len = unpack_from('<L', data, index)[0]
+                        s = data[index+4:index+4+name_len]
                         vals.append(str(s.decode('utf-8')))
                     else:
                         d = data[index:index+len(data)]
                         vals.append(d)
                 elif data_type == 218:
-                    index = 52+(counter*dataSize)
-                    NameLength = unpack_from('<B', data, index)[0]
-                    s = data[index+1:index+1+NameLength]
+                    index = 52+(counter*data_size)
+                    name_len = unpack_from('<B', data, index)[0]
+                    s = data[index+1:index+1+name_len]
                     vals.append(str(s.decode('utf-8')))
                 else:
                     returnvalue = unpack_from(CIPFormat, data, index)[0]
                     vals.append(returnvalue)
 
-                self.Offset += dataSize
+                self.Offset += data_size
                 counter += 1
 
                 # re-read because the data is in more than one packet
@@ -1402,14 +1463,14 @@ class PLC:
                     counter = 0
 
                     ioi = self._buildTagIOI(tag_name, data_type)
-                    readIOI = self._addPartialReadIOI(ioi, elements)
-                    eip_header = self._buildEIPHeader(readIOI)
+                    read_service = self._add_partial_read_service(ioi, elements)
+                    eip_header = self._buildEIPHeader(read_service)
 
                     self.Socket.send(eip_header)
                     data = self.recv_data()
 
                     status = unpack_from('<B', data, 48)[0]
-                    numbytes = len(data)-dataSize
+                    numbytes = len(data)-data_size
 
             return vals
 
@@ -1454,7 +1515,7 @@ class PLC:
             return tag, None, 0
 
         ioi = self._buildTagIOI(base_tag, data_type)
-        request = self._addPartialReadIOI(ioi, 1)
+        request = self._add_partial_read_service(ioi, 1)
         eip_header = self._buildEIPHeader(request)
 
         # send our tag read request
@@ -1513,7 +1574,7 @@ class PLC:
 
         return ret[bitPos:bitPos+count]
 
-    def _multiParser(self, tags, data):
+    def _multiReadParser(self, tags, data):
         """
         Takes multi read reply data and returns an array of the values
         """
@@ -1559,6 +1620,29 @@ class PLC:
             reply.append(response)
 
         return reply
+
+    def _multiWriteParser(self, write_data, data):
+        # remove the beginning of the packet because we just don't care about it
+        stripped = data[50:]
+        tag_count = unpack_from('<H', stripped, 0)[0]
+
+        # get the offset values for each of the tags in the packet
+        offsets = []
+        for i in range(tag_count):
+            loc = i*2+2
+            offsets.append(unpack_from('<H', stripped, loc)[0])
+        
+        reply = []
+        for i, offset in enumerate(offsets):
+            loc = 2 + len(offsets)
+            status = unpack_from('<B', stripped, offset+2)[0]
+            response = Response(write_data[i][0], write_data[i][1], status)
+            reply.append(response)
+
+        return reply
+
+        
+
 
     def _buildListIdentity(self):
         """
