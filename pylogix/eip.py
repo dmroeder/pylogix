@@ -110,14 +110,6 @@ class PLC:
             else:
                 return self._writeTag(tag, value, datatype)
 
-    def MultiRead(self, tags):
-        """
-        Read multiple tags in one request
-
-        returns a list of Response class (.TagName, .Value, .Status)
-        """
-        return self._multiRead(tags)
-
     def GetPLCTime(self, raw=False):
         """
         Get the PLC's clock time, return as human readable (default) or raw if raw=True

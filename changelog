@@ -1,4 +1,6 @@
 12/20/19
+  - Upped version to 0.5.0
+  - Removed deprecated MultiRead method since Read handles this
   - Implemented multi-write service
   - Just some renaming and cleanup
   - More cleanup and renaming
