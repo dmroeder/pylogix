@@ -1,3 +1,6 @@
+12/20/19
+  - Just some renaming and cleanup
+
 12/17/19
   - Added fragmented write for arrays larger than a packet
 
