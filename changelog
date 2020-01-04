@@ -1,3 +1,7 @@
+01/04/19
+  - Upped version to 0.6.0, skipping the 0.5.x series
+  - Fix for writing strings to Micro800
+
 12/20/19
   - Upped version to 0.5.0
   - Removed deprecated MultiRead method since Read handles this

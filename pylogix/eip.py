@@ -68,7 +68,7 @@ class PLC:
                          202: (4, "REAL", 'f'),
                          203: (8, "LREAL", 'd'),
                          211: (4, "DWORD", 'I'),
-                         218: (0, "STRING", 'B')}
+                         218: (1, "STRING", 'B')}
 
     def __enter__(self):
         return self
