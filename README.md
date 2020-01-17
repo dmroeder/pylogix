@@ -2,6 +2,8 @@
 
 This project will allow you to easily read/write values from tags in Rockwell Automation Logix based PLC's over Ethernet I/P using Python.  PLC models inclued CompactLogix, ControlLogix and Micro8xx.  Python2 and Python3 are both supported.
 
+This project does not support PLC5, SLC or the Micrologix controllers.
+
 ## Getting Started
 
 There are currently no dependencies so you can get going quickly without having to install any other prerequiste packages.

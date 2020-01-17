@@ -1,4 +1,7 @@
-01/04/19
+01/16/20
+  - Updated readme
+
+01/04/20
   - Upped version to 0.6.0, skipping the 0.5.x series
   - Fix for writing strings to Micro800
 
