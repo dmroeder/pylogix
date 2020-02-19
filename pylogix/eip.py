@@ -42,6 +42,8 @@ class PLC:
         self.ContextPointer = 0
         self.Socket = socket.socket()
         self.SocketConnected = False
+        self._registered = False
+        self._connected = False
         self.OTNetworkConnectionID = None
         self.SessionHandle = 0x0000
         self.SessionRegistered = False
@@ -741,7 +743,7 @@ class PLC:
         Request the properties of a module in a particular
         slot.  Returns LgxDevice
         """
-        if not self._connect():
+        if not self._connect(False):
             return None
 
         AttributeService = 0x01
@@ -779,12 +781,19 @@ class PLC:
         else:
             return Response(None, LGXDevice(), status)
 
-    def _connect(self):
+    def _connect(self, connected=True):
         """
-        Open a connection to the PLC
+        Open a connection to the PLC.
         """
         if self.SocketConnected:
-            return True
+            if connected and not self._connected:
+                # connection type changed, need to close so we can reconnect
+                self._closeConnection()
+            elif not connected and self._connected:
+                # connection type changed, need to close so we can reconnect
+                self._closeConnection()
+            else:
+                return True
 
         # Make sure the connection size is correct
         if not 500 <= self.ConnectionSize <= 4000:
@@ -804,32 +813,38 @@ class PLC:
         ret_data = self.recv_data()
         if ret_data:
             self.SessionHandle = unpack_from('<I', ret_data, 4)[0]
+            self._registered = True
         else:
             self.SocketConnected = False
             raise Exception("Failed to register session")
 
-        self.Socket.send(self._buildForwardOpenPacket())
-        ret_data = self.recv_data()
-        sts = unpack_from('<b', ret_data, 42)[0]
-        if not sts:
-            self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
-            self.SocketConnected = True
-        else:
-            self.SocketConnected = False
-            raise Exception("Forward Open Failed")
-
-        return True
+        if connected:
+            self.Socket.send(self._buildForwardOpenPacket())
+            ret_data = self.recv_data()
+            sts = unpack_from('<b', ret_data, 42)[0]
+            if not sts:
+                self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
+                self._connected = True
+            else:
+                self.SocketConnected = False
+                raise Exception("Forward Open Failed")
+        self.SocketConnected = True
+        return self.SocketConnected
 
     def _closeConnection(self):
         """
         Close the connection to the PLC (forward close, unregister session)
         """
         self.SocketConnected = False
-        close_packet = self._buildForwardClosePacket()
-        unreg_packet = self._buildUnregisterSession()
+        
+        
         try:
-            self.Socket.send(close_packet)
-            self.Socket.send(unreg_packet)
+            if self._registered:
+                close_packet = self._buildForwardClosePacket()
+                self.Socket.send(close_packet)
+            if self._connected:
+                unreg_packet = self._buildUnregisterSession()
+                self.Socket.send(unreg_packet)
             self.Socket.close()
         except Exception:
             self.Socket.close()

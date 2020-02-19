@@ -1,3 +1,6 @@
+02/19/20
+  - Changed connection to properly allow unconnected send for getting module properties
+
 01/16/20
   - Updated readme
 
