@@ -33,6 +33,48 @@ class LGXDevice():
         self.ProductName=""
         self.State=None
 
+    def __repr__(self):
+
+        props = ''
+        props += 'Length={}, '.format(self.Length)
+        props += 'EncapsulationVersion={}, '.format(self.EncapsulationVersion)
+        props += 'IPAddress={}, '.format(self.IPAddress)
+        props += 'VendorID={}, '.format(self.VendorID)
+        props += 'Vendor={}, '.format(self.Vendor)
+        props += 'DeviceID={}, '.format(self.DeviceID)
+        props += 'DeviceType={}, '.format(self.DevceType)
+        props += 'ProductCode={}, '.format(self.ProductCode)
+        props += 'Revision={}, '.format(self.Revision)
+        props += 'Status={}, '.format(self.Status)
+        props += 'SerialNumber={}, '.format(self.SerialNumber)
+        props += 'ProductNameLength={}, '.format(self.ProductNameLength)
+        props += 'ProductName={}, '.format(self.ProductName)
+        props += 'State={}'.format(self.State)
+
+        return 'LGXDevice({})'.format(props)
+
+
+
+    def __str__(self):
+
+        ret = "{} {} {} {} {} {} {} {} {} {} {} {} {} {}".format(
+                 self.Length,
+                 self.EncapsulationVersion,
+                 self.IPAddress,
+                 self.VendorID,
+                 self.Vendor,
+                 self.DeviceID,
+                 self.DeviceType,
+                 self.ProductCode,
+                 self.Revision,
+                 self.Status,
+                 self.SerialNumber,
+                 self.ProductNameLength,
+                 self.ProductName,
+                 self.State)
+
+        return ret
+
 def GetDevice(deviceID):
     if deviceID in devices.keys():
         return devices[deviceID]

@@ -1931,6 +1931,31 @@ class LgxTag:
         self.Struct = 0x00
         self.Size = 0x00
 
+    def __repr__(self):
+
+        props = ''
+        props += 'TagName={}, '.format(self.TagName)
+        props += 'InstanceID={}, '.format(self.InstanceID)
+        props += 'SymbolType={}, '.format(self.SymbolType)
+        props += 'DataTypeValue={}, '.format(self.DataTypeValue)
+        props += 'DataType={}, '.format(self.DataType)
+        props += 'Array={}, '.format(self.Array)
+        props += 'Struct={}, '.format(self.Struct)
+        props += 'Size={}'.format(self.Size)
+
+        return 'LgxTag({})'.format(props)
+
+    def __str__(self):
+
+        return '{} {} {} {} {} {} {} {}'.format(
+                self.TagName,
+                self.InstanceID,
+                self.SymbolType,
+                self.DataTypeValue,
+                self.DataType,
+                self.Array,
+                self.Struct,
+                self.Size)
 
 class Response:
 

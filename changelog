@@ -1,6 +1,7 @@
 02/19/20
   - Changed connection to properly allow unconnected send for getting module properties
   - Added GetDeviceProperties to get properties of a device at the specified address
+  - Added str() and repr() methods to LgxTag and LGXDevice
 
 01/16/20
   - Updated readme
