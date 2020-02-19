@@ -200,6 +200,15 @@ class PLC:
         """
         return self._getModuleProperties(slot)
 
+    def GetDeviceProperties(self):
+        """
+        Get the device properties of a device at the
+        specified IP address
+
+        returns Response class (.TagName, .Value, .Status)
+        """
+        return self._getDeviceProperties()
+
     def Close(self):
         """
         Close the connection to the PLC
@@ -770,6 +779,41 @@ class PLC:
                                LinkAddress)
 
         frame = self._buildCIPUnconnectedSend() + AttributePacket
+        eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
+        pad = pack('<I', 0x00)
+        self.Socket.send(eip_header)
+        ret_data = pad + self.recv_data()
+        status = unpack_from('<B', ret_data, 46)[0]
+
+        if status == 0:
+            return Response(None, _parseIdentityResponse(ret_data), status)
+        else:
+            return Response(None, LGXDevice(), status)
+
+    def _getDeviceProperties(self):
+        """
+        Request the properties of a device at the
+        specified IP address.  Returns LgxDevice
+        """
+        if not self._connect(False):
+            return None
+
+        AttributeService = 0x01
+        AttributeSize = 0x02
+        AttributeClassType = 0x20
+        AttributeClass = 0x01
+        AttributeInstanceType = 0x24
+        AttributeInstance = 0x01
+
+        AttributePacket = pack('<6B',
+                               AttributeService,
+                               AttributeSize,
+                               AttributeClassType,
+                               AttributeClass,
+                               AttributeInstanceType,
+                               AttributeInstance)
+
+        frame = AttributePacket
         eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
         pad = pack('<I', 0x00)
         self.Socket.send(eip_header)
