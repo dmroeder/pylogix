@@ -42,7 +42,7 @@ class LGXDevice():
         props += 'VendorID={}, '.format(self.VendorID)
         props += 'Vendor={}, '.format(self.Vendor)
         props += 'DeviceID={}, '.format(self.DeviceID)
-        props += 'DeviceType={}, '.format(self.DevceType)
+        props += 'DeviceType={}, '.format(self.DeviceType)
         props += 'ProductCode={}, '.format(self.ProductCode)
         props += 'Revision={}, '.format(self.Revision)
         props += 'Status={}, '.format(self.Status)
