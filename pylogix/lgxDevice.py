@@ -1,5 +1,5 @@
 '''
-   Copyright 2019 Dustin Roeder (dmroeder@gmail.com)   
+   Copyright 2020 Dustin Roeder (dmroeder@gmail.com)   
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -24,13 +24,13 @@ class LGXDevice():
         self.VendorID=None
         self.Vendor=None
         self.DeviceID=None
-        self.DeviceType=""
+        self.DeviceType=None
         self.ProductCode=None
         self.Revision=None
         self.Status=None
         self.SerialNumber=None
         self.ProductNameLength=None
-        self.ProductName=""
+        self.ProductName=None
         self.State=None
 
     def __repr__(self):

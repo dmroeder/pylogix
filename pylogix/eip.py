@@ -2,7 +2,7 @@
    Originally created by Burt Peterson
    Updated and maintained by Dustin Roeder (dmroeder@gmail.com)
 
-   Copyright 2019 Dustin Roeder
+   Copyright 2020 Dustin Roeder
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ from datetime import datetime, timedelta
 from .lgxDevice import LGXDevice, GetDevice, GetVendor
 from random import randrange
 from struct import pack, unpack_from
-
 
 class PLC:
 
@@ -137,10 +136,7 @@ class PLC:
 
         returns Response class (.TagName, .Value, .Status)
         """
-        tag_list = self._getTagList(allTags)
-        updated_list = self._getUDT(tag_list.Value)
-
-        return Response(None, updated_list, tag_list.Status)
+        return self._getTagList(allTags)
 
     def GetProgramTagList(self, programName):
         """
@@ -149,6 +145,9 @@ class PLC:
 
         returns Response class (.TagName, .Value, .Status)
         """
+        conn = self._connect()
+        if not conn[0]:
+            return Response(programName, None, conn[1])
 
         # If ProgramNames is empty then _getTagList hasn't been called
         if not self.ProgramNames:
@@ -163,7 +162,7 @@ class PLC:
             program_tags = self._getUDT(program_tags.Value)
             return Response(None, program_tags, status)
         else:
-            return Response(None, None, 'Program not found, please check name!')
+            return Response(programName, None, 'Program not found, please check name!')
 
     def GetProgramsList(self):
         """
@@ -173,6 +172,11 @@ class PLC:
 
         returns Response class (.TagName, .Value, .Status)
         """
+
+        conn = self._connect()
+        if not conn[0]:
+            return Response(None, None, conn[1])
+
         tags = ''
         if not self.ProgramNames:
             tags = self._getTagList(False)
@@ -217,12 +221,13 @@ class PLC:
 
     def _readTag(self, tag_name, elements, data_type):
         """
-        processes the read request
+        Processes the read request
         """
         self.Offset = 0
 
-        if not self._connect():
-            return None
+        conn = self._connect()
+        if not conn[0]:
+            return Response(tag_name, None, conn[1])
 
         tag, base_tag, index = _parseTagName(tag_name, 0)
         resp = self._initial_read(tag, base_tag, data_type)
@@ -266,8 +271,9 @@ class PLC:
         self.Offset = 0
         write_data = []
         
-        if not self._connect():
-            return None
+        conn = self._connect()
+        if not conn[0]:
+            return Response(tag_name, value, conn[1])
 
         tag, base_tag, index = _parseTagName(tag_name, 0)
         resp = self._initial_read(tag, base_tag, data_type)
@@ -329,8 +335,9 @@ class PLC:
         tag_count = len(tags)
         self.Offset = 0
 
-        if not self._connect():
-            return None
+        conn = self._connect()
+        if not conn[0]:
+            return [Response(None, None, conn[1])]
 
         for tag in tags:
             if isinstance(tag, (list, tuple)):
@@ -380,8 +387,9 @@ class PLC:
         tag_count = len(write_data)
         self.Offset = 0
 
-        if not self._connect():
-            return None
+        conn = self._connect()
+        if not conn[0]:
+            return [Response(None, value, conn[1])]
 
         for wd in write_data:
 
@@ -426,16 +434,15 @@ class PLC:
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
 
-        #tags = [t[0] for t in stuff]
-
         return self._multiWriteParser(write_data, ret_data)
 
     def _getPLCTime(self, raw=False):
         """
         Requests the PLC clock time
         """
-        if not self._connect():
-            return None
+        conn = self._connect()
+        if not conn[0]:
+            return Response(None, None, conn[1])
 
         AttributeService = 0x03
         AttributeSize = 0x02
@@ -475,8 +482,9 @@ class PLC:
         """
         Requests the PLC clock time
         """
-        if not self._connect():
-            return None
+        conn = self._connect()
+        if not conn[0]:
+            return Response(None, None, conn[1])
 
         AttributeService = 0x04
         AttributeSize = 0x02
@@ -507,8 +515,9 @@ class PLC:
         """
         Requests the controller tag list and returns a list of LgxTag type
         """
-        if not self._connect():
-            return None
+        conn = self._connect()
+        if not conn[0]:
+            return Response(None, None, conn[1])
 
         self.Offset = 0
         tags = []
@@ -553,15 +562,17 @@ class PLC:
                         tags += self._extractTagPacket(ret_data, program_name)
                     else:
                         return Response(None, None, status)
-
-        return Response(None, tags, status)
+                        
+        updated_list = self._getUDT(tags)
+        return Response(None, updated_list, status)
 
     def _getProgramTagList(self, programName):
         """
         Requests tag list for a specific program and returns a list of LgxTag type
         """
-        if not self._connect():
-            return None
+        conn = self._connect()
+        if not conn[0]:
+            return Response(None, None, conn[1])
 
         self.Offset = 0
         tags = []
@@ -584,6 +595,7 @@ class PLC:
             else:
                 return Response(None, None, status)
 
+        updated_list = self._getUDT(tags)
         return Response(None, tags, status)
 
     def _getUDT(self, tag_list):
@@ -629,10 +641,6 @@ class PLC:
         """
         Get the attributes of a UDT
         """
-
-        if not self._connect():
-            return None
-
         request = self._buildTemplateAttributes(instance)
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
@@ -642,9 +650,6 @@ class PLC:
         """
         Get the members of a UDT so we can get it
         """
-        if not self._connect():
-            return None
-
         request = self._readTemplateService(instance, dataLen)
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
@@ -752,8 +757,9 @@ class PLC:
         Request the properties of a module in a particular
         slot.  Returns LgxDevice
         """
-        if not self._connect(False):
-            return None
+        conn = self._connect(False)
+        if not conn[0]:
+            return Response(tag_name, value, conn[1])
 
         AttributeService = 0x01
         AttributeSize = 0x02
@@ -795,8 +801,9 @@ class PLC:
         Request the properties of a device at the
         specified IP address.  Returns LgxDevice
         """
-        if not self._connect(False):
-            return None
+        conn = self._connect(False)
+        if not conn[0]:
+            return Response(None, LGXDevice(), conn[1])
 
         AttributeService = 0x01
         AttributeSize = 0x02
@@ -837,21 +844,21 @@ class PLC:
                 # connection type changed, need to close so we can reconnect
                 self._closeConnection()
             else:
-                return True
+                return (True, 'Success')
 
         # Make sure the connection size is correct
         if not 500 <= self.ConnectionSize <= 4000:
-            raise ValueError("ConnectionSize must be an integer between 500 and 4000")
+            return (False, 'ConnectionSize must be an integer between 500 and 4000')
 
         try:
             self.Socket = socket.socket()
             self.Socket.settimeout(5.0)
             self.Socket.connect((self.IPAddress, self.Port))
-        except(socket.error):
+        except socket.error as e:
             self.SocketConnected = False
             self.SequenceCounter = 1
             self.Socket.close()
-            raise
+            return (False, e)
 
         self.Socket.send(self._buildRegisterSession())
         ret_data = self.recv_data()
@@ -860,27 +867,29 @@ class PLC:
             self._registered = True
         else:
             self.SocketConnected = False
-            raise Exception("Failed to register session")
+            return (False, 'Register session failed')
 
         if connected:
             self.Socket.send(self._buildForwardOpenPacket())
-            ret_data = self.recv_data()
+            try:
+                ret_data = self.recv_data()
+            except socket.timeout as e:
+                return (False, e)
             sts = unpack_from('<b', ret_data, 42)[0]
             if not sts:
                 self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
                 self._connected = True
             else:
                 self.SocketConnected = False
-                raise Exception("Forward Open Failed")
+                return (False, 'Forward open failed')
         self.SocketConnected = True
-        return self.SocketConnected
+        return (self.SocketConnected, 'Success')
 
     def _closeConnection(self):
         """
         Close the connection to the PLC (forward close, unregister session)
         """
         self.SocketConnected = False
-        
         
         try:
             if self._registered:
@@ -1692,9 +1701,6 @@ class PLC:
 
         return reply
 
-        
-
-
     def _buildListIdentity(self):
         """
         Build the list identity request for discovering Ethernet I/P
@@ -1770,7 +1776,6 @@ class PLC:
                 work.append(0x00)
         return work
 
-
 def _getBitOfWord(tag, value):
     """
     Takes a tag name, gets the bit from the end of
@@ -1793,7 +1798,6 @@ def _getBitOfWord(tag, value):
             pass
     return returnValue
 
-
 def _getWordCount(start, length, bits):
     """
     Get the number of words that the requested
@@ -1806,7 +1810,6 @@ def _getWordCount(start, length, bits):
 
     totalWords = (newEnd-1) / bits
     return totalWords + 1
-
 
 def _parseTagName(tag, offset):
     """
@@ -1837,7 +1840,6 @@ def _parseTagName(tag, offset):
     except Exception:
         return tag, bt, 0
 
-
 def BitofWord(tag):
     """
     Test if the user is trying to write to a bit of a word
@@ -1849,7 +1851,6 @@ def BitofWord(tag):
     else:
         return False
 
-
 def BitValue(value, bitno):
     """
     Returns the specific bit of a words value
@@ -1859,7 +1860,6 @@ def BitValue(value, bitno):
         return True
     else:
         return False
-
 
 def _parseIdentityResponse(data):
     # we're going to take the packet and parse all
@@ -1892,7 +1892,6 @@ def _parseIdentityResponse(data):
     resp.State = unpack_from('<B', state, 0)[0]
 
     return resp
-
 
 def parseLgxTag(packet, programName):
 
@@ -1973,7 +1972,6 @@ class Response:
 
         return '{} {} {}'.format(self.TagName, self.Value, self.Status)
 
-
 def get_error_code(status):
     """
     Get the CIP error code string, if the status is a string it will be returned
@@ -1993,7 +1991,6 @@ def get_error_code(status):
     else:
         err = 'Unknown error {}'.format(status)
     return err
-
 
 cip_error_codes = {0x00: 'Success',
                    0x01: 'Connection failure',

@@ -1,3 +1,6 @@
+03/20/20
+  - Impoved lost connections and error handling, upped version to 0.6.3
+
 02/28/20
   - Fixed typo in lgxDevice.py
   - Upped to version 0.6.2
