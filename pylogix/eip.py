@@ -35,6 +35,7 @@ class PLC:
         self.IPAddress = ip_address
         self.ProcessorSlot = slot
         self.Micro800 = False
+        self.Route = None
         self.Port = 44818
         self.VendorID = 0x1337
         self.Context = 0x00
@@ -656,7 +657,10 @@ class PLC:
         return ret_data
 
     def _buildTemplateAttributes(self, instance):
-
+        """
+        Build the template attribute packet, part of
+        retreiving the UDT names
+        """
         TemplateService = 0x03
         TemplateLength = 0x03
         TemplateClassType = 0x20
@@ -683,7 +687,10 @@ class PLC:
                     Attrib1)
 
     def _readTemplateService(self, instance, dataLen):
-
+        """
+        Build the template attribute packet, part of
+        retreiving the UDT names
+        """
         TemplateService = 0x4c
         TemplateLength = 0x03
         TemplateClassType = 0x20
@@ -704,6 +711,10 @@ class PLC:
                     DataLength)
 
     def _discover(self):
+        """
+        Discover devices on the network, similar to the RSLinx
+        Ethernet I/P driver
+        """
         devices = []
         request = self._buildListIdentity()
 
@@ -759,7 +770,7 @@ class PLC:
         """
         conn = self._connect(False)
         if not conn[0]:
-            return Response(tag_name, value, conn[1])
+            return Response(None, LGXDevice(), conn[1])
 
         AttributeService = 0x01
         AttributeSize = 0x02
@@ -767,24 +778,18 @@ class PLC:
         AttributeClass = 0x01
         AttributeInstanceType = 0x24
         AttributeInstance = 0x01
-        PathRouteSize = 0x01
-        Reserved = 0x00
-        Backplane = 0x01
-        LinkAddress = slot
 
-        AttributePacket = pack('<10B',
+        AttributePacket = pack('<6B',
                                AttributeService,
                                AttributeSize,
                                AttributeClassType,
                                AttributeClass,
                                AttributeInstanceType,
-                               AttributeInstance,
-                               PathRouteSize,
-                               Reserved,
-                               Backplane,
-                               LinkAddress)
+                               AttributeInstance)
 
-        frame = self._buildCIPUnconnectedSend() + AttributePacket
+        ConnectionPath = self._unconnectedPath(slot)
+
+        frame = self._buildCIPUnconnectedSend() + AttributePacket + ConnectionPath
         eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
         pad = pack('<I', 0x00)
         self.Socket.send(eip_header)
@@ -820,7 +825,9 @@ class PLC:
                                AttributeInstanceType,
                                AttributeInstance)
 
-        frame = AttributePacket
+        ConnectionPath = self._unconnectedPath(slot=0)
+
+        frame = self._buildCIPUnconnectedSend() + AttributePacket + ConnectionPath
         eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
         pad = pack('<I', 0x00)
         self.Socket.send(eip_header)
@@ -860,6 +867,7 @@ class PLC:
             self.Socket.close()
             return (False, e)
 
+        # register the session
         self.Socket.send(self._buildRegisterSession())
         ret_data = self.recv_data()
         if ret_data:
@@ -869,6 +877,7 @@ class PLC:
             self.SocketConnected = False
             return (False, 'Register session failed')
 
+        # forward open connection
         if connected:
             self.Socket.send(self._buildForwardOpenPacket())
             try:
@@ -882,6 +891,7 @@ class PLC:
             else:
                 self.SocketConnected = False
                 return (False, 'Forward open failed')
+
         self.SocketConnected = True
         return (self.SocketConnected, 'Success')
 
@@ -890,12 +900,11 @@ class PLC:
         Close the connection to the PLC (forward close, unregister session)
         """
         self.SocketConnected = False
-        
         try:
-            if self._registered:
+            if self._connected:
                 close_packet = self._buildForwardClosePacket()
                 self.Socket.send(close_packet)
-            if self._connected:
+            if self._registered:
                 unreg_packet = self._buildUnregisterSession()
                 self.Socket.send(unreg_packet)
             self.Socket.close()
@@ -948,6 +957,9 @@ class PLC:
                     EIPOptionFlag)
 
     def _buildUnregisterSession(self):
+        """
+        Build Unregister session
+        """
         EIPCommand = 0x66
         EIPLength = 0x0
         EIPSessionHandle = self.SessionHandle
@@ -1042,16 +1054,11 @@ class PLC:
                            CIPTransportTrigger)
 
         # add the connection path
-        if self.Micro800:
-            ConnectionPath = [0x20, 0x02, 0x24, 0x01]
-        else:
-            ConnectionPath = [0x01, self.ProcessorSlot, 0x20, 0x02, 0x24, 0x01]
 
-        ConnectionPathSize = int(len(ConnectionPath)/2)
-        pack_format = '<B' + str(len(ConnectionPath)) + 'B'
-        CIPConnectionPath = pack(pack_format, ConnectionPathSize, *ConnectionPath)
-
-        return ForwardOpen + CIPConnectionPath
+        path_size, path = self._connectedPath()
+        connection_path = pack('<B', path_size)
+        connection_path += path
+        return ForwardOpen + connection_path
 
     def _buildForwardClose(self):
         """
@@ -1084,18 +1091,15 @@ class PLC:
                             CIPOriginatorSerialNumber)
 
         # add the connection path
-        if self.Micro800:
-            ConnectionPath = [0x20, 0x02, 0x24, 0x01]
-        else:
-            ConnectionPath = [0x01, self.ProcessorSlot, 0x20, 0x02, 0x24, 0x01]
-
-        ConnectionPathSize = int(len(ConnectionPath)/2)
-        pack_format = '<H' + str(len(ConnectionPath)) + 'B'
-        CIPConnectionPath = pack(pack_format, ConnectionPathSize, *ConnectionPath)
-
-        return ForwardClose + CIPConnectionPath
+        path_size, path = self._connectedPath()
+        connection_path = pack('<BB', path_size, 0x00)
+        connection_path += path
+        return ForwardClose + connection_path
 
     def _buildEIPSendRRDataHeader(self, frameLen):
+        """
+        Build the EIP Send RR Data Header
+        """
         EIPCommand = 0x6F
         EIPLength = 16+frameLen
         EIPSessionHandle = self.SessionHandle
@@ -1152,6 +1156,76 @@ class PLC:
                     CIPPriority,
                     CIPTimeoutTicks,
                     ServiceSize)
+
+    def _connectedPath(self):
+        """
+        Build the connected path porition of the packet
+        """
+        # if a route was provided, use it, otherwise use
+        # the default route
+        if self.Route:
+            route = self.Route
+        else:
+            route = [(0x01, self.ProcessorSlot)]
+
+        path = []
+        if self.Micro800:
+            pass
+        else:
+            for segment in route:
+                if isinstance(segment[1], int):
+                    # port segment
+                    path += segment
+                else:
+                    # port segment with link
+                    path.append(segment[0]+0x10)
+                    path.append(len(segment[1]))
+                    for c in segment[1]:
+                        path.append(ord(c))
+                    # byte align
+                    if len(path)%2:
+                        path.append(0x00)
+
+        path += [0x20, 0x02, 0x24, 0x01]
+
+        path_size = int(len(path)/2)
+        pack_format = '<{}B'.format(len(path))
+        connection_path = pack(pack_format, *path)
+
+        return path_size, connection_path
+
+    def _unconnectedPath(self, slot):
+        """
+        Build the unconnection path portion of the packet
+        """
+        # if a route was provided, use it, otherwise use
+        # the default route
+        if self.Route:
+            route = self.Route
+        else:
+            route = [(0x01, slot)]
+
+        reserved = 0x00
+        path = []
+        for segment in route:
+            if isinstance(segment[1], int):
+                # port segment
+                path += segment
+            else:
+                # port segment with link
+                path.append(segment[0]+0x10)
+                path.append(len(segment[1]))
+                for c in segment[1]:
+                    path.append(ord(c))
+                # byte align
+                if len(path)%2:
+                    path.append(0x00)
+
+        path_size = int(len(path)/2)
+        pack_format = '<{}BBB'.format(len(path))
+        connection_path = pack(pack_format, path_size, reserved, *path)
+
+        return connection_path
 
     def _buildTagIOI(self, tagName, data_type):
         """
@@ -1591,12 +1665,12 @@ class PLC:
             return tag, None, status
 
     def _convert_write_data(self, tag, data_type, write_values):
-        '''
+        """
         In order to handle write requests that are larger than a single
         packet, we'll break up the values to write into multiple lists
         of values.  The size of each list will be calculated based on the
         connection size, length of the tag name and the data type.
-        '''
+        """
         # packet header is always 110 bytes
         packet_overhead = 110
         # calculate number of bytes tag name will occupy
