@@ -1166,12 +1166,13 @@ class PLC:
         if self.Route:
             route = self.Route
         else:
-            route = [(0x01, self.ProcessorSlot)]
+            if self.Micro800:
+                route = []
+            else:
+                route = [(0x01, self.ProcessorSlot)]
 
         path = []
-        if self.Micro800:
-            pass
-        else:
+        if route:
             for segment in route:
                 if isinstance(segment[1], int):
                     # port segment
