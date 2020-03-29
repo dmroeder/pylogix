@@ -1,6 +1,7 @@
 03/29/20
   - Fixed routing to Micro800 controllers
   - Fixed GetDeviceProperties for Micro800
+  - Fixed ForwardClose
 
 03/24/20
   - Added the ability to route packets through a CLX rack, upped to 0.6.4

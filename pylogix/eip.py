@@ -907,6 +907,7 @@ class PLC:
             if self._connected:
                 close_packet = self._buildForwardClosePacket()
                 self.Socket.send(close_packet)
+                ret_data = self.recv_data()
             if self._registered:
                 unreg_packet = self._buildUnregisterSession()
                 self.Socket.send(unreg_packet)
