@@ -1010,7 +1010,7 @@ class PLC:
         CIPPriority = 0x0A
         CIPTimeoutTicks = 0x0e
         CIPOTConnectionID = 0x20000002
-        CIPTOConnectionID = 0x20000001
+        CIPTOConnectionID = randrange(65000)
         self.SerialNumber = randrange(65000)
         CIPConnectionSerialNumber = self.SerialNumber
         CIPVendorID = self.VendorID
