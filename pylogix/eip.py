@@ -827,7 +827,10 @@ class PLC:
 
         ConnectionPath = self._unconnectedPath(slot=0)
 
-        frame = self._buildCIPUnconnectedSend() + AttributePacket + ConnectionPath
+        if self.Route:
+            frame = self._buildCIPUnconnectedSend() + AttributePacket + ConnectionPath
+        else:
+            frame = AttributePacket + ConnectionPath
         eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
         pad = pack('<I', 0x00)
         self.Socket.send(eip_header)
