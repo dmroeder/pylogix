@@ -2,6 +2,8 @@
 
 This project will allow you to easily read/write values from tags in Rockwell Automation Logix based PLC's over Ethernet I/P using Python.  PLC models inclued CompactLogix, ControlLogix and Micro8xx.  Python2 and Python3 are both supported.
 
+This project does not support PLC5, SLC or the Micrologix controllers.
+
 ## Getting Started
 
 There are currently no dependencies so you can get going quickly without having to install any other prerequiste packages.
@@ -44,7 +46,7 @@ The cloned repository will come with many examples, I'll give one here.  We'll r
 
 ```
 from pylogix import PLC
-with comm as PLC()
+with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
     ret = comm.Read('MyTagName')
     print(ret.TagName, ret.Value, ret.Status)

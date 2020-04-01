@@ -1,3 +1,49 @@
+03/29/20
+  - Fixed routing to Micro800 controllers
+  - Fixed GetDeviceProperties for Micro800
+  - Fixed ForwardClose
+  - Randomize TOConnectionID
+  - Upped version to 0.6.5
+
+03/24/20
+  - Added the ability to route packets through a CLX rack, upped to 0.6.4
+
+03/20/20
+  - Impoved lost connections and error handling, upped version to 0.6.3
+
+02/28/20
+  - Fixed typo in lgxDevice.py
+  - Upped to version 0.6.2
+
+02/19/20
+  - Changed connection to properly allow unconnected send for getting module properties
+  - Added GetDeviceProperties to get properties of a device at the specified address
+  - Added str() and repr() methods to LgxTag and LGXDevice
+  - Upped version to 0.6.1
+
+01/16/20
+  - Updated readme
+
+01/04/20
+  - Upped version to 0.6.0, skipping the 0.5.x series
+  - Fix for writing strings to Micro800
+
+12/20/19
+  - Upped version to 0.5.0
+  - Removed deprecated MultiRead method since Read handles this
+  - Implemented multi-write service
+  - Just some renaming and cleanup
+  - More cleanup and renaming
+
+12/17/19
+  - Added fragmented write for arrays larger than a packet
+
+10/29/19
+  - Moved examples from pylogix to root directory
+  - Added comments about how data is returned
+  - Added IP address and slot as parameters to PLC
+  - Upped version to 0.4.12
+
 10/02/19
   - setup.py imports version from __init__
   - update tests\readme with tox info

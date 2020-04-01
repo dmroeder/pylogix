@@ -1,5 +1,5 @@
 '''
-   Copyright 2019 Dustin Roeder (dmroeder@gmail.com)   
+   Copyright 2020 Dustin Roeder (dmroeder@gmail.com)   
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -24,14 +24,56 @@ class LGXDevice():
         self.VendorID=None
         self.Vendor=None
         self.DeviceID=None
-        self.DeviceType=""
+        self.DeviceType=None
         self.ProductCode=None
         self.Revision=None
         self.Status=None
         self.SerialNumber=None
         self.ProductNameLength=None
-        self.ProductName=""
+        self.ProductName=None
         self.State=None
+
+    def __repr__(self):
+
+        props = ''
+        props += 'Length={}, '.format(self.Length)
+        props += 'EncapsulationVersion={}, '.format(self.EncapsulationVersion)
+        props += 'IPAddress={}, '.format(self.IPAddress)
+        props += 'VendorID={}, '.format(self.VendorID)
+        props += 'Vendor={}, '.format(self.Vendor)
+        props += 'DeviceID={}, '.format(self.DeviceID)
+        props += 'DeviceType={}, '.format(self.DeviceType)
+        props += 'ProductCode={}, '.format(self.ProductCode)
+        props += 'Revision={}, '.format(self.Revision)
+        props += 'Status={}, '.format(self.Status)
+        props += 'SerialNumber={}, '.format(self.SerialNumber)
+        props += 'ProductNameLength={}, '.format(self.ProductNameLength)
+        props += 'ProductName={}, '.format(self.ProductName)
+        props += 'State={}'.format(self.State)
+
+        return 'LGXDevice({})'.format(props)
+
+
+
+    def __str__(self):
+
+        ret = "{} {} {} {} {} {} {} {} {} {} {} {} {} {}".format(
+                 self.Length,
+                 self.EncapsulationVersion,
+                 self.IPAddress,
+                 self.VendorID,
+                 self.Vendor,
+                 self.DeviceID,
+                 self.DeviceType,
+                 self.ProductCode,
+                 self.Revision,
+                 self.Status,
+                 self.SerialNumber,
+                 self.ProductNameLength,
+                 self.ProductName,
+                 self.State)
+
+        return ret
 
 def GetDevice(deviceID):
     if deviceID in devices.keys():
