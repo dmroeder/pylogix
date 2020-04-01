@@ -1,3 +1,10 @@
+4/01/20
+  - Added Docs folder
+  - Added Templates for Issues and Pull requests
+  - Added Guides
+  - Added UnitTesting doc
+  - Upped version to 0.6.6
+
 03/29/20
   - Fixed routing to Micro800 controllers
   - Fixed GetDeviceProperties for Micro800
