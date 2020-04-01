@@ -10,17 +10,17 @@ If you don't have python installed, download and install [Python Download](https
 
 The best thing to do with python installed is to use pip which is a python package manager, otherwise you have to copy and paste libraries to where your script is located.
 
-Install pylogix, ping3, and progress:
+Install pylogix:
 
 ```
  pip install git+https://github.com/dmroeder/pylogix
- pip install ping3
- pip install progress
 ```
+
+> In the near future pylogix will be available from pypi
 
 ## RSLogix5000 Project
 
-If you have an existing project then skip this section. You want to test this library with a very minimal code like test-01, this will ensure you have connection to the PLC before writing complex code. I am using softlogix 5800, but this applies to any Contrologix, and Compactlogix. If you already have existing code, then go to controller tags, and pick a boolean tag, and replace it on test-01.py line 25.
+If you have an existing project then skip this section. You want to test this library with a very minimal code like [test-01.py](../python_code/test-01.py), this will ensure you have connection to the PLC before writing complex code. I am using softlogix 5800, but this applies to any Contrologix, and Compactlogix. If you already have existing code, then go to controller tags, and pick a boolean tag, and replace it on test-01.py line 25.
 
 > Note: Ethernet Protocol does not work with emulator.
 
@@ -66,13 +66,13 @@ py -3.7 test-01.py
 Output:
 
 ```
-True
+bool_01 True Success
 ```
 
-If the tag name is wrong, and doesn't exists, you'll get the following exception:
+If the tag name is wrong, and doesn't exists, you'll get a value of None, and an error
 
 ```
-Failed to read tag: Path segment error
+bool_01 None Path segment error
 ```
 
 If you're able to read that boolean you are good to go with pylogix. If not see possible issues.

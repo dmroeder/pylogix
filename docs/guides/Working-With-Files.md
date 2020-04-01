@@ -28,16 +28,18 @@ saved_tags.txt
 First append tags to a list:
 
 ```python
-# read online value, try, except in case tag doesn't exists
-    try:
-        value = read_tag(plc_tag)
-        put_string = plc_tag + "|" + str(value)
+# read online value
+
+for index in range(len(all_lines)):
+        ret = Read(all_lines[index])
+        
+        # could have a sanity check here if ret.Value is None
+
+        put_string = ret.TagName + "|" + str(ret.Value)
 
         # append to list
         tags_list.append(put_string)
 
-    except ValueError as e:
-        print(e)
 ```
 
 Then save to a file:

@@ -7,7 +7,7 @@
 ## Type of issue
 
 - [ ] Bug
-- [ ] Request
+- [ ] Feature Request
 - [ ] Question
 - [ ] Other
 
