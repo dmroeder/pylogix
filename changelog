@@ -4,6 +4,7 @@
   - Added Guides
   - Added UnitTesting doc
   - Upped version to 0.6.6
+  - Updated README to reflect pypi install
 
 03/29/20
   - Fixed routing to Micro800 controllers

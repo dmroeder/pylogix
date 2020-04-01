@@ -10,24 +10,30 @@ There are currently no dependencies so you can get going quickly without having 
 
 ### Installing
 
-You can clone the repo with the following:
+Install pylogix with pip (Latest version):
 
 ```
-git clone https://github.com/dmroeder/pylogix.git
-cd pylogix
-python setup.py install --user
-```
-
-Or you can install with pip (Latest version):
-
-```
-pip install git+https://github.com/dmroeder/pylogix
+pip install pylogix
 ```
 
 To install previous version before major changes (0.3.7):
 
 ```
-pip install git+https://github.com/dmroeder/pylogix@v0.3.7
+pip install pylogix==0.3.7
+```
+
+To upgrade to the latest version:
+
+```
+pip install pylogix --upgrade
+```
+
+Alternatively, you can clone the repo and manually install it:
+
+```
+git clone https://github.com/dmroeder/pylogix.git
+cd pylogix
+python setup.py install --user
 ```
 
 ### Verifying Installation
