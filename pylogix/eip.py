@@ -17,6 +17,7 @@
    limitations under the License.
 """
 
+import math
 import socket
 import sys
 import time
@@ -52,6 +53,7 @@ class PLC:
         self.SequenceCounter = 1
         self.ConnectionSize = 508
         self.Offset = 0
+        self.UDT = {}
         self.KnownTags = {}
         self.TagList = []
         self.ProgramNames = []
@@ -93,7 +95,7 @@ class PLC:
                 return [self._readTag(tag[0], count, datatype)]
             if datatype:
                 raise TypeError('Datatype should be set to None when reading lists')
-            return self._multiRead(tag)
+            return self._batchRead(tag)
         else:
             return self._readTag(tag, count, datatype)
 
@@ -137,7 +139,14 @@ class PLC:
 
         returns Response class (.TagName, .Value, .Status)
         """
-        return self._getTagList(allTags)
+        self.UDT = {}
+        self.KnownTags = {}
+        self.TagList = []
+        self.ProgramNames = []
+        tag_list = self._getTagList(allTags)
+        updated_list = self._getUDT(tag_list.Value)
+
+        return Response(None, updated_list, tag_list.Status)
 
     def GetProgramTagList(self, programName):
         """
@@ -271,7 +280,7 @@ class PLC:
         """
         self.Offset = 0
         write_data = []
-        
+
         conn = self._connect()
         if not conn[0]:
             return Response(tag_name, value, conn[1])
@@ -289,7 +298,7 @@ class PLC:
         else:
             elements = 1
             value = [value]
-            
+
         # format the values
         for v in value:
             if data_type == 202 or data_type == 203:
@@ -327,18 +336,33 @@ class PLC:
 
         return Response(tag_name, value, status)
 
+    def _batchRead(self, tags):
+        """
+        Processes the multiple read request. Split into multiple requests and reassemble responses when needed
+        """
+        result = []
+        while len(result) < len(tags):
+            result.extend(self._multiRead(tags[len(result):]))
+        return result
+
     def _multiRead(self, tags):
         """
-        Processes the multiple read request
+        Processes the multiple read request, but only the possible number of tags in a single request. The size
+        difference between tags and result must be check for a complete read
         """
         serviceSegments = []
         segments = b""
-        tag_count = len(tags)
+        tag_count = 0
         self.Offset = 0
 
         conn = self._connect()
         if not conn[0]:
             return [Response(None, None, conn[1])]
+
+        header = self._buildMultiServiceHeader()
+
+        # eip_header + size of header + offset
+        service_segment_size = 46 + len(header) + 2
 
         for tag in tags:
             if isinstance(tag, (list, tuple)):
@@ -355,9 +379,17 @@ class PLC:
             ioi = self._buildTagIOI(tag_name, data_type)
 
             read_service = self._add_read_service(ioi, 1)
-            serviceSegments.append(read_service)
 
-        header = self._buildMultiServiceHeader()
+            # check if request size does not exceed (512 bytes limit)
+            next_request_size = service_segment_size + len(read_service) + (tag_count + 1) * 2
+            if next_request_size <= 512:
+                service_segment_size = service_segment_size + len(read_service)
+                serviceSegments.append(read_service)
+                tag_count = tag_count + 1
+            else:
+                break
+
+        tags_effective = tags[0:tag_count]
         segmentCount = pack('<H', tag_count)
 
         temp = len(header)
@@ -377,7 +409,8 @@ class PLC:
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
 
-        return self._multiReadParser(tags, ret_data)
+
+        return self._multiReadParser(tags_effective, ret_data)
 
     def _multiWrite(self, write_data):
         """
@@ -390,7 +423,7 @@ class PLC:
 
         conn = self._connect()
         if not conn[0]:
-            return [Response(None, value, conn[1])]
+            return [Response(None, write_data, conn[1])]
 
         for wd in write_data:
 
@@ -403,7 +436,7 @@ class PLC:
                 data_type = 0
 
             ioi = self._buildTagIOI(tag_name, data_type)
-            
+
             # format the values
             if data_type == 202 or data_type == 203:
                 value = float(wd[1])
@@ -563,7 +596,7 @@ class PLC:
                         tags += self._extractTagPacket(ret_data, program_name)
                     else:
                         return Response(None, None, status)
-                        
+
         updated_list = self._getUDT(tags)
         return Response(None, updated_list, status)
 
@@ -608,34 +641,95 @@ class PLC:
         struct_tags = [x for x in tag_list if x.Struct == 1]
         # reduce our struct tag list to only unique instances
         seen = set()
+        tags = []
         unique = [obj for obj in struct_tags if obj.DataTypeValue not in seen and not seen.add(obj.DataTypeValue)]
 
+        self.UDT = {}
+        self.UDTByName = {}
         template = {}
-        for u in unique:
-            temp = self._getTemplateAttribute(u.DataTypeValue)
+        while len(unique):
+            iterTemplate = {}
+            for u in unique:
+                temp = self._getTemplateAttribute(u.DataTypeValue)
 
-            val = unpack_from('<I', temp[46:], 10)[0]
-            words = (val * 4) - 23
-            member_count = int(unpack_from('<H', temp[46:], 24)[0])
+                block = temp[46:]
+                if len(block) > 24:
+                    val = unpack_from('<I', block, 10)[0]
+                    words = (val * 4) - 23
+                    size = int(math.ceil(words / 4.0)) * 4
+                    member_count = int(unpack_from('<H', block, 24)[0])
+                    iterTemplate[u.DataTypeValue] = template[u.DataTypeValue] = [size, '', member_count]
+                else:
+                    print("Received invalid template attribute for", u.TagName)
 
-            template[u.DataTypeValue] = [words, '', member_count]
+            unique = []
+            for key, value in iterTemplate.items():
+                t = self._getTemplate(key, value[0])
+                member_count = value[2]
+                size = member_count * 8
+                p = t[50:]
+                memberBytes = p[size:]
+                split_char = pack('<b', 0x00)
+                members = memberBytes.split(split_char)
+                split_char = pack('<b', 0x3b)
+                defs = members[0].split(split_char)
+                name = str(defs[0].decode('utf-8'))
+                template[key][1] = name
+                if len(defs)>1:
+                    # count = min(len(defs[1]) - 1 >> 1, len(members)-1)
+                    udt = UDT()
+                    udt.type = key
+                    udt.name = name
+                    for i in range(1, member_count + 1):
+                        field = LgxTag()
+                        field.UDT = udt
+                        field.TagName = members[i].decode('utf-8')
+                        scope = unpack_from('<cc', defs[1], 1 + (i-1)*2)
+                        field.AccessRight = scope[1][0] & 0x03
+                        field.scope0 = scope[0][0]
+                        field.scope1 = scope[1][0]
+                        fieldDef = p[slice((i-1) * 8, i * 8)]
+                        field.bytes = fieldDef
+                        field.InstanceID = unpack_from('<H', fieldDef, 6)[0]
+                        field.Meta = unpack_from("<H", fieldDef, 4)[0]
+                        val = unpack_from("<H", fieldDef, 2)[0]
+                        field.SymbolType = val & 0xff
+                        field.DataTypeValue = val & 0xfff
+                        field.Internal = field.AccessRight == 0
+                        field.Array = (val & 0x6000) >> 13
+                        field.Struct = (val & 0x8000) >> 15
+                        if field.Array:
+                            field.Size = unpack_from('<H', fieldDef, 0)[0]
+                        else:
+                            field.Size = 0
 
-        for key, value in template.items():
-            t = self._getTemplate(key, value[0])
-            size = value[2] * 8
-            p = t[50:]
-            member_bytes = p[size:]
-            split_char = pack('<b', 0x00)
-            members = member_bytes.split(split_char)
-            split_char = pack('<b', 0x3b)
-            name = members[0].split(split_char)[0]
-            template[key][1] = str(name.decode('utf-8'))
+                        if field.TagName.startswith('__'):
+                            continue
+
+                        if field.TagName in ('FbkOff'):
+                            tags.append(field)
+
+                        if not field.SymbolType in self.CIPTypes:
+                            if not field.DataTypeValue in self.UDT:
+                                unique.append(field)
+                        udt.fields.append(field)
+                        udt.fieldsByName[field.TagName] = field
+                    self.UDT[key] = udt
+                    self.UDTByName[udt.name] = udt
 
         for tag in tag_list:
             if tag.DataTypeValue in template:
                 tag.DataType = template[tag.DataTypeValue][1]
             elif tag.SymbolType in self.CIPTypes:
                 tag.DataType = self.CIPTypes[tag.SymbolType][1]
+
+        for typeName, udt in self.UDT.items():
+            for field in udt.fields:
+                if field.DataTypeValue in template:
+                    field.DataType = template[field.DataTypeValue][1]
+                elif field.SymbolType in self.CIPTypes:
+                    field.DataType = self.CIPTypes[field.SymbolType][1]
+
         return tag_list
 
     def _getTemplateAttribute(self, instance):
@@ -651,10 +745,26 @@ class PLC:
         """
         Get the members of a UDT so we can get it
         """
-        request = self._readTemplateService(instance, dataLen)
-        eip_header = self._buildEIPHeader(request)
-        status, ret_data = self._getBytes(eip_header)
-        return ret_data
+
+        if not self._connect(): return None
+
+        data = b''
+        status = 0
+        partOffset = 0
+        remaining = dataLen
+        while remaining > 0 and not status:
+            readRequest = self._readTemplateService(instance, remaining, partOffset)
+            eipHeader = self._buildEIPHeader(readRequest)
+            status, retData = self._getBytes(eipHeader)
+            if status == 6:
+                status = 0
+            if len(data):
+                part = retData[50:]
+                retData = part
+            data = data + retData
+            partOffset = len(data) - 50
+            remaining = dataLen - partOffset
+        return data
 
     def _buildTemplateAttributes(self, instance):
         """
@@ -686,7 +796,7 @@ class PLC:
                     Attrib2,
                     Attrib1)
 
-    def _readTemplateService(self, instance, dataLen):
+    def _readTemplateService(self, instance, dataLen, offset = 0):
         """
         Build the template attribute packet, part of
         retreiving the UDT names
@@ -697,7 +807,7 @@ class PLC:
         TemplateClass = 0x6c
         TemplateInstanceType = 0x25
         TemplateInstance = instance
-        TemplateOffset = 0x00
+        TemplateOffset = offset
         DataLength = dataLen
 
         return pack('<BBBBHHIH',
@@ -921,6 +1031,8 @@ class PLC:
         """
         Sends data and gets the return data
         """
+        if len(data) > 512:
+            raise BufferError("ethernet/ip _getBytes output size exceeded: %d bytes" % len(data))
         try:
             self.Socket.send(data)
             ret_data = self.recv_data()
@@ -1682,7 +1794,7 @@ class PLC:
         tag_length = len(tag) + len(tag) % 2
         # calculate the available space (in bytes) for the write values
         space_for_payload = self.ConnectionSize - packet_overhead - tag_length
-        
+
         # calculate how many bytes per value are required
         bytes_per_value  = self.CIPTypes[data_type][0]
         # calculate the limit for values in each request
@@ -1770,7 +1882,7 @@ class PLC:
         for i in range(tag_count):
             loc = i*2+2
             offsets.append(unpack_from('<H', stripped, loc)[0])
-        
+
         reply = []
         for i, offset in enumerate(offsets):
             loc = 2 + len(offsets)
@@ -1995,6 +2107,14 @@ def parseLgxTag(packet, programName):
     else:
         t.Size = 0
     return t
+
+class UDT:
+
+    def __init__(self):
+        self.type = 0
+        self.name = ''
+        self.fields = []
+        self.fieldsByName = {}
 
 
 class LgxTag:
