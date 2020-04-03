@@ -678,8 +678,8 @@ class PLC:
                 if len(defs)>1:
                     # count = min(len(defs[1]) - 1 >> 1, len(members)-1)
                     udt = UDT()
-                    udt.type = key
-                    udt.name = name
+                    udt.Type = key
+                    udt.Name = name
                     for i in range(1, member_count + 1):
                         field = LgxTag()
                         field.UDT = udt
@@ -712,10 +712,10 @@ class PLC:
                         if not field.SymbolType in self.CIPTypes:
                             if not field.DataTypeValue in self.UDT:
                                 unique.append(field)
-                        udt.fields.append(field)
-                        udt.fieldsByName[field.TagName] = field
+                        udt.Fields.append(field)
+                        udt.FieldsByName[field.TagName] = field
                     self.UDT[key] = udt
-                    self.UDTByName[udt.name] = udt
+                    self.UDTByName[udt.Name] = udt
 
         for tag in tag_list:
             if tag.DataTypeValue in template:
@@ -724,7 +724,7 @@ class PLC:
                 tag.DataType = self.CIPTypes[tag.SymbolType][1]
 
         for typeName, udt in self.UDT.items():
-            for field in udt.fields:
+            for field in udt.Fields:
                 if field.DataTypeValue in template:
                     field.DataType = template[field.DataTypeValue][1]
                 elif field.SymbolType in self.CIPTypes:
