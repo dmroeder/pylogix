@@ -683,11 +683,11 @@ class PLC:
                     for i in range(1, member_count + 1):
                         field = LgxTag()
                         field.UDT = udt
-                        field.TagName = members[i].decode('utf-8')
-                        scope = unpack_from('<cc', defs[1], 1 + (i-1)*2)
-                        field.AccessRight = scope[1][0] & 0x03
-                        field.scope0 = scope[0][0]
-                        field.scope1 = scope[1][0]
+                        field.TagName = str(members[i].decode('utf-8'))
+                        scope = unpack_from('<BB', defs[1], 1 + (i-1)*2)
+                        field.AccessRight = scope[1] & 0x03
+                        field.scope0 = scope[0]
+                        field.scope1 = scope[1]
                         fieldDef = p[slice((i-1) * 8, i * 8)]
                         field.bytes = fieldDef
                         field.InstanceID = unpack_from('<H', fieldDef, 6)[0]
