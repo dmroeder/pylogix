@@ -2111,10 +2111,10 @@ def parseLgxTag(packet, programName):
 class UDT:
 
     def __init__(self):
-        self.type = 0
-        self.name = ''
-        self.fields = []
-        self.fieldsByName = {}
+        self.Type = 0
+        self.Name = ''
+        self.Fields = []
+        self.FieldsByName = {}
 
 
 class LgxTag:
