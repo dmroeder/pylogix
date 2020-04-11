@@ -58,6 +58,7 @@ class PLC:
         self.TagList = []
         self.ProgramNames = []
         self.StructIdentifier = 0x0fCE
+        self.StringEncoding = 'utf-8'
         self.CIPTypes = {0: (0, "UNKNOWN", '?'),
                          160: (88, "STRUCT", 'B'),
                          193: (1, "BOOL", '?'),
@@ -144,8 +145,7 @@ class PLC:
         self.TagList = []
         self.ProgramNames = []
         tag_list = self._getTagList(allTags)
-        updated_list = self._getUDT(tag_list.Value)
-
+        updated_list = self._getUDT(tag_list.Value) if tag_list.Value else None
         return Response(None, updated_list, tag_list.Status)
 
     def GetProgramTagList(self, programName):
@@ -363,6 +363,7 @@ class PLC:
 
         # eip_header + size of header + offset
         service_segment_size = 46 + len(header) + 2
+        rsp_tag_size = 52
 
         for tag in tags:
             if isinstance(tag, (list, tuple)):
@@ -376,13 +377,16 @@ class PLC:
             else:
                 data_type = None
 
+            if data_type and data_type in self.CIPTypes.keys():
+                rsp_tag_size = rsp_tag_size + 4 + self.CIPTypes[data_type][0]
+
             ioi = self._buildTagIOI(tag_name, data_type)
 
             read_service = self._add_read_service(ioi, 1)
 
-            # check if request size does not exceed (512 bytes limit)
+            # check if request size does not exceed (ConnectionSize bytes limit)
             next_request_size = service_segment_size + len(read_service) + (tag_count + 1) * 2
-            if next_request_size <= 512:
+            if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
                 service_segment_size = service_segment_size + len(read_service)
                 serviceSegments.append(read_service)
                 tag_count = tag_count + 1
@@ -650,17 +654,18 @@ class PLC:
         while len(unique):
             iterTemplate = {}
             for u in unique:
-                temp = self._getTemplateAttribute(u.DataTypeValue)
+                if not u.DataTypeValue in self.UDT.keys():
+                    temp = self._getTemplateAttribute(u.DataTypeValue)
 
-                block = temp[46:]
-                if len(block) > 24:
-                    val = unpack_from('<I', block, 10)[0]
-                    words = (val * 4) - 23
-                    size = int(math.ceil(words / 4.0)) * 4
-                    member_count = int(unpack_from('<H', block, 24)[0])
-                    iterTemplate[u.DataTypeValue] = template[u.DataTypeValue] = [size, '', member_count]
-                else:
-                    print("Received invalid template attribute for", u.TagName)
+                    block = temp[46:]
+                    if len(block) > 24:
+                        val = unpack_from('<I', block, 10)[0]
+                        words = (val * 4) - 23
+                        size = int(math.ceil(words / 4.0)) * 4
+                        member_count = int(unpack_from('<H', block, 24)[0])
+                        iterTemplate[u.DataTypeValue] = template[u.DataTypeValue] = [size, '', member_count]
+                    else:
+                        print("Received invalid template attribute for", u.TagName)
 
             unique = []
             for key, value in iterTemplate.items():
@@ -1031,7 +1036,7 @@ class PLC:
         """
         Sends data and gets the return data
         """
-        if len(data) > 512:
+        if len(data) > self.ConnectionSize:
             raise BufferError("ethernet/ip _getBytes output size exceeded: %d bytes" % len(data))
         try:
             self.Socket.send(data)
@@ -1692,7 +1697,7 @@ class PLC:
                         index = 54+(counter*data_size)
                         name_len = unpack_from('<L', data, index)[0]
                         s = data[index+4:index+4+name_len]
-                        vals.append(str(s.decode('utf-8')))
+                        vals.append(str(s.decode(self.StringEncoding)))
                     else:
                         d = data[index:index+len(data)]
                         vals.append(d)
@@ -1860,7 +1865,7 @@ class PLC:
                 elif dataTypeValue == 160:
                     strlen = unpack_from('<B', stripped, offset+8)[0]
                     s = stripped[offset+12:offset+12+strlen]
-                    value = str(s.decode('utf-8'))
+                    value = str(s.decode(self.StringEncoding))
                     response = Response(tag, value, replyStatus)
                 else:
                     dataTypeFormat = self.CIPTypes[dataTypeValue][2]
@@ -1955,9 +1960,9 @@ class PLC:
     def _makeString(self, string):
         work = []
         if self.Micro800:
-            temp = pack('<B', len(string)).decode('utf-8')
+            temp = pack('<B', len(string)).decode(self.StringEncoding)
         else:
-            temp = pack('<I', len(string)).decode('utf-8')
+            temp = pack('<I', len(string)).decode(self.StringEncoding)
         for char in temp:
             work.append(ord(char))
         for char in string:
