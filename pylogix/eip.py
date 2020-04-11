@@ -54,6 +54,7 @@ class PLC:
         self.ConnectionSize = 508
         self.Offset = 0
         self.UDT = {}
+        self.UDTByName = {}
         self.KnownTags = {}
         self.TagList = []
         self.ProgramNames = []
@@ -666,7 +667,7 @@ class PLC:
                         iterTemplate[u.DataTypeValue] = template[u.DataTypeValue] = [size, '', member_count]
                     else:
                         print("Received invalid template attribute for", u.TagName)
-
+                        
             unique = []
             for key, value in iterTemplate.items():
                 t = self._getTemplate(key, value[0])
@@ -680,47 +681,54 @@ class PLC:
                 defs = members[0].split(split_char)
                 name = str(defs[0].decode('utf-8'))
                 template[key][1] = name
-                if len(defs)>1:
-                    # count = min(len(defs[1]) - 1 >> 1, len(members)-1)
-                    udt = UDT()
-                    udt.Type = key
-                    udt.Name = name
-                    for i in range(1, member_count + 1):
-                        field = LgxTag()
-                        field.UDT = udt
-                        field.TagName = str(members[i].decode('utf-8'))
+                
+                udt = UDT()
+                udt.Type = key
+                udt.Name = name
+                for i in range(1, member_count + 1):
+                    field = LgxTag()
+                    field.UDT = udt
+                    field.TagName = str(members[i].decode('utf-8'))
+                    if len(defs) > 1:
                         scope = unpack_from('<BB', defs[1], 1 + (i-1)*2)
                         field.AccessRight = scope[1] & 0x03
                         field.scope0 = scope[0]
                         field.scope1 = scope[1]
-                        fieldDef = p[slice((i-1) * 8, i * 8)]
-                        field.bytes = fieldDef
-                        field.InstanceID = unpack_from('<H', fieldDef, 6)[0]
-                        field.Meta = unpack_from("<H", fieldDef, 4)[0]
-                        val = unpack_from("<H", fieldDef, 2)[0]
-                        field.SymbolType = val & 0xff
-                        field.DataTypeValue = val & 0xfff
                         field.Internal = field.AccessRight == 0
-                        field.Array = (val & 0x6000) >> 13
-                        field.Struct = (val & 0x8000) >> 15
-                        if field.Array:
-                            field.Size = unpack_from('<H', fieldDef, 0)[0]
-                        else:
-                            field.Size = 0
+                    else:
+                        field.AccessRight = None
+                        field.scope0 = None
+                        field.scope1 = None
+                        field.Internal = None
 
-                        if field.TagName.startswith('__'):
-                            continue
+                    fieldDef = p[slice((i-1) * 8, i * 8)]
+                    field.bytes = fieldDef
+                    field.InstanceID = unpack_from('<H', fieldDef, 6)[0]
+                    field.Meta = unpack_from("<H", fieldDef, 4)[0]
+                    val = unpack_from("<H", fieldDef, 2)[0]
+                    field.SymbolType = val & 0xff
+                    field.DataTypeValue = val & 0xfff
+                    
+                    field.Array = (val & 0x6000) >> 13
+                    field.Struct = (val & 0x8000) >> 15
+                    if field.Array:
+                        field.Size = unpack_from('<H', fieldDef, 0)[0]
+                    else:
+                        field.Size = 0
 
-                        if field.TagName in ('FbkOff'):
-                            tags.append(field)
+                    if field.TagName.startswith('__'):
+                        continue
 
-                        if not field.SymbolType in self.CIPTypes:
-                            if not field.DataTypeValue in self.UDT:
-                                unique.append(field)
-                        udt.Fields.append(field)
-                        udt.FieldsByName[field.TagName] = field
-                    self.UDT[key] = udt
-                    self.UDTByName[udt.Name] = udt
+                    if field.TagName in ('FbkOff'):
+                        tags.append(field)
+
+                    if not field.SymbolType in self.CIPTypes:
+                        if not field.DataTypeValue in self.UDT:
+                            unique.append(field)
+                    udt.Fields.append(field)
+                    udt.FieldsByName[field.TagName] = field
+                self.UDT[key] = udt
+                self.UDTByName[udt.Name] = udt
 
         for tag in tag_list:
             if tag.DataTypeValue in template:
