@@ -692,17 +692,12 @@ class PLC:
                     if len(defs) > 1:
                         scope = unpack_from('<BB', defs[1], 1 + (i-1)*2)
                         field.AccessRight = scope[1] & 0x03
-                        field.scope0 = scope[0]
-                        field.scope1 = scope[1]
+                        field.Scope0 = scope[0]
+                        field.Scope1 = scope[1]
                         field.Internal = field.AccessRight == 0
-                    else:
-                        field.AccessRight = None
-                        field.scope0 = None
-                        field.scope1 = None
-                        field.Internal = None
 
                     fieldDef = p[slice((i-1) * 8, i * 8)]
-                    field.bytes = fieldDef
+                    field.Bytes = fieldDef
                     field.InstanceID = unpack_from('<H', fieldDef, 6)[0]
                     field.Meta = unpack_from("<H", fieldDef, 4)[0]
                     val = unpack_from("<H", fieldDef, 2)[0]
@@ -2124,15 +2119,34 @@ def parseLgxTag(packet, programName):
 class UDT:
 
     def __init__(self):
+
         self.Type = 0
         self.Name = ''
         self.Fields = []
         self.FieldsByName = {}
 
+    def __repr__(self):
+
+        props = ''
+        props += 'Type={}'.format(self.Type)
+        props += 'Name={}'.format(self.Name)
+        props += 'Fields={}'.format(self.Fields)
+        props += 'FieldsByNam={}'.format(self.FieldsByName)
+        
+        return 'UDT({})'.format(props)
+
+    def __str__(self):
+
+        return '{} {} {} {}'.format(
+                self.Type,
+                self.Name,
+                self.Fields,
+                self.FieldsByName)
 
 class LgxTag:
 
     def __init__(self):
+
         self.TagName = ''
         self.InstanceID = 0x00
         self.SymbolType = 0x00
@@ -2141,6 +2155,12 @@ class LgxTag:
         self.Array = 0x00
         self.Struct = 0x00
         self.Size = 0x00
+        self.AccessRight = None
+        self.Internal = None
+        self.Meta = None
+        self.Scope0 = None
+        self.Scope1 = None
+        self.Bytes = None
 
     def __repr__(self):
 
@@ -2153,12 +2173,18 @@ class LgxTag:
         props += 'Array={}, '.format(self.Array)
         props += 'Struct={}, '.format(self.Struct)
         props += 'Size={}'.format(self.Size)
+        props += 'AccessRight={}'.format(self.AccessRight)
+        props += 'Internal={}'.format(self.Internal)
+        props += 'Meta={}'.format(self.Meta)
+        props += 'Scope0={}'.format(self.Scope0)
+        props += 'Scope1={}'.format(self.Scope1)
+        props += 'Bytes={}'.format(self.Bytes)
 
         return 'LgxTag({})'.format(props)
 
     def __str__(self):
 
-        return '{} {} {} {} {} {} {} {}'.format(
+        return '{} {} {} {} {} {} {} {} {} {} {} {} {} {}'.format(
                 self.TagName,
                 self.InstanceID,
                 self.SymbolType,
@@ -2166,7 +2192,13 @@ class LgxTag:
                 self.DataType,
                 self.Array,
                 self.Struct,
-                self.Size)
+                self.Size,
+                self.AccessRight,
+                self.Internal,
+                self.Meta,
+                self.Scope0,
+                self.Scope1,
+                self.bytes)
 
 class Response:
 
