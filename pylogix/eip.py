@@ -2131,7 +2131,7 @@ class UDT:
         props += 'Type={}'.format(self.Type)
         props += 'Name={}'.format(self.Name)
         props += 'Fields={}'.format(self.Fields)
-        props += 'FieldsByNam={}'.format(self.FieldsByName)
+        props += 'FieldsByName={}'.format(self.FieldsByName)
         
         return 'UDT({})'.format(props)
 
