@@ -17,6 +17,7 @@
    limitations under the License.
 """
 
+import math
 import socket
 import sys
 import time
@@ -52,10 +53,13 @@ class PLC:
         self.SequenceCounter = 1
         self.ConnectionSize = 508
         self.Offset = 0
+        self.UDT = {}
+        self.UDTByName = {}
         self.KnownTags = {}
         self.TagList = []
         self.ProgramNames = []
         self.StructIdentifier = 0x0fCE
+        self.StringEncoding = 'utf-8'
         self.CIPTypes = {0: (0, "UNKNOWN", '?'),
                          160: (88, "STRUCT", 'B'),
                          193: (1, "BOOL", '?'),
@@ -93,7 +97,7 @@ class PLC:
                 return [self._readTag(tag[0], count, datatype)]
             if datatype:
                 raise TypeError('Datatype should be set to None when reading lists')
-            return self._multiRead(tag)
+            return self._batchRead(tag)
         else:
             return self._readTag(tag, count, datatype)
 
@@ -137,7 +141,13 @@ class PLC:
 
         returns Response class (.TagName, .Value, .Status)
         """
-        return self._getTagList(allTags)
+        self.UDT = {}
+        self.KnownTags = {}
+        self.TagList = []
+        self.ProgramNames = []
+        tag_list = self._getTagList(allTags)
+        updated_list = self._getUDT(tag_list.Value) if tag_list.Value else None
+        return Response(None, updated_list, tag_list.Status)
 
     def GetProgramTagList(self, programName):
         """
@@ -271,7 +281,7 @@ class PLC:
         """
         self.Offset = 0
         write_data = []
-        
+
         conn = self._connect()
         if not conn[0]:
             return Response(tag_name, value, conn[1])
@@ -289,7 +299,7 @@ class PLC:
         else:
             elements = 1
             value = [value]
-            
+
         # format the values
         for v in value:
             if data_type == 202 or data_type == 203:
@@ -327,18 +337,34 @@ class PLC:
 
         return Response(tag_name, value, status)
 
+    def _batchRead(self, tags):
+        """
+        Processes the multiple read request. Split into multiple requests and reassemble responses when needed
+        """
+        result = []
+        while len(result) < len(tags):
+            result.extend(self._multiRead(tags[len(result):]))
+        return result
+
     def _multiRead(self, tags):
         """
-        Processes the multiple read request
+        Processes the multiple read request, but only the possible number of tags in a single request. The size
+        difference between tags and result must be check for a complete read
         """
         serviceSegments = []
         segments = b""
-        tag_count = len(tags)
+        tag_count = 0
         self.Offset = 0
 
         conn = self._connect()
         if not conn[0]:
             return [Response(None, None, conn[1])]
+
+        header = self._buildMultiServiceHeader()
+
+        # eip_header + size of header + offset
+        service_segment_size = 46 + len(header) + 2
+        rsp_tag_size = 52
 
         for tag in tags:
             if isinstance(tag, (list, tuple)):
@@ -352,12 +378,23 @@ class PLC:
             else:
                 data_type = None
 
+            if data_type and data_type in self.CIPTypes.keys():
+                rsp_tag_size = rsp_tag_size + 4 + self.CIPTypes[data_type][0]
+
             ioi = self._buildTagIOI(tag_name, data_type)
 
             read_service = self._add_read_service(ioi, 1)
-            serviceSegments.append(read_service)
 
-        header = self._buildMultiServiceHeader()
+            # check if request size does not exceed (ConnectionSize bytes limit)
+            next_request_size = service_segment_size + len(read_service) + (tag_count + 1) * 2
+            if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
+                service_segment_size = service_segment_size + len(read_service)
+                serviceSegments.append(read_service)
+                tag_count = tag_count + 1
+            else:
+                break
+
+        tags_effective = tags[0:tag_count]
         segmentCount = pack('<H', tag_count)
 
         temp = len(header)
@@ -377,7 +414,8 @@ class PLC:
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
 
-        return self._multiReadParser(tags, ret_data)
+
+        return self._multiReadParser(tags_effective, ret_data)
 
     def _multiWrite(self, write_data):
         """
@@ -390,7 +428,7 @@ class PLC:
 
         conn = self._connect()
         if not conn[0]:
-            return [Response(None, value, conn[1])]
+            return [Response(None, write_data, conn[1])]
 
         for wd in write_data:
 
@@ -403,7 +441,7 @@ class PLC:
                 data_type = 0
 
             ioi = self._buildTagIOI(tag_name, data_type)
-            
+
             # format the values
             if data_type == 202 or data_type == 203:
                 value = float(wd[1])
@@ -563,7 +601,7 @@ class PLC:
                         tags += self._extractTagPacket(ret_data, program_name)
                     else:
                         return Response(None, None, status)
-                        
+
         updated_list = self._getUDT(tags)
         return Response(None, updated_list, status)
 
@@ -608,34 +646,98 @@ class PLC:
         struct_tags = [x for x in tag_list if x.Struct == 1]
         # reduce our struct tag list to only unique instances
         seen = set()
+        tags = []
         unique = [obj for obj in struct_tags if obj.DataTypeValue not in seen and not seen.add(obj.DataTypeValue)]
 
+        self.UDT = {}
+        self.UDTByName = {}
         template = {}
-        for u in unique:
-            temp = self._getTemplateAttribute(u.DataTypeValue)
+        while len(unique):
+            iterTemplate = {}
+            for u in unique:
+                if not u.DataTypeValue in self.UDT.keys():
+                    temp = self._getTemplateAttribute(u.DataTypeValue)
 
-            val = unpack_from('<I', temp[46:], 10)[0]
-            words = (val * 4) - 23
-            member_count = int(unpack_from('<H', temp[46:], 24)[0])
+                    block = temp[46:]
+                    if len(block) > 24:
+                        val = unpack_from('<I', block, 10)[0]
+                        words = (val * 4) - 23
+                        size = int(math.ceil(words / 4.0)) * 4
+                        member_count = int(unpack_from('<H', block, 24)[0])
+                        iterTemplate[u.DataTypeValue] = template[u.DataTypeValue] = [size, '', member_count]
+                    else:
+                        print("Received invalid template attribute for", u.TagName)
+                        
+            unique = []
+            for key, value in iterTemplate.items():
+                t = self._getTemplate(key, value[0])
+                member_count = value[2]
+                size = member_count * 8
+                p = t[50:]
+                memberBytes = p[size:]
+                split_char = pack('<b', 0x00)
+                members = memberBytes.split(split_char)
+                split_char = pack('<b', 0x3b)
+                defs = members[0].split(split_char)
+                name = str(defs[0].decode('utf-8'))
+                template[key][1] = name
+                
+                udt = UDT()
+                udt.Type = key
+                udt.Name = name
+                for i in range(1, member_count + 1):
+                    field = LgxTag()
+                    field.UDT = udt
+                    field.TagName = str(members[i].decode('utf-8'))
+                    if len(defs) > 1:
+                        scope = unpack_from('<BB', defs[1], 1 + (i-1)*2)
+                        field.AccessRight = scope[1] & 0x03
+                        field.Scope0 = scope[0]
+                        field.Scope1 = scope[1]
+                        field.Internal = field.AccessRight == 0
 
-            template[u.DataTypeValue] = [words, '', member_count]
+                    fieldDef = p[slice((i-1) * 8, i * 8)]
+                    field.Bytes = fieldDef
+                    field.InstanceID = unpack_from('<H', fieldDef, 6)[0]
+                    field.Meta = unpack_from("<H", fieldDef, 4)[0]
+                    val = unpack_from("<H", fieldDef, 2)[0]
+                    field.SymbolType = val & 0xff
+                    field.DataTypeValue = val & 0xfff
+                    
+                    field.Array = (val & 0x6000) >> 13
+                    field.Struct = (val & 0x8000) >> 15
+                    if field.Array:
+                        field.Size = unpack_from('<H', fieldDef, 0)[0]
+                    else:
+                        field.Size = 0
 
-        for key, value in template.items():
-            t = self._getTemplate(key, value[0])
-            size = value[2] * 8
-            p = t[50:]
-            member_bytes = p[size:]
-            split_char = pack('<b', 0x00)
-            members = member_bytes.split(split_char)
-            split_char = pack('<b', 0x3b)
-            name = members[0].split(split_char)[0]
-            template[key][1] = str(name.decode('utf-8'))
+                    if field.TagName.startswith('__'):
+                        continue
+
+                    if field.TagName in ('FbkOff'):
+                        tags.append(field)
+
+                    if not field.SymbolType in self.CIPTypes:
+                        if not field.DataTypeValue in self.UDT:
+                            unique.append(field)
+                    udt.Fields.append(field)
+                    udt.FieldsByName[field.TagName] = field
+                self.UDT[key] = udt
+                self.UDTByName[udt.Name] = udt
 
         for tag in tag_list:
             if tag.DataTypeValue in template:
                 tag.DataType = template[tag.DataTypeValue][1]
             elif tag.SymbolType in self.CIPTypes:
                 tag.DataType = self.CIPTypes[tag.SymbolType][1]
+
+        for typeName, udt in self.UDT.items():
+            for field in udt.Fields:
+                if field.DataTypeValue in template:
+                    field.DataType = template[field.DataTypeValue][1]
+                elif field.SymbolType in self.CIPTypes:
+                    field.DataType = self.CIPTypes[field.SymbolType][1]
+
         return tag_list
 
     def _getTemplateAttribute(self, instance):
@@ -651,10 +753,26 @@ class PLC:
         """
         Get the members of a UDT so we can get it
         """
-        request = self._readTemplateService(instance, dataLen)
-        eip_header = self._buildEIPHeader(request)
-        status, ret_data = self._getBytes(eip_header)
-        return ret_data
+
+        if not self._connect(): return None
+
+        data = b''
+        status = 0
+        partOffset = 0
+        remaining = dataLen
+        while remaining > 0 and not status:
+            readRequest = self._readTemplateService(instance, remaining, partOffset)
+            eipHeader = self._buildEIPHeader(readRequest)
+            status, retData = self._getBytes(eipHeader)
+            if status == 6:
+                status = 0
+            if len(data):
+                part = retData[50:]
+                retData = part
+            data = data + retData
+            partOffset = len(data) - 50
+            remaining = dataLen - partOffset
+        return data
 
     def _buildTemplateAttributes(self, instance):
         """
@@ -686,7 +804,7 @@ class PLC:
                     Attrib2,
                     Attrib1)
 
-    def _readTemplateService(self, instance, dataLen):
+    def _readTemplateService(self, instance, dataLen, offset = 0):
         """
         Build the template attribute packet, part of
         retreiving the UDT names
@@ -697,7 +815,7 @@ class PLC:
         TemplateClass = 0x6c
         TemplateInstanceType = 0x25
         TemplateInstance = instance
-        TemplateOffset = 0x00
+        TemplateOffset = offset
         DataLength = dataLen
 
         return pack('<BBBBHHIH',
@@ -921,6 +1039,8 @@ class PLC:
         """
         Sends data and gets the return data
         """
+        if len(data) > self.ConnectionSize:
+            raise BufferError("ethernet/ip _getBytes output size exceeded: %d bytes" % len(data))
         try:
             self.Socket.send(data)
             ret_data = self.recv_data()
@@ -1580,7 +1700,7 @@ class PLC:
                         index = 54+(counter*data_size)
                         name_len = unpack_from('<L', data, index)[0]
                         s = data[index+4:index+4+name_len]
-                        vals.append(str(s.decode('utf-8')))
+                        vals.append(str(s.decode(self.StringEncoding)))
                     else:
                         d = data[index:index+len(data)]
                         vals.append(d)
@@ -1682,7 +1802,7 @@ class PLC:
         tag_length = len(tag) + len(tag) % 2
         # calculate the available space (in bytes) for the write values
         space_for_payload = self.ConnectionSize - packet_overhead - tag_length
-        
+
         # calculate how many bytes per value are required
         bytes_per_value  = self.CIPTypes[data_type][0]
         # calculate the limit for values in each request
@@ -1748,7 +1868,7 @@ class PLC:
                 elif dataTypeValue == 160:
                     strlen = unpack_from('<B', stripped, offset+8)[0]
                     s = stripped[offset+12:offset+12+strlen]
-                    value = str(s.decode('utf-8'))
+                    value = str(s.decode(self.StringEncoding))
                     response = Response(tag, value, replyStatus)
                 else:
                     dataTypeFormat = self.CIPTypes[dataTypeValue][2]
@@ -1770,7 +1890,7 @@ class PLC:
         for i in range(tag_count):
             loc = i*2+2
             offsets.append(unpack_from('<H', stripped, loc)[0])
-        
+
         reply = []
         for i, offset in enumerate(offsets):
             loc = 2 + len(offsets)
@@ -1843,9 +1963,9 @@ class PLC:
     def _makeString(self, string):
         work = []
         if self.Micro800:
-            temp = pack('<B', len(string)).decode('utf-8')
+            temp = pack('<B', len(string)).decode(self.StringEncoding)
         else:
-            temp = pack('<I', len(string)).decode('utf-8')
+            temp = pack('<I', len(string)).decode(self.StringEncoding)
         for char in temp:
             work.append(ord(char))
         for char in string:
@@ -1996,10 +2116,37 @@ def parseLgxTag(packet, programName):
         t.Size = 0
     return t
 
+class UDT:
+
+    def __init__(self):
+
+        self.Type = 0
+        self.Name = ''
+        self.Fields = []
+        self.FieldsByName = {}
+
+    def __repr__(self):
+
+        props = ''
+        props += 'Type={}'.format(self.Type)
+        props += 'Name={}'.format(self.Name)
+        props += 'Fields={}'.format(self.Fields)
+        props += 'FieldsByName={}'.format(self.FieldsByName)
+        
+        return 'UDT({})'.format(props)
+
+    def __str__(self):
+
+        return '{} {} {} {}'.format(
+                self.Type,
+                self.Name,
+                self.Fields,
+                self.FieldsByName)
 
 class LgxTag:
 
     def __init__(self):
+
         self.TagName = ''
         self.InstanceID = 0x00
         self.SymbolType = 0x00
@@ -2008,6 +2155,12 @@ class LgxTag:
         self.Array = 0x00
         self.Struct = 0x00
         self.Size = 0x00
+        self.AccessRight = None
+        self.Internal = None
+        self.Meta = None
+        self.Scope0 = None
+        self.Scope1 = None
+        self.Bytes = None
 
     def __repr__(self):
 
@@ -2020,12 +2173,18 @@ class LgxTag:
         props += 'Array={}, '.format(self.Array)
         props += 'Struct={}, '.format(self.Struct)
         props += 'Size={}'.format(self.Size)
+        props += 'AccessRight={}'.format(self.AccessRight)
+        props += 'Internal={}'.format(self.Internal)
+        props += 'Meta={}'.format(self.Meta)
+        props += 'Scope0={}'.format(self.Scope0)
+        props += 'Scope1={}'.format(self.Scope1)
+        props += 'Bytes={}'.format(self.Bytes)
 
         return 'LgxTag({})'.format(props)
 
     def __str__(self):
 
-        return '{} {} {} {} {} {} {} {}'.format(
+        return '{} {} {} {} {} {} {} {} {} {} {} {} {} {}'.format(
                 self.TagName,
                 self.InstanceID,
                 self.SymbolType,
@@ -2033,7 +2192,13 @@ class LgxTag:
                 self.DataType,
                 self.Array,
                 self.Struct,
-                self.Size)
+                self.Size,
+                self.AccessRight,
+                self.Internal,
+                self.Meta,
+                self.Scope0,
+                self.Scope1,
+                self.bytes)
 
 class Response:
 
