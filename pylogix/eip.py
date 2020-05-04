@@ -510,8 +510,9 @@ class PLC:
             plc_time = unpack_from('<Q', ret_data, 56)[0]
             if raw:
                 value = plc_time
-            human_time = datetime(1970, 1, 1) + timedelta(microseconds=plc_time)
-            value = human_time
+            else:
+                human_time = datetime(1970, 1, 1) + timedelta(microseconds=plc_time)
+                value = human_time
         else:
             value = None
 

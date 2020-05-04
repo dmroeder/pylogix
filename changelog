@@ -1,3 +1,7 @@
+04/05/20
+  - Fix raw return for GetPLCTime
+  - Fix printed return for example 21
+  
 04/23/20
   - jprogin's enhancements (read large lists, save UDT)
   - Fixes for making too many requests for templates already known

@@ -15,7 +15,5 @@ with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
     ret = comm.GetPLCTime()
 
-    # print the whole value
-    print(ret.Value)
     # print each pice of time
-    print(ret.year, ret.month, ret.day, ret.hour, ret.minute, ret.second, ret.microsecond)
+    print(ret.TagName, ret.Value, ret.Status)
