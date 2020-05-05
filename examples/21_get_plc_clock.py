@@ -13,6 +13,7 @@ from pylogix import PLC
 
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
+    ret = comm.GetPLCTime()
     time_value = ret.Value
 
     # print the Response value
