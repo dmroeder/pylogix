@@ -22,8 +22,10 @@ import socket
 import sys
 import time
 
+from .lgx_device import Device
+from .lgx_response import Response
+from .lgx_tag import Tag, UDT
 from datetime import datetime, timedelta
-from .lgxDevice import LGXDevice, GetDevice, GetVendor
 from random import randrange
 from struct import pack, unpack_from
 
@@ -168,7 +170,7 @@ class PLC:
         if programName in self.ProgramNames:
             program_tags = self._getProgramTagList(programName)
             # Getting status from program_tags Response object
-            # _getUDT returns a list of LGXTags might need rework in the future
+            # _getUDT returns a list of tags might need rework in the future
             status = program_tags.Status
             program_tags = self._getUDT(program_tags.Value)
             return Response(None, program_tags, status)
@@ -553,7 +555,7 @@ class PLC:
 
     def _getTagList(self, allTags):
         """
-        Requests the controller tag list and returns a list of LgxTag type
+        Requests the controller tag list and returns a list of Tag type
         """
         conn = self._connect()
         if not conn[0]:
@@ -608,7 +610,7 @@ class PLC:
 
     def _getProgramTagList(self, programName):
         """
-        Requests tag list for a specific program and returns a list of LgxTag type
+        Requests tag list for a specific program and returns a list of Tag type
         """
         conn = self._connect()
         if not conn[0]:
@@ -687,7 +689,7 @@ class PLC:
                 udt.Type = key
                 udt.Name = name
                 for i in range(1, member_count + 1):
-                    field = LgxTag()
+                    field = Tag()
                     field.UDT = udt
                     field.TagName = str(members[i].decode('utf-8'))
                     if len(defs) > 1:
@@ -885,11 +887,11 @@ class PLC:
     def _getModuleProperties(self, slot):
         """
         Request the properties of a module in a particular
-        slot.  Returns LgxDevice
+        slot.  Returns Device()
         """
         conn = self._connect(False)
         if not conn[0]:
-            return Response(None, LGXDevice(), conn[1])
+            return Response(None, Device(), conn[1])
 
         AttributeService = 0x01
         AttributeSize = 0x02
@@ -918,16 +920,16 @@ class PLC:
         if status == 0:
             return Response(None, _parseIdentityResponse(ret_data), status)
         else:
-            return Response(None, LGXDevice(), status)
+            return Response(None, Device(), status)
 
     def _getDeviceProperties(self):
         """
         Request the properties of a device at the
-        specified IP address.  Returns LgxDevice
+        specified IP address.  Returns Device()
         """
         conn = self._connect(False)
         if not conn[0]:
-            return Response(None, LGXDevice(), conn[1])
+            return Response(None, Device(), conn[1])
 
         AttributeService = 0x01
         AttributeSize = 0x02
@@ -959,7 +961,7 @@ class PLC:
         if status == 0:
             return Response(None, _parseIdentityResponse(ret_data), status)
         else:
-            return Response(None, LGXDevice(), status)
+            return Response(None, Device(), status)
 
     def _connect(self, connected=True):
         """
@@ -2065,7 +2067,7 @@ def _parseIdentityResponse(data):
     # we're going to take the packet and parse all
     #  the data that is in it.
 
-    resp = LGXDevice()
+    resp = Device()
     resp.Length = unpack_from('<H', data, 28)[0]
     resp.EncapsulationVersion = unpack_from('<H', data, 30)[0]
 
@@ -2073,10 +2075,10 @@ def _parseIdentityResponse(data):
     resp.IPAddress = socket.inet_ntoa(pack('<L', longIP))
 
     resp.VendorID = unpack_from('<H', data, 48)[0]
-    resp.Vendor = GetVendor(resp.VendorID)
+    resp.Vendor = Device.get_vendor(resp.VendorID)
 
     resp.DeviceID = unpack_from('<H', data, 50)[0]
-    resp.Device = GetDevice(resp.DeviceID)
+    resp.Device = Device.get_device(resp.DeviceID)
 
     resp.ProductCode = unpack_from('<H', data, 52)[0]
     major = unpack_from('<B', data, 54)[0]
@@ -2095,7 +2097,7 @@ def _parseIdentityResponse(data):
 
 def parseLgxTag(packet, programName):
 
-    t = LgxTag()
+    t = Tag()
     length = unpack_from('<H', packet, 4)[0]
     name = packet[6:length+6].decode('utf-8')
     if programName:
@@ -2116,172 +2118,6 @@ def parseLgxTag(packet, programName):
     else:
         t.Size = 0
     return t
-
-class UDT:
-
-    def __init__(self):
-
-        self.Type = 0
-        self.Name = ''
-        self.Fields = []
-        self.FieldsByName = {}
-
-    def __repr__(self):
-
-        props = ''
-        props += 'Type={}'.format(self.Type)
-        props += 'Name={}'.format(self.Name)
-        props += 'Fields={}'.format(self.Fields)
-        props += 'FieldsByName={}'.format(self.FieldsByName)
-        
-        return 'UDT({})'.format(props)
-
-    def __str__(self):
-
-        return '{} {} {} {}'.format(
-                self.Type,
-                self.Name,
-                self.Fields,
-                self.FieldsByName)
-
-class LgxTag:
-
-    def __init__(self):
-
-        self.TagName = ''
-        self.InstanceID = 0x00
-        self.SymbolType = 0x00
-        self.DataTypeValue = 0x00
-        self.DataType = ''
-        self.Array = 0x00
-        self.Struct = 0x00
-        self.Size = 0x00
-        self.AccessRight = None
-        self.Internal = None
-        self.Meta = None
-        self.Scope0 = None
-        self.Scope1 = None
-        self.Bytes = None
-
-    def __repr__(self):
-
-        props = ''
-        props += 'TagName={}, '.format(self.TagName)
-        props += 'InstanceID={}, '.format(self.InstanceID)
-        props += 'SymbolType={}, '.format(self.SymbolType)
-        props += 'DataTypeValue={}, '.format(self.DataTypeValue)
-        props += 'DataType={}, '.format(self.DataType)
-        props += 'Array={}, '.format(self.Array)
-        props += 'Struct={}, '.format(self.Struct)
-        props += 'Size={}'.format(self.Size)
-        props += 'AccessRight={}'.format(self.AccessRight)
-        props += 'Internal={}'.format(self.Internal)
-        props += 'Meta={}'.format(self.Meta)
-        props += 'Scope0={}'.format(self.Scope0)
-        props += 'Scope1={}'.format(self.Scope1)
-        props += 'Bytes={}'.format(self.Bytes)
-
-        return 'LgxTag({})'.format(props)
-
-    def __str__(self):
-
-        return '{} {} {} {} {} {} {} {} {} {} {} {} {} {}'.format(
-                self.TagName,
-                self.InstanceID,
-                self.SymbolType,
-                self.DataTypeValue,
-                self.DataType,
-                self.Array,
-                self.Struct,
-                self.Size,
-                self.AccessRight,
-                self.Internal,
-                self.Meta,
-                self.Scope0,
-                self.Scope1,
-                self.bytes)
-
-class Response:
-
-    def __init__(self, tag_name, value, status):
-        self.TagName = tag_name
-        self.Value = value
-        self.Status = get_error_code(status)
-
-    def __repr__(self):
-
-        return 'Response(TagName={}, Value={}, Status={})'.format(
-            self.TagName, self.Value, self.Status)
-
-    def __str__(self):
-
-        return '{} {} {}'.format(self.TagName, self.Value, self.Status)
-
-def get_error_code(status):
-    """
-    Get the CIP error code string, if the status is a string it will be returned
-    """
-    # hack to check if status string for both py2 and py3
-    # because of nesting Response.Status to another Response obj constr
-    # some Success results are shown as 'Unknown error Success'
-    if sys.version_info.major == 3:
-        if isinstance(status, str):
-            return status
-    if sys.version_info.major == 2:
-        if isinstance(status, basestring):
-            return status
-
-    if status in cip_error_codes.keys():
-        err = cip_error_codes[status]
-    else:
-        err = 'Unknown error {}'.format(status)
-    return err
-
-cip_error_codes = {0x00: 'Success',
-                   0x01: 'Connection failure',
-                   0x02: 'Resource unavailable',
-                   0x03: 'Invalid parameter value',
-                   0x04: 'Path segment error',
-                   0x05: 'Path destination unknown',
-                   0x06: 'Partial transfer',
-                   0x07: 'Connection lost',
-                   0x08: 'Service not supported',
-                   0x09: 'Invalid Attribute',
-                   0x0A: 'Attribute list error',
-                   0x0B: 'Already in requested mode/state',
-                   0x0C: 'Object state conflict',
-                   0x0D: 'Object already exists',
-                   0x0E: 'Attribute not settable',
-                   0x0F: 'Privilege violation',
-                   0x10: 'Device state conflict',
-                   0x11: 'Reply data too large',
-                   0x12: 'Fragmentation of a premitive value',
-                   0x13: 'Not enough data',
-                   0x14: 'Attribute not supported',
-                   0x15: 'Too much data',
-                   0x16: 'Object does not exist',
-                   0x17: 'Service fragmentation sequence not in progress',
-                   0x18: 'No stored attribute data',
-                   0x19: 'Store operation failure',
-                   0x1A: 'Routing failure, request packet too large',
-                   0x1B: 'Routing failure, response packet too large',
-                   0x1C: 'Missing attribute list entry data',
-                   0x1D: 'Invalid attribute value list',
-                   0x1E: 'Embedded service error',
-                   0x1F: 'Vendor specific',
-                   0x20: 'Invalid Parameter',
-                   0x21: 'Write once value or medium already written',
-                   0x22: 'Invalid reply received',
-                   0x23: 'Buffer overflow',
-                   0x24: 'Invalid message format',
-                   0x25: 'Key failure in path',
-                   0x26: 'Path size invalid',
-                   0x27: 'Unexpected attribute in list',
-                   0x28: 'Invalid member ID',
-                   0x29: 'Member not settable',
-                   0x2A: 'Group 2 only server general failure',
-                   0x2B: 'Unknown Modbus error',
-                   0x2C: 'Attribute not gettable'}
 
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,
