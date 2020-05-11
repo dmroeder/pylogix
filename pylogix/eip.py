@@ -977,10 +977,6 @@ class PLC:
             else:
                 return (True, 'Success')
 
-        # Make sure the connection size is correct
-        if not 500 <= self.ConnectionSize <= 4000:
-            return (False, 'ConnectionSize must be an integer between 500 and 4000')
-
         try:
             self.Socket = socket.socket()
             self.Socket.settimeout(5.0)
@@ -1001,20 +997,37 @@ class PLC:
             self.SocketConnected = False
             return (False, 'Register session failed')
 
-        # forward open connection
         if connected:
-            self.Socket.send(self._buildForwardOpenPacket())
-            try:
-                ret_data = self.recv_data()
-            except socket.timeout as e:
-                return (False, e)
-            sts = unpack_from('<b', ret_data, 42)[0]
-            if not sts:
-                self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
-                self._connected = True
-            else:
-                self.SocketConnected = False
-                return (False, 'Forward open failed')
+            # try a large forward open
+            ret = self._forward_open(4002)
+
+            # if large forward open fails, try
+            # a normal forward open
+            if not ret[0]:
+                ret = self._forward_open(508)
+
+            return ret
+
+        self.SocketConnected = True
+        return (self.SocketConnected, 'Success')
+
+    def _forward_open(self, connection_size):
+        """
+        ForwardOpen connection
+        """
+        self.ConnectionSize = connection_size
+        self.Socket.send(self._buildForwardOpenPacket())
+        try:
+            ret_data = self.recv_data()
+        except socket.timeout as e:
+            return (False, e)
+        sts = unpack_from('<b', ret_data, 42)[0]
+        if not sts:
+            self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
+            self._connected = True
+        else:
+            self.SocketConnected = False
+            return (False, 'Forward open failed')
 
         self.SocketConnected = True
         return (self.SocketConnected, 'Success')

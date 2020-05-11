@@ -1,4 +1,5 @@
 05/11/20
+  - Default to LargeForwardOpen, fall back on ForwardOpen
   - Restructured some code, cleanup
 
 05/05/20
