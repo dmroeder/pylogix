@@ -1,4 +1,7 @@
 05/13/20
+  - Force little endian to support pylogix import in jython as Java uses big-endian. Issue #132 
+
+05/13/20
   - Fixed PylogixTests.py imports
 
 05/11/20
