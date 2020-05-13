@@ -19,7 +19,8 @@
 
 import sys
 sys.path.append(".")
-from pylogix.eip import LgxTag, Response  # Need Classes for type checking
+from pylogix.lgx_tag import Tag  # Need Classes for type checking
+from pylogix.lgx_response import Response
 import plcConfig  # Info: tests\README.md - Setup test configuration file
 from pylogix import PLC
 import time
@@ -341,7 +342,7 @@ class PylogixTests(unittest.TestCase):
         tags = comm.GetTagList()
         self.assertEqual(
             isinstance(
-                tags.Value[0], LgxTag), True, "LgxTag not found in GetTagList")
+                tags.Value[0], Tag), True, "LgxTag not found in GetTagList")
 
     def test_response_class(self):
         one_bool = comm.Read('BaseBool')
@@ -372,7 +373,7 @@ class PylogixTests(unittest.TestCase):
             isinstance(program_tags, Response),
             True, "Reponse class not found in GetProgramTagList")
         self.assertEqual(
-            isinstance(program_tags.Value[0], LgxTag),
+            isinstance(program_tags.Value[0], Tag),
             True, "LgxTag class not found in GetProgramTagList Value")
 
     def tearDown(self):
