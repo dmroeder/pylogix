@@ -262,7 +262,6 @@ class PLC:
             bit_pos = int(bit_pos)
 
             words = _getWordCount(bit_pos, elements, bit_count)
-
             request = self._add_read_service(ioi, words)
         else:
             # everything else
@@ -271,11 +270,29 @@ class PLC:
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
 
-        if status == 0 or status == 6:
-            return_value = self._parseReply(tag_name, elements, ret_data)
-            return Response(tag_name, return_value, status)
+        return_values = []
+        while True:
+            if status == 0 or status == 6:
+                val = self._parseReply(tag_name, elements, ret_data)
+                return_values.append(val)
+            else:
+                break
+
+            if status == 0:
+                break
+
+            if status == 6:
+                # request new data if partial transfer
+                read_service = self._add_partial_read_service(ioi, elements)
+                eip_header = self._buildEIPHeader(read_service)
+                status, ret_data = self._getBytes(eip_header)
+
+        if return_values:
+            value = return_values[0]
         else:
-            return Response(tag_name, None, status)
+            value = None
+
+        return Response(tag_name, value, status)
 
     def _writeTag(self, tag_name, value, data_type):
         """
@@ -1693,68 +1710,47 @@ class PLC:
         Gather up all the values in the reply/replies
         """
         status = unpack_from('<B', data, 48)[0]
-        extendedStatus = unpack_from('<B', data, 49)[0]
+        ext_status = unpack_from('<B', data, 49)[0]
         elements = int(elements)
 
-        if status == 0 or status == 6:
-            # parse the tag
-            tag, base_tag, index = _parseTagName(tag_name, 0)
-            data_type = self.KnownTags[base_tag][0]
-            CIPFormat = self.CIPTypes[data_type][2]
-            vals = []
+        tag, base_tag, index = _parseTagName(tag_name, 0)
+        data_type = self.KnownTags[base_tag][0]
+        fmt = self.CIPTypes[data_type][2]
+        vals = []
 
-            data_size = self.CIPTypes[data_type][0]
-            numbytes = len(data)-data_size
-            counter = 0
-            self.Offset = 0
-            for i in range(elements):
-                index = 52+(counter*data_size)
-                if data_type == 160:
-                    tmp = unpack_from('<h', data, 52)[0]
-                    if tmp == self.StructIdentifier:
-                        # gotta handle strings a little different
-                        index = 54+(counter*data_size)
-                        name_len = unpack_from('<L', data, index)[0]
-                        s = data[index+4:index+4+name_len]
-                        vals.append(str(s.decode(self.StringEncoding)))
-                    else:
-                        d = data[index:index+len(data)]
-                        vals.append(d)
-                elif data_type == 218:
-                    index = 52+(counter*data_size)
-                    name_len = unpack_from('<B', data, index)[0]
-                    s = data[index+1:index+1+name_len]
-                    vals.append(str(s.decode('utf-8')))
+        data_size = self.CIPTypes[data_type][0]
+        numbytes = len(data)-data_size
+        counter = 0
+        self.Offset = 0
+
+        while True:
+            if index >= numbytes:
+               break
+            index = 52+(counter*data_size)
+            if data_type == 160:
+                tmp = unpack_from('<h', data, 52)[0]
+                if tmp == self.StructIdentifier:
+                    # gotta handle strings a little different
+                    index = 54+(counter*data_size)
+                    name_len = unpack_from('<L', data, index)[0]
+                    s = data[index+4:index+4+name_len]
+                    vals.append(str(s.decode(self.StringEncoding)))
                 else:
-                    returnvalue = unpack_from(CIPFormat, data, index)[0]
-                    vals.append(returnvalue)
-
-                self.Offset += data_size
-                counter += 1
-
-                # re-read because the data is in more than one packet
-                if index == numbytes and status == 6:
-                    index = 0
-                    counter = 0
-
-                    ioi = self._buildTagIOI(tag_name, data_type)
-                    read_service = self._add_partial_read_service(ioi, elements)
-                    eip_header = self._buildEIPHeader(read_service)
-
-                    self.Socket.send(eip_header)
-                    data = self.recv_data()
-
-                    status = unpack_from('<B', data, 48)[0]
-                    numbytes = len(data)-data_size
-
-            return vals
-
-        else:  # didn't nail it
-            if status in cipErrorCodes.keys():
-                err = cipErrorCodes[status]
+                    d = data[index:index+len(data)]
+                    vals.append(d)
+            elif data_type == 218:
+                index = 52+(counter*data_size)
+                name_len = unpack_from('<B', data, index)[0]
+                s = data[index+1:index+1+name_len]
+                vals.append(str(s.decode('utf-8')))
             else:
-                err = 'Unknown error'
-            return 'Failed to read tag: {} - {}'.format(tag, err)
+                returnvalue = unpack_from(fmt, data, index)[0]
+                vals.append(returnvalue)
+
+            self.Offset += data_size
+            counter += 1
+
+        return vals
 
     def recv_data(self):
         """
