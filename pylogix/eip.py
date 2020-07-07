@@ -2020,7 +2020,7 @@ def _getWordCount(start, length, bits):
     newEnd = newStart + length
 
     totalWords = (newEnd-1) / bits
-    return totalWords + 1
+    return int(totalWords + 1)
 
 def _parseTagName(tag, offset):
     """

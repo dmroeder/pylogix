@@ -1,6 +1,7 @@
 07/07/20
   - Reorganized read and parsing replies
   - DWORD had incorrect pack/unpack format
+  - Fixed getwrordcount returning a float under python3
 
 05/13/20
   - Force little endian to support pylogix import in jython as Java uses big-endian. Issue #132 
