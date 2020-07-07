@@ -75,7 +75,7 @@ class PLC:
                          201: (8, "LWORD", '<Q'),
                          202: (4, "REAL", '<f'),
                          203: (8, "LREAL", '<d'),
-                         211: (4, "DWORD", '<I'),
+                         211: (4, "DWORD", '<i'),
                          218: (1, "STRING", '<B')}
 
     def __enter__(self):
