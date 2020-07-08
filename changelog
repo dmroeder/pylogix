@@ -1,6 +1,7 @@
 07/08/20
   - Fixed read issues after reorganization
   - Upped version to 0.6.11
+  - Cleanup leftovers
 
 07/07/20
   - Reorganized read and parsing replies

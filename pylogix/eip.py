@@ -301,8 +301,6 @@ class PLC:
 
         return Response(tag_name, value, status)
 
-        return Response(tag_name, value, status)
-
     def _writeTag(self, tag_name, value, data_type):
         """
         Processes the write request
@@ -1715,9 +1713,6 @@ class PLC:
         """
         Gather up all the values in the reply/replies
         """
-        #status = unpack_from('<B', data, 48)[0]
-        #ext_status = unpack_from('<B', data, 49)[0]
-        #elements = int(elements)
 
         tag, base_tag, index = _parseTagName(tag_name, 0)
         data_type = self.KnownTags[base_tag][0]
@@ -1784,11 +1779,9 @@ class PLC:
         """
         # if a tag already exists, return True
         if base_tag in self.KnownTags:
-            # return True
             return tag, None, 0
         if data_type:
             self.KnownTags[base_tag] = (data_type, 0)
-            # return True
             return tag, None, 0
 
         ioi = self._buildTagIOI(base_tag, data_type)
