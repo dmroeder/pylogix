@@ -271,10 +271,14 @@ class PLC:
         status, ret_data = self._getBytes(eip_header)
 
         return_values = []
+        return_values = []
         while True:
             if status == 0 or status == 6:
-                val = self._parseReply(tag_name, elements, ret_data)
-                return_values.append(val)
+                val = self._parseReply(tag_name, elements, ret_data[50:])
+                if isinstance(val, str):
+                    return_values.append(val)
+                else:
+                    return_values.extend(val)
             else:
                 break
 
@@ -288,9 +292,14 @@ class PLC:
                 status, ret_data = self._getBytes(eip_header)
 
         if return_values:
-            value = return_values[0]
+            if len(return_values) == 1:
+                value = return_values[0]
+            else:
+                value = return_values
         else:
             value = None
+
+        return Response(tag_name, value, status)
 
         return Response(tag_name, value, status)
 
@@ -1700,18 +1709,15 @@ class PLC:
         else:
             vals = self._getReplyValues(tag_name, elements, data)
 
-        if len(vals) == 1:
-            return vals[0]
-        else:
-            return vals
+        return vals
 
     def _getReplyValues(self, tag_name, elements, data):
         """
         Gather up all the values in the reply/replies
         """
-        status = unpack_from('<B', data, 48)[0]
-        ext_status = unpack_from('<B', data, 49)[0]
-        elements = int(elements)
+        #status = unpack_from('<B', data, 48)[0]
+        #ext_status = unpack_from('<B', data, 49)[0]
+        #elements = int(elements)
 
         tag, base_tag, index = _parseTagName(tag_name, 0)
         data_type = self.KnownTags[base_tag][0]
@@ -1724,14 +1730,14 @@ class PLC:
         self.Offset = 0
 
         while True:
-            if index >= numbytes:
+            index = 2+(counter*data_size)
+            if index > numbytes:
                break
-            index = 52+(counter*data_size)
             if data_type == 160:
-                tmp = unpack_from('<h', data, 52)[0]
+                tmp = unpack_from('<h', data, 2)[0]
                 if tmp == self.StructIdentifier:
                     # gotta handle strings a little different
-                    index = 54+(counter*data_size)
+                    index = 4+(counter*data_size)
                     name_len = unpack_from('<L', data, index)[0]
                     s = data[index+4:index+4+name_len]
                     vals.append(str(s.decode(self.StringEncoding)))
@@ -1739,7 +1745,7 @@ class PLC:
                     d = data[index:index+len(data)]
                     vals.append(d)
             elif data_type == 218:
-                index = 52+(counter*data_size)
+                index = 2+(counter*data_size)
                 name_len = unpack_from('<B', data, index)[0]
                 s = data[index+1:index+1+name_len]
                 vals.append(str(s.decode('utf-8')))

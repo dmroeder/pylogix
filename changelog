@@ -1,3 +1,7 @@
+07/08/20
+  - Fixed read issues after reorganization
+  - Upped version to 0.6.11
+
 07/07/20
   - Reorganized read and parsing replies
   - DWORD had incorrect pack/unpack format
