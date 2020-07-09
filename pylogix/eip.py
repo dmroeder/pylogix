@@ -271,7 +271,7 @@ class PLC:
         status, ret_data = self._getBytes(eip_header)
 
         return_values = []
-        return_values = []
+
         while True:
             if status == 0 or status == 6:
                 val = self._parseReply(tag_name, elements, ret_data[50:])
@@ -367,6 +367,9 @@ class PLC:
         """
         Processes the multiple read request. Split into multiple requests and reassemble responses when needed
         """
+        if self.Micro800:
+            return Response(tags, None, 8)
+
         result = []
         while len(result) < len(tags):
             result.extend(self._multiRead(tags[len(result):]))
@@ -439,7 +442,6 @@ class PLC:
         request = header + segmentCount + offsets + segments
         eip_header = self._buildEIPHeader(request)
         status, ret_data = self._getBytes(eip_header)
-
 
         return self._multiReadParser(tags_effective, ret_data)
 
@@ -1713,7 +1715,6 @@ class PLC:
         """
         Gather up all the values in the reply/replies
         """
-
         tag, base_tag, index = _parseTagName(tag_name, 0)
         data_type = self.KnownTags[base_tag][0]
         fmt = self.CIPTypes[data_type][2]
@@ -1740,10 +1741,19 @@ class PLC:
                     d = data[index:index+len(data)]
                     vals.append(d)
             elif data_type == 218:
-                index = 2+(counter*data_size)
-                name_len = unpack_from('<B', data, index)[0]
-                s = data[index+1:index+1+name_len]
-                vals.append(str(s.decode('utf-8')))
+                # remove the data type
+                data = data[2:] 
+                while len(data) > 0:
+                    # get the next string length
+                    length = unpack_from('<B', data, 0)[0]
+                    # remove the length from the packet
+                    data = data[1:]
+                    # grab the string
+                    s = data[:length]
+                    vals.append(str(s.decode(self.StringEncoding)))
+                    # remove the string from the packet
+                    data = data[length:]
+                break
             else:
                 returnvalue = unpack_from(fmt, data, index)[0]
                 vals.append(returnvalue)
