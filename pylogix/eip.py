@@ -372,7 +372,12 @@ class PLC:
 
         result = []
         while len(result) < len(tags):
-            result.extend(self._multiRead(tags[len(result):]))
+            if len(result) == len(tags)-1:
+                # single tag left over, can't use multi msg service
+                tag = tags[len(result):][0]
+                result.append(self._readTag(tag, 1, None))
+            else:
+                result.extend(self._multiRead(tags[len(result):]))
         return result
 
     def _multiRead(self, tags):
