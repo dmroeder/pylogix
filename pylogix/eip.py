@@ -370,6 +370,18 @@ class PLC:
         if self.Micro800:
             return Response(tags, None, 8)
 
+        # get a list of tags we have not read yet
+        unk_tags = []
+        for t in tags:
+            tag_name, base_tag, index = _parseTagName(t, 0)
+            if base_tag not in self.KnownTags:
+                unk_tags.append(t)
+
+        # get the unknown tags
+        result = []
+        while len(result) < len(unk_tags):
+            result.extend(self._multi_read(tags[len(result):], True))
+
         result = []
         while len(result) < len(tags):
             if len(result) == len(tags)-1:
@@ -377,10 +389,10 @@ class PLC:
                 tag = tags[len(result):][0]
                 result.append(self._readTag(tag, 1, None))
             else:
-                result.extend(self._multiRead(tags[len(result):]))
+                result.extend(self._multi_read(tags[len(result):], False))
         return result
 
-    def _multiRead(self, tags):
+    def _multi_read(self, tags, first):
         """
         Processes the multiple read request, but only the possible number of tags in a single request. The size
         difference between tags and result must be check for a complete read
@@ -401,23 +413,12 @@ class PLC:
         rsp_tag_size = 52
 
         for tag in tags:
-            if isinstance(tag, (list, tuple)):
-                tag_name, base_tag, index = _parseTagName(tag[0], 0)
-                self._initial_read(tag_name, base_tag, tag[1])
+            tag_name, base_tag, index = _parseTagName(tag, 0)
+            ioi = self._buildTagIOI(base_tag, None)
+            if first:
+                read_service = self._add_partial_read_service(ioi, 1)
             else:
-                tag_name, base_tag, index = _parseTagName(tag, 0)
-                self._initial_read(tag_name, base_tag, None)
-            if base_tag in self.KnownTags.keys():
-                data_type = self.KnownTags[base_tag][0]
-            else:
-                data_type = None
-
-            if data_type and data_type in self.CIPTypes.keys():
-                rsp_tag_size = rsp_tag_size + 4 + self.CIPTypes[data_type][0]
-
-            ioi = self._buildTagIOI(tag_name, data_type)
-
-            read_service = self._add_read_service(ioi, 1)
+                read_service = self._add_read_service(ioi, 1)
 
             # check if request size does not exceed (ConnectionSize bytes limit)
             next_request_size = service_segment_size + len(read_service) + (tag_count + 1) * 2
@@ -1880,6 +1881,8 @@ class PLC:
             # successful reply, add the value to our list
             if replyStatus == 0 and replyExtended == 0:
                 dataTypeValue = unpack_from('<B', stripped, offset+4)[0]
+                tag_name, base_tag, index = _parseTagName(tag, 0)
+                self.KnownTags[base_tag] = (dataTypeValue, 0)
                 # if bit of word was requested
                 if BitofWord(tag):
                     dataTypeFormat = self.CIPTypes[dataTypeValue][2]
