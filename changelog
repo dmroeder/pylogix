@@ -1,5 +1,6 @@
 07/15/20
   - Check connection sooner when reading lists
+  - Updated README
 
 07/14/20
   - Use muti service object to learn data types
