@@ -370,6 +370,10 @@ class PLC:
         if self.Micro800:
             return Response(tags, None, 8)
 
+        conn = self._connect()
+        if not conn[0]:
+            return [Response(None, None, conn[1])]
+
         # get a list of tags we have not read yet
         unk_tags = []
         for t in tags:
@@ -406,10 +410,6 @@ class PLC:
         segments = b""
         tag_count = 0
         self.Offset = 0
-
-        conn = self._connect()
-        if not conn[0]:
-            return [Response(None, None, conn[1])]
 
         header = self._buildMultiServiceHeader()
 
