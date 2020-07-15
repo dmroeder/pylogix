@@ -380,7 +380,12 @@ class PLC:
         # get the unknown tags
         result = []
         while len(result) < len(unk_tags):
-            result.extend(self._multi_read(tags[len(result):], True))
+            if len(result) == len(unk_tags)-1:
+                tag = unk_tags[len(result):][0]
+                tag_name, base_tag, index = _parseTagName(tag, 0)
+                result.append(self._initial_read(tag, base_tag, None))
+            else:
+                result.extend(self._multi_read(unk_tags[len(result):], True))
 
         result = []
         while len(result) < len(tags):
