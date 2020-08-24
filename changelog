@@ -1,3 +1,6 @@
+08/24/20
+  - Fixed typo in lgx_device.py
+
 07/15/20
   - Check connection sooner when reading lists
   - Updated README

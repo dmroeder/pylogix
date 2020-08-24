@@ -53,7 +53,7 @@ class Tag:
         props += 'Scope1={} '.format(self.Scope1)
         props += 'Bytes={}'.format(self.Bytes)
 
-        return 'LgxTag({})'.format(props)
+        return 'Tag({})'.format(props)
 
     def __str__(self):
 
@@ -71,7 +71,7 @@ class Tag:
                 self.Meta,
                 self.Scope0,
                 self.Scope1,
-                self.bytes)
+                self.Bytes)
     
     @staticmethod
     def parse(packet, programName):
