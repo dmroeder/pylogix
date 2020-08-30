@@ -31,7 +31,7 @@ from struct import pack, unpack_from
 
 class PLC:
 
-    def __init__(self, ip_address="", slot=0):
+    def __init__(self, ip_address="", slot=0, timeout=5.0):
         """
         Initialize our parameters
         """
@@ -44,6 +44,7 @@ class PLC:
         self.Context = 0x00
         self.ContextPointer = 0
         self.Socket = socket.socket()
+        self.SocketTimeout = timeout
         self.SocketConnected = False
         self._registered = False
         self._connected = False
@@ -1016,7 +1017,7 @@ class PLC:
 
         try:
             self.Socket = socket.socket()
-            self.Socket.settimeout(5.0)
+            self.Socket.settimeout(self.SocketTimeout)
             self.Socket.connect((self.IPAddress, self.Port))
         except socket.error as e:
             self.SocketConnected = False
