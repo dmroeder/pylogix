@@ -1,6 +1,7 @@
 09/01/20
   - Moved some code to lgx_device and lgx_tag
   - Removed unnecessary calls to _getUDT()
+  - Upped version to 0.7.2
 
 08/24/20
   - Fixed typo in lgx_device.py
