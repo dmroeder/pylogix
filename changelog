@@ -1,3 +1,6 @@
+09/01/20
+  - Moved some code to lgx_device and lgx_tag
+
 08/24/20
   - Fixed typo in lgx_device.py
 

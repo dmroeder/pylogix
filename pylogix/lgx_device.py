@@ -14,6 +14,9 @@
    limitations under the License.
 """
 
+import socket
+from struct import pack, unpack_from
+
 class Device():
     
     def __init__(self):
@@ -86,6 +89,39 @@ class Device():
             return vendors[vendorID]
         else:
             return "Unknown"
+
+    @staticmethod
+    def parse(data):
+        # we're going to take the packet and parse all
+        #  the data that is in it.
+
+        resp = Device()
+        resp.Length = unpack_from('<H', data, 28)[0]
+        resp.EncapsulationVersion = unpack_from('<H', data, 30)[0]
+
+        longIP = unpack_from('<I', data, 36)[0]
+        resp.IPAddress = socket.inet_ntoa(pack('<L', longIP))
+
+        resp.VendorID = unpack_from('<H', data, 48)[0]
+        resp.Vendor = Device.get_vendor(resp.VendorID)
+
+        resp.DeviceID = unpack_from('<H', data, 50)[0]
+        resp.Device = Device.get_device(resp.DeviceID)
+
+        resp.ProductCode = unpack_from('<H', data, 52)[0]
+        major = unpack_from('<B', data, 54)[0]
+        minor = unpack_from('<B', data, 55)[0]
+        resp.Revision = str(major) + '.' + str(minor)
+
+        resp.Status = unpack_from('<H', data, 56)[0]
+        resp.SerialNumber = hex(unpack_from('<I', data, 58)[0])
+        resp.ProductNameLength = unpack_from('<B', data, 62)[0]
+        resp.ProductName = str(data[63:63+resp.ProductNameLength].decode('utf-8'))
+
+        state = data[-1:]
+        resp.State = unpack_from('<B', state, 0)[0]
+
+        return resp
 
 # List originally came from Wireshark /epan/dissectors/packet-cip.c
 devices = {0x00: 'Generic Device (deprecated)',

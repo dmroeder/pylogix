@@ -895,7 +895,7 @@ class PLC:
                         ret = s.recv(4096)
                         context = unpack_from('<Q', ret, 14)[0]
                         if context == 0x006d6f4d6948:
-                            device = _parseIdentityResponse(ret)
+                            device = Device.parse(ret)
                             if device.IPAddress:
                                 devices.append(device)
                 except Exception:
@@ -914,7 +914,7 @@ class PLC:
                     ret = s.recv(4096)
                     context = unpack_from('<Q', ret, 14)[0]
                     if context == 0x006d6f4d6948:
-                        device = _parseIdentityResponse(ret)
+                        device = Device.parse(ret)
                         if device.IPAddress:
                             devices.append(device)
             except Exception:
@@ -956,7 +956,7 @@ class PLC:
         status = unpack_from('<B', ret_data, 46)[0]
 
         if status == 0:
-            return Response(None, _parseIdentityResponse(ret_data), status)
+            return Response(None, Device.parse(ret_data), status)
         else:
             return Response(None, Device(), status)
 
@@ -997,7 +997,7 @@ class PLC:
         status = unpack_from('<B', ret_data, 46)[0]
 
         if status == 0:
-            return Response(None, _parseIdentityResponse(ret_data), status)
+            return Response(None, Device.parse(ret_data), status)
         else:
             return Response(None, Device(), status)
 
@@ -1974,7 +1974,7 @@ class PLC:
             # extract the offset
             self.Offset = unpack_from('<H', packet, 0)[0]
             # add the tag to our tag list
-            tag = parseLgxTag(packet, programName)
+            tag = Tag.parse(packet, programName)
 
             # filter out garbage
             if '__DEFVAL_' in tag.TagName:
@@ -2094,62 +2094,6 @@ def BitValue(value, bitno):
         return True
     else:
         return False
-
-def _parseIdentityResponse(data):
-    # we're going to take the packet and parse all
-    #  the data that is in it.
-
-    resp = Device()
-    resp.Length = unpack_from('<H', data, 28)[0]
-    resp.EncapsulationVersion = unpack_from('<H', data, 30)[0]
-
-    longIP = unpack_from('<I', data, 36)[0]
-    resp.IPAddress = socket.inet_ntoa(pack('<L', longIP))
-
-    resp.VendorID = unpack_from('<H', data, 48)[0]
-    resp.Vendor = Device.get_vendor(resp.VendorID)
-
-    resp.DeviceID = unpack_from('<H', data, 50)[0]
-    resp.Device = Device.get_device(resp.DeviceID)
-
-    resp.ProductCode = unpack_from('<H', data, 52)[0]
-    major = unpack_from('<B', data, 54)[0]
-    minor = unpack_from('<B', data, 55)[0]
-    resp.Revision = str(major) + '.' + str(minor)
-
-    resp.Status = unpack_from('<H', data, 56)[0]
-    resp.SerialNumber = hex(unpack_from('<I', data, 58)[0])
-    resp.ProductNameLength = unpack_from('<B', data, 62)[0]
-    resp.ProductName = str(data[63:63+resp.ProductNameLength].decode('utf-8'))
-
-    state = data[-1:]
-    resp.State = unpack_from('<B', state, 0)[0]
-
-    return resp
-
-def parseLgxTag(packet, programName):
-
-    t = Tag()
-    length = unpack_from('<H', packet, 4)[0]
-    name = packet[6:length+6].decode('utf-8')
-    if programName:
-        t.TagName = str(programName + '.' + name)
-    else:
-        t.TagName = str(name)
-    t.InstanceID = unpack_from('<H', packet, 0)[0]
-
-    val = unpack_from('<H', packet, length+6)[0]
-
-    t.SymbolType = val & 0xff
-    t.DataTypeValue = val & 0xfff
-    t.Array = (val & 0x6000) >> 13
-    t.Struct = (val & 0x8000) >> 15
-
-    if t.Array:
-        t.Size = unpack_from('<H', packet, length+8)[0]
-    else:
-        t.Size = 0
-    return t
 
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,
