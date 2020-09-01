@@ -643,8 +643,7 @@ class PLC:
                     else:
                         return Response(None, None, status)
 
-        updated_list = self._getUDT(tags)
-        return Response(None, updated_list, status)
+        return Response(None, tags, status)
 
     def _getProgramTagList(self, programName):
         """
@@ -675,7 +674,6 @@ class PLC:
             else:
                 return Response(None, None, status)
 
-        updated_list = self._getUDT(tags)
         return Response(None, tags, status)
 
     def _getUDT(self, tag_list):
