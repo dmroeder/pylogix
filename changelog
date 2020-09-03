@@ -1,5 +1,6 @@
 09/02/20
   - Moved communications to its own module
+  - Upped version to 0.7.3
 
 09/01/20
   - Moved some code to lgx_device and lgx_tag
