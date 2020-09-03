@@ -22,6 +22,7 @@ import socket
 import sys
 import time
 
+from .lgx_comm import Connection
 from .lgx_device import Device
 from .lgx_response import Response
 from .lgx_tag import Tag, UDT
@@ -37,23 +38,11 @@ class PLC:
         """
         self.IPAddress = ip_address
         self.ProcessorSlot = slot
+        self.SocketTimeout = timeout
         self.Micro800 = False
         self.Route = None
-        self.Port = 44818
-        self.VendorID = 0x1337
-        self.Context = 0x00
-        self.ContextPointer = 0
-        self.Socket = socket.socket()
-        self.SocketTimeout = timeout
-        self.SocketConnected = False
-        self._registered = False
-        self._connected = False
-        self.OTNetworkConnectionID = None
-        self.SessionHandle = 0x0000
-        self.SessionRegistered = False
-        self.SerialNumber = 0
-        self.OriginatorSerialNumber = 42
-        self.SequenceCounter = 1
+
+        self.conn = Connection(self)
         self.ConnectionSize = 508
         self.Offset = 0
         self.UDT = {}
@@ -86,7 +75,7 @@ class PLC:
         """
         Clean up on exit
         """
-        return self._closeConnection()
+        self.conn.close()
 
     def Read(self, tag, count=1, datatype=None):
         """
@@ -159,7 +148,7 @@ class PLC:
 
         returns Response class (.TagName, .Value, .Status)
         """
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return Response(programName, None, conn[1])
 
@@ -187,7 +176,7 @@ class PLC:
         returns Response class (.TagName, .Value, .Status)
         """
 
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return Response(None, None, conn[1])
 
@@ -231,7 +220,7 @@ class PLC:
         """
         Close the connection to the PLC
         """
-        return self._closeConnection()
+        return self.conn.close()
 
     def _readTag(self, tag_name, elements, data_type):
         """
@@ -239,7 +228,7 @@ class PLC:
         """
         self.Offset = 0
 
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return Response(tag_name, None, conn[1])
 
@@ -268,8 +257,7 @@ class PLC:
             # everything else
             request = self._add_read_service(ioi, elements)
 
-        eip_header = self._buildEIPHeader(request)
-        status, ret_data = self._getBytes(eip_header)
+        status, ret_data = self.conn.send(request)
 
         return_values = []
 
@@ -288,9 +276,8 @@ class PLC:
 
             if status == 6:
                 # request new data if partial transfer
-                read_service = self._add_partial_read_service(ioi, elements)
-                eip_header = self._buildEIPHeader(read_service)
-                status, ret_data = self._getBytes(eip_header)
+                request = self._add_partial_read_service(ioi, elements)
+                status, ret_data = self.conn.send(request)
 
         if return_values:
             if len(return_values) == 1:
@@ -309,7 +296,7 @@ class PLC:
         self.Offset = 0
         write_data = []
 
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return Response(tag_name, value, conn[1])
 
@@ -349,8 +336,7 @@ class PLC:
             # write requires multiple packets
             for w in write_data:
                 request = self._add_frag_write_service(element_count, ioi, w, data_type)
-                eip_header = self._buildEIPHeader(request)
-                status, ret_data = self._getBytes(eip_header)
+                status, ret_data = self.conn.send(request)
                 self.Offset += len(w)*self.CIPTypes[data_type][0]
         else:
             # write fits in one packet
@@ -359,8 +345,7 @@ class PLC:
             else:
                 request = self._add_write_service(ioi, write_data[0], data_type)
 
-            eip_header = self._buildEIPHeader(request)
-            status, ret_data = self._getBytes(eip_header)
+            status, ret_data = self.conn.send(request)
 
         return Response(tag_name, value, status)
 
@@ -371,7 +356,7 @@ class PLC:
         if self.Micro800:
             return Response(tags, None, 8)
 
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return [Response(None, None, conn[1])]
 
@@ -452,8 +437,7 @@ class PLC:
             offsets += pack('<H', temp)
 
         request = header + segmentCount + offsets + segments
-        eip_header = self._buildEIPHeader(request)
-        status, ret_data = self._getBytes(eip_header)
+        status, ret_data = self.conn.send(request)
 
         return self._multiReadParser(tags_effective, ret_data)
 
@@ -466,7 +450,7 @@ class PLC:
         tag_count = len(write_data)
         self.Offset = 0
 
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return [Response(None, write_data, conn[1])]
 
@@ -510,8 +494,7 @@ class PLC:
             offsets += pack('<H', temp)
 
         request = header + segmentCount + offsets + segments
-        eip_header = self._buildEIPHeader(request)
-        status, ret_data = self._getBytes(eip_header)
+        status, ret_data = self.conn.send(request)
 
         return self._multiWriteParser(write_data, ret_data)
 
@@ -519,7 +502,7 @@ class PLC:
         """
         Requests the PLC clock time
         """
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return Response(None, None, conn[1])
 
@@ -532,18 +515,17 @@ class PLC:
         AttributeCount = 0x01
         TimeAttribute = 0x0B
 
-        AttributePacket = pack('<BBBBBBH1H',
-                               AttributeService,
-                               AttributeSize,
-                               AttributeClassType,
-                               AttributeClass,
-                               AttributeInstanceType,
-                               AttributeInstance,
-                               AttributeCount,
-                               TimeAttribute)
+        request = pack('<BBBBBBH1H',
+                        AttributeService,
+                        AttributeSize,
+                        AttributeClassType,
+                        AttributeClass,
+                        AttributeInstanceType,
+                        AttributeInstance,
+                        AttributeCount,
+                        TimeAttribute)
 
-        eip_header = self._buildEIPHeader(AttributePacket)
-        status, ret_data = self._getBytes(eip_header)
+        status, ret_data = self.conn.send(request)
 
         if status == 0:
             # get the time from the packet
@@ -562,7 +544,7 @@ class PLC:
         """
         Requests the PLC clock time
         """
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return Response(None, None, conn[1])
 
@@ -575,19 +557,18 @@ class PLC:
         AttributeCount = 0x01
         Attribute = 0x06
         Time = int(time.time() * 1000000)
-        AttributePacket = pack('<BBBBBBHHQ',
-                               AttributeService,
-                               AttributeSize,
-                               AttributeClassType,
-                               AttributeClass,
-                               AttributeInstanceType,
-                               AttributeInstance,
-                               AttributeCount,
-                               Attribute,
-                               Time)
+        request = pack('<BBBBBBHHQ',
+                        AttributeService,
+                        AttributeSize,
+                        AttributeClassType,
+                        AttributeClass,
+                        AttributeInstanceType,
+                        AttributeInstance,
+                        AttributeCount,
+                        Attribute,
+                        Time)
 
-        eip_header = self._buildEIPHeader(AttributePacket)
-        status, ret_data = self._getBytes(eip_header)
+        status, ret_data = self.conn.send(request)
 
         return Response(None, Time, status)
 
@@ -595,28 +576,20 @@ class PLC:
         """
         Requests the controller tag list and returns a list of Tag type
         """
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return Response(None, None, conn[1])
 
         self.Offset = 0
+        status = 6
         tags = []
 
-        request = self._buildTagListRequest(programName=None)
-        eip_header = self._buildEIPHeader(request)
-        status, ret_data = self._getBytes(eip_header)
-        if status == 0 or status == 6:
-            tags += self._extractTagPacket(ret_data, programName=None)
-        else:
-            return Response(None, None, status)
-
         while status == 6:
-            self.Offset += 1
             request = self._buildTagListRequest(programName=None)
-            eip_header = self._buildEIPHeader(request)
-            status, ret_data = self._getBytes(eip_header)
+            status, ret_data = self.conn.send(request)
             if status == 0 or status == 6:
                 tags += self._extractTagPacket(ret_data, programName=None)
+                self.Offset += 1
             else:
                 return Response(None, None, status)
 
@@ -626,18 +599,17 @@ class PLC:
                 self.Offset = 0
 
                 request = self._buildTagListRequest(program_name)
-                eip_header = self._buildEIPHeader(request)
-                status, ret_data = self._getBytes(eip_header)
+                status, ret_data = self.conn.send(request)
                 if status == 0 or status == 6:
                     tags += self._extractTagPacket(ret_data, program_name)
+                    self.Offset += 1
                 else:
                     return Response(None, None, status)
 
                 while status == 6:
                     self.Offset += 1
                     request = self._buildTagListRequest(program_name)
-                    eip_header = self._buildEIPHeader(request)
-                    status, ret_data = self._getBytes(eip_header)
+                    status, ret_data = self.conn.send(request)
                     if status == 0 or status == 6:
                         tags += self._extractTagPacket(ret_data, program_name)
                     else:
@@ -649,7 +621,7 @@ class PLC:
         """
         Requests tag list for a specific program and returns a list of Tag type
         """
-        conn = self._connect()
+        conn = self.conn.connect()
         if not conn[0]:
             return Response(None, None, conn[1])
 
@@ -657,8 +629,7 @@ class PLC:
         tags = []
 
         request = self._buildTagListRequest(programName)
-        eip_header = self._buildEIPHeader(request)
-        status, ret_data = self._getBytes(eip_header)
+        status, ret_data = self.conn.send(request)
         if status == 0 or status == 6:
             tags += self._extractTagPacket(ret_data, programName)
         else:
@@ -667,8 +638,7 @@ class PLC:
         while status == 6:
             self.Offset += 1
             request = self._buildTagListRequest(programName)
-            eip_header = self._buildEIPHeader(request)
-            status, ret_data = self._getBytes(eip_header)
+            status, ret_data = self.conn.send(request)
             if status == 0 or status == 6:
                 tags += self._extractTagPacket(ret_data, programName)
             else:
@@ -784,31 +754,26 @@ class PLC:
         Get the attributes of a UDT
         """
         request = self._buildTemplateAttributes(instance)
-        eip_header = self._buildEIPHeader(request)
-        status, ret_data = self._getBytes(eip_header)
+        status, ret_data = self.conn.send(request)
         return ret_data
 
     def _getTemplate(self, instance, dataLen):
         """
         Get the members of a UDT so we can get it
         """
-
-        if not self._connect(): return None
-
         data = b''
         status = 0
         partOffset = 0
         remaining = dataLen
         while remaining > 0 and not status:
-            readRequest = self._readTemplateService(instance, remaining, partOffset)
-            eipHeader = self._buildEIPHeader(readRequest)
-            status, retData = self._getBytes(eipHeader)
+            request = self._readTemplateService(instance, remaining, partOffset)
+            status, ret_data = self.conn.send(request)
             if status == 6:
                 status = 0
             if len(data):
-                part = retData[50:]
-                retData = part
-            data = data + retData
+                part = ret_data[50:]
+                ret_data = part
+            data = data + ret_data
             partOffset = len(data) - 50
             remaining = dataLen - partOffset
         return data
@@ -925,7 +890,7 @@ class PLC:
         Request the properties of a module in a particular
         slot.  Returns Device()
         """
-        conn = self._connect(False)
+        conn = self.conn.connect(False)
         if not conn[0]:
             return Response(None, Device(), conn[1])
 
@@ -936,22 +901,17 @@ class PLC:
         AttributeInstanceType = 0x24
         AttributeInstance = 0x01
 
-        AttributePacket = pack('<6B',
-                               AttributeService,
-                               AttributeSize,
-                               AttributeClassType,
-                               AttributeClass,
-                               AttributeInstanceType,
-                               AttributeInstance)
+        request = pack('<6B',
+                        AttributeService,
+                        AttributeSize,
+                        AttributeClassType,
+                        AttributeClass,
+                        AttributeInstanceType,
+                        AttributeInstance)
 
-        ConnectionPath = self._unconnectedPath(slot)
-
-        frame = self._buildCIPUnconnectedSend() + AttributePacket + ConnectionPath
-        eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
+        status, ret_data = self.conn.send(request, False, 0)
         pad = pack('<I', 0x00)
-        self.Socket.send(eip_header)
-        ret_data = pad + self.recv_data()
-        status = unpack_from('<B', ret_data, 46)[0]
+        ret_data = pad + ret_data
 
         if status == 0:
             return Response(None, Device.parse(ret_data), status)
@@ -963,7 +923,7 @@ class PLC:
         Request the properties of a device at the
         specified IP address.  Returns Device()
         """
-        conn = self._connect(False)
+        conn = self.conn.connect(False)
         if not conn[0]:
             return Response(None, Device(), conn[1])
 
@@ -974,435 +934,22 @@ class PLC:
         AttributeInstanceType = 0x24
         AttributeInstance = 0x01
 
-        AttributePacket = pack('<6B',
-                               AttributeService,
-                               AttributeSize,
-                               AttributeClassType,
-                               AttributeClass,
-                               AttributeInstanceType,
-                               AttributeInstance)
+        request = pack('<6B',
+                        AttributeService,
+                        AttributeSize,
+                        AttributeClassType,
+                        AttributeClass,
+                        AttributeInstanceType,
+                        AttributeInstance)
 
-        ConnectionPath = self._unconnectedPath(slot=0)
-
-        if self.Route:
-            frame = self._buildCIPUnconnectedSend() + AttributePacket + ConnectionPath
-        else:
-            frame = AttributePacket + ConnectionPath
-        eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
+        status, ret_data = self.conn.send(request, False, 0)
         pad = pack('<I', 0x00)
-        self.Socket.send(eip_header)
-        ret_data = pad + self.recv_data()
-        status = unpack_from('<B', ret_data, 46)[0]
+        ret_data = pad + ret_data
 
         if status == 0:
             return Response(None, Device.parse(ret_data), status)
         else:
             return Response(None, Device(), status)
-
-    def _connect(self, connected=True):
-        """
-        Open a connection to the PLC.
-        """
-        if self.SocketConnected:
-            if connected and not self._connected:
-                # connection type changed, need to close so we can reconnect
-                self._closeConnection()
-            elif not connected and self._connected:
-                # connection type changed, need to close so we can reconnect
-                self._closeConnection()
-            else:
-                return (True, 'Success')
-
-        try:
-            self.Socket = socket.socket()
-            self.Socket.settimeout(self.SocketTimeout)
-            self.Socket.connect((self.IPAddress, self.Port))
-        except socket.error as e:
-            self.SocketConnected = False
-            self.SequenceCounter = 1
-            self.Socket.close()
-            return (False, e)
-
-        # register the session
-        self.Socket.send(self._buildRegisterSession())
-        ret_data = self.recv_data()
-        if ret_data:
-            self.SessionHandle = unpack_from('<I', ret_data, 4)[0]
-            self._registered = True
-        else:
-            self.SocketConnected = False
-            return (False, 'Register session failed')
-
-        if connected:
-            # try a large forward open
-            ret = self._forward_open(4002)
-
-            # if large forward open fails, try
-            # a normal forward open
-            if not ret[0]:
-                ret = self._forward_open(508)
-
-            return ret
-
-        self.SocketConnected = True
-        return (self.SocketConnected, 'Success')
-
-    def _forward_open(self, connection_size):
-        """
-        ForwardOpen connection
-        """
-        self.ConnectionSize = connection_size
-        self.Socket.send(self._buildForwardOpenPacket())
-        try:
-            ret_data = self.recv_data()
-        except socket.timeout as e:
-            return (False, e)
-        sts = unpack_from('<b', ret_data, 42)[0]
-        if not sts:
-            self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
-            self._connected = True
-        else:
-            self.SocketConnected = False
-            return (False, 'Forward open failed')
-
-        self.SocketConnected = True
-        return (self.SocketConnected, 'Success')
-
-    def _closeConnection(self):
-        """
-        Close the connection to the PLC (forward close, unregister session)
-        """
-        self.SocketConnected = False
-        try:
-            if self._connected:
-                close_packet = self._buildForwardClosePacket()
-                self.Socket.send(close_packet)
-                ret_data = self.recv_data()
-            if self._registered:
-                unreg_packet = self._buildUnregisterSession()
-                self.Socket.send(unreg_packet)
-            self.Socket.close()
-        except Exception:
-            self.Socket.close()
-        finally:
-            pass
-
-    def _getBytes(self, data):
-        """
-        Sends data and gets the return data
-        """
-        if len(data) > self.ConnectionSize:
-            raise BufferError("ethernet/ip _getBytes output size exceeded: %d bytes" % len(data))
-        try:
-            self.Socket.send(data)
-            ret_data = self.recv_data()
-            if ret_data:
-                status = unpack_from('<B', ret_data, 48)[0]
-                return status, ret_data
-            else:
-                return 1, None
-        except (socket.gaierror):
-            self.SocketConnected = False
-            return 1, None
-        except (IOError):
-            self.SocketConnected = False
-            return 7, None
-
-    def _buildRegisterSession(self):
-        """
-        Register our CIP connection
-        """
-        EIPCommand = 0x0065
-        EIPLength = 0x0004
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x0000
-        EIPContext = self.Context
-        EIPOptions = 0x0000
-
-        EIPProtocolVersion = 0x01
-        EIPOptionFlag = 0x00
-
-        return pack('<HHIIQIHH',
-                    EIPCommand,
-                    EIPLength,
-                    EIPSessionHandle,
-                    EIPStatus,
-                    EIPContext,
-                    EIPOptions,
-                    EIPProtocolVersion,
-                    EIPOptionFlag)
-
-    def _buildUnregisterSession(self):
-        """
-        Build Unregister session
-        """
-        EIPCommand = 0x66
-        EIPLength = 0x0
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x0000
-        EIPContext = self.Context
-        EIPOptions = 0x0000
-
-        return pack('<HHIIQI',
-                    EIPCommand,
-                    EIPLength,
-                    EIPSessionHandle,
-                    EIPStatus,
-                    EIPContext,
-                    EIPOptions)
-
-    def _buildForwardOpenPacket(self):
-        """
-        Assemble the forward open packet
-        """
-        forwardOpen = self._buildCIPForwardOpen()
-        rrDataHeader = self._buildEIPSendRRDataHeader(len(forwardOpen))
-        return rrDataHeader+forwardOpen
-
-    def _buildForwardClosePacket(self):
-        """
-        Assemble the forward close packet
-        """
-        forwardClose = self._buildForwardClose()
-        rrDataHeader = self._buildEIPSendRRDataHeader(len(forwardClose))
-        return rrDataHeader + forwardClose
-
-    def _buildCIPForwardOpen(self):
-        """
-        Forward Open happens after a connection is made,
-        this will sequp the CIP connection parameters
-        """
-        CIPPathSize = 0x02
-        CIPClassType = 0x20
-
-        CIPClass = 0x06
-        CIPInstanceType = 0x24
-
-        CIPInstance = 0x01
-        CIPPriority = 0x0A
-        CIPTimeoutTicks = 0x0e
-        CIPOTConnectionID = 0x20000002
-        CIPTOConnectionID = randrange(65000)
-        self.SerialNumber = randrange(65000)
-        CIPConnectionSerialNumber = self.SerialNumber
-        CIPVendorID = self.VendorID
-        CIPOriginatorSerialNumber = self.OriginatorSerialNumber
-        CIPMultiplier = 0x03
-        CIPOTRPI = 0x00201234
-        CIPConnectionParameters = 0x4200
-        CIPTORPI = 0x00204001
-        CIPTransportTrigger = 0xA3
-
-        # decide whether to use the standard ForwardOpen
-        # or the large format
-        if self.ConnectionSize <= 511:
-            CIPService = 0x54
-            CIPConnectionParameters += self.ConnectionSize
-            pack_format = '<BBBBBBBBIIHHIIIHIHB'
-        else:
-            CIPService = 0x5B
-            CIPConnectionParameters = CIPConnectionParameters << 16
-            CIPConnectionParameters += self.ConnectionSize
-            pack_format = '<BBBBBBBBIIHHIIIIIIB'
-
-        CIPOTNetworkConnectionParameters = CIPConnectionParameters
-        CIPTONetworkConnectionParameters = CIPConnectionParameters
-
-        ForwardOpen = pack(pack_format,
-                           CIPService,
-                           CIPPathSize,
-                           CIPClassType,
-                           CIPClass,
-                           CIPInstanceType,
-                           CIPInstance,
-                           CIPPriority,
-                           CIPTimeoutTicks,
-                           CIPOTConnectionID,
-                           CIPTOConnectionID,
-                           CIPConnectionSerialNumber,
-                           CIPVendorID,
-                           CIPOriginatorSerialNumber,
-                           CIPMultiplier,
-                           CIPOTRPI,
-                           CIPOTNetworkConnectionParameters,
-                           CIPTORPI,
-                           CIPTONetworkConnectionParameters,
-                           CIPTransportTrigger)
-
-        # add the connection path
-
-        path_size, path = self._connectedPath()
-        connection_path = pack('<B', path_size)
-        connection_path += path
-        return ForwardOpen + connection_path
-
-    def _buildForwardClose(self):
-        """
-        Forward Close packet for closing the connection
-        """
-        CIPService = 0x4E
-        CIPPathSize = 0x02
-        CIPClassType = 0x20
-        CIPClass = 0x06
-        CIPInstanceType = 0x24
-
-        CIPInstance = 0x01
-        CIPPriority = 0x0A
-        CIPTimeoutTicks = 0x0e
-        CIPConnectionSerialNumber = self.SerialNumber
-        CIPVendorID = self.VendorID
-        CIPOriginatorSerialNumber = self.OriginatorSerialNumber
-
-        ForwardClose = pack('<BBBBBBBBHHI',
-                            CIPService,
-                            CIPPathSize,
-                            CIPClassType,
-                            CIPClass,
-                            CIPInstanceType,
-                            CIPInstance,
-                            CIPPriority,
-                            CIPTimeoutTicks,
-                            CIPConnectionSerialNumber,
-                            CIPVendorID,
-                            CIPOriginatorSerialNumber)
-
-        # add the connection path
-        path_size, path = self._connectedPath()
-        connection_path = pack('<BB', path_size, 0x00)
-        connection_path += path
-        return ForwardClose + connection_path
-
-    def _buildEIPSendRRDataHeader(self, frameLen):
-        """
-        Build the EIP Send RR Data Header
-        """
-        EIPCommand = 0x6F
-        EIPLength = 16+frameLen
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x00
-        EIPContext = self.Context
-        EIPOptions = 0x00
-
-        EIPInterfaceHandle = 0x00
-        EIPTimeout = 0x00
-        EIPItemCount = 0x02
-        EIPItem1Type = 0x00
-        EIPItem1Length = 0x00
-        EIPItem2Type = 0xB2
-        EIPItem2Length = frameLen
-
-        return pack('<HHIIQIIHHHHHH',
-                    EIPCommand,
-                    EIPLength,
-                    EIPSessionHandle,
-                    EIPStatus,
-                    EIPContext,
-                    EIPOptions,
-                    EIPInterfaceHandle,
-                    EIPTimeout,
-                    EIPItemCount,
-                    EIPItem1Type,
-                    EIPItem1Length,
-                    EIPItem2Type,
-                    EIPItem2Length)
-
-    def _buildCIPUnconnectedSend(self):
-        """
-        build unconnected send to request tag database
-        """
-        CIPService = 0x52
-        CIPPathSize = 0x02
-        CIPClassType = 0x20
-
-        CIPClass = 0x06
-        CIPInstanceType = 0x24
-
-        CIPInstance = 0x01
-        CIPPriority = 0x0A
-        CIPTimeoutTicks = 0x0e
-        ServiceSize = 0x06
-
-        return pack('<BBBBBBBBH',
-                    CIPService,
-                    CIPPathSize,
-                    CIPClassType,
-                    CIPClass,
-                    CIPInstanceType,
-                    CIPInstance,
-                    CIPPriority,
-                    CIPTimeoutTicks,
-                    ServiceSize)
-
-    def _connectedPath(self):
-        """
-        Build the connected path porition of the packet
-        """
-        # if a route was provided, use it, otherwise use
-        # the default route
-        if self.Route:
-            route = self.Route
-        else:
-            if self.Micro800:
-                route = []
-            else:
-                route = [(0x01, self.ProcessorSlot)]
-
-        path = []
-        if route:
-            for segment in route:
-                if isinstance(segment[1], int):
-                    # port segment
-                    path += segment
-                else:
-                    # port segment with link
-                    path.append(segment[0]+0x10)
-                    path.append(len(segment[1]))
-                    for c in segment[1]:
-                        path.append(ord(c))
-                    # byte align
-                    if len(path)%2:
-                        path.append(0x00)
-
-        path += [0x20, 0x02, 0x24, 0x01]
-
-        path_size = int(len(path)/2)
-        pack_format = '<{}B'.format(len(path))
-        connection_path = pack(pack_format, *path)
-
-        return path_size, connection_path
-
-    def _unconnectedPath(self, slot):
-        """
-        Build the unconnection path portion of the packet
-        """
-        # if a route was provided, use it, otherwise use
-        # the default route
-        if self.Route:
-            route = self.Route
-        else:
-            route = [(0x01, slot)]
-
-        reserved = 0x00
-        path = []
-        for segment in route:
-            if isinstance(segment[1], int):
-                # port segment
-                path += segment
-            else:
-                # port segment with link
-                path.append(segment[0]+0x10)
-                path.append(len(segment[1]))
-                for c in segment[1]:
-                    path.append(ord(c))
-                # byte align
-                if len(path)%2:
-                    path.append(0x00)
-
-        path_size = int(len(path)/2)
-        pack_format = '<{}BBB'.format(len(path))
-        connection_path = pack(pack_format, path_size, reserved, *path)
-
-        return connection_path
 
     def _buildTagIOI(self, tagName, data_type):
         """
@@ -1591,55 +1138,6 @@ class PLC:
 
         return request
 
-    def _buildEIPHeader(self, ioi):
-        """
-        The EIP Header contains the tagIOI and the
-        commands to perform the read or write.  This request
-        will be followed by the reply containing the data
-        """
-        if self.ContextPointer == 155:
-            self.ContextPointer = 0
-
-        EIPPayloadLength = 22+len(ioi)
-        EIPConnectedDataLength = len(ioi)+2
-
-        EIPCommand = 0x70
-        EIPLength = 22 + len(ioi)
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x00
-        EIPContext = context_dict[self.ContextPointer]
-        self.ContextPointer += 1
-
-        EIPOptions = 0x0000
-        EIPInterfaceHandle = 0x00
-        EIPTimeout = 0x00
-        EIPItemCount = 0x02
-        EIPItem1ID = 0xA1
-        EIPItem1Length = 0x04
-        EIPItem1 = self.OTNetworkConnectionID
-        EIPItem2ID = 0xB1
-        EIPItem2Length = EIPConnectedDataLength
-        EIPSequence = self.SequenceCounter
-        self.SequenceCounter += 1
-        self.SequenceCounter = self.SequenceCounter % 0x10000
-
-        EIPHeaderFrame = pack('<HHIIQIIHHHHIHHH',
-                              EIPCommand,
-                              EIPLength,
-                              EIPSessionHandle,
-                              EIPStatus,
-                              EIPContext,
-                              EIPOptions,
-                              EIPInterfaceHandle,
-                              EIPTimeout,
-                              EIPItemCount,
-                              EIPItem1ID,
-                              EIPItem1Length,
-                              EIPItem1,
-                              EIPItem2ID, EIPItem2Length, EIPSequence)
-
-        return EIPHeaderFrame+ioi
-
     def _buildMultiServiceHeader(self):
         """
         Service header for making a multiple tag request
@@ -1773,25 +1271,6 @@ class PLC:
 
         return vals
 
-    def recv_data(self):
-        """
-        When receiving data from the socket, it is possible to receive
-        incomplete data.  The initial packet that comes in contains
-        the length of the payload.  We can use that to keep calling
-        recv() until the entire payload is received.  This only happnens
-        when using LargeForwardOpen
-        """
-        data = b''
-        part = self.Socket.recv(4096)
-        payload_len = unpack_from('<H', part, 2)[0]
-        data += part
-
-        while len(data)-24 < payload_len:
-            part = self.Socket.recv(4096)
-            data += part
-
-        return data
-
     def _initial_read(self, tag, base_tag, data_type):
         """
         Store each unique tag read in a dict so that we can retreive the
@@ -1806,10 +1285,9 @@ class PLC:
 
         ioi = self._buildTagIOI(base_tag, data_type)
         request = self._add_partial_read_service(ioi, 1)
-        eip_header = self._buildEIPHeader(request)
 
         # send our tag read request
-        status, ret_data = self._getBytes(eip_header)
+        status, ret_data = self.conn.send(request)
 
         # make sure it was successful
         if status == 0 or status == 6:
@@ -2092,161 +1570,3 @@ def BitValue(value, bitno):
         return True
     else:
         return False
-
-# Context values passed to the PLC when reading/writing
-context_dict = {0: 0x6572276557,
-                1: 0x6f6e,
-                2: 0x676e61727473,
-                3: 0x737265,
-                4: 0x6f74,
-                5: 0x65766f6c,
-                6: 0x756f59,
-                7: 0x776f6e6b,
-                8: 0x656874,
-                9: 0x73656c7572,
-                10: 0x646e61,
-                11: 0x6f73,
-                12: 0x6f64,
-                13: 0x49,
-                14: 0x41,
-                15: 0x6c6c7566,
-                16: 0x74696d6d6f63,
-                17: 0x7327746e656d,
-                18: 0x74616877,
-                19: 0x6d2749,
-                20: 0x6b6e696874,
-                21: 0x676e69,
-                22: 0x666f,
-                23: 0x756f59,
-                24: 0x746e646c756f77,
-                25: 0x746567,
-                26: 0x73696874,
-                27: 0x6d6f7266,
-                28: 0x796e61,
-                29: 0x726568746f,
-                30: 0x797567,
-                31: 0x49,
-                32: 0x7473756a,
-                33: 0x616e6e6177,
-                34: 0x6c6c6574,
-                35: 0x756f79,
-                36: 0x776f68,
-                37: 0x6d2749,
-                38: 0x676e696c656566,
-                39: 0x6174746f47,
-                40: 0x656b616d,
-                41: 0x756f79,
-                42: 0x7265646e75,
-                43: 0x646e617473,
-                44: 0x726576654e,
-                45: 0x616e6e6f67,
-                46: 0x65766967,
-                47: 0x756f79,
-                48: 0x7075,
-                49: 0x726576654e,
-                50: 0x616e6e6f67,
-                51: 0x74656c,
-                52: 0x756f79,
-                53: 0x6e776f64,
-                54: 0x726576654e,
-                55: 0x616e6e6f67,
-                56: 0x6e7572,
-                57: 0x646e756f7261,
-                58: 0x646e61,
-                59: 0x747265736564,
-                60: 0x756f79,
-                61: 0x726576654e,
-                62: 0x616e6e6f67,
-                63: 0x656b616d,
-                64: 0x756f79,
-                65: 0x797263,
-                66: 0x726576654e,
-                67: 0x616e6e6f67,
-                68: 0x796173,
-                69: 0x657962646f6f67,
-                70: 0x726576654e,
-                71: 0x616e6e6f67,
-                72: 0x6c6c6574,
-                73: 0x61,
-                74: 0x65696c,
-                75: 0x646e61,
-                76: 0x74727568,
-                77: 0x756f79,
-                78: 0x6576276557,
-                79: 0x6e776f6e6b,
-                80: 0x68636165,
-                81: 0x726568746f,
-                82: 0x726f66,
-                83: 0x6f73,
-                84: 0x676e6f6c,
-                85: 0x72756f59,
-                86: 0x73277472616568,
-                87: 0x6e656562,
-                88: 0x676e69686361,
-                89: 0x747562,
-                90: 0x657227756f59,
-                91: 0x6f6f74,
-                92: 0x796873,
-                93: 0x6f74,
-                94: 0x796173,
-                95: 0x7469,
-                96: 0x656469736e49,
-                97: 0x6577,
-                98: 0x68746f62,
-                99: 0x776f6e6b,
-                100: 0x732774616877,
-                101: 0x6e656562,
-                102: 0x676e696f67,
-                103: 0x6e6f,
-                104: 0x6557,
-                105: 0x776f6e6b,
-                106: 0x656874,
-                107: 0x656d6167,
-                108: 0x646e61,
-                109: 0x6572276577,
-                110: 0x616e6e6f67,
-                111: 0x79616c70,
-                112: 0x7469,
-                113: 0x646e41,
-                114: 0x6669,
-                115: 0x756f79,
-                116: 0x6b7361,
-                117: 0x656d,
-                118: 0x776f68,
-                119: 0x6d2749,
-                120: 0x676e696c656566,
-                121: 0x74276e6f44,
-                122: 0x6c6c6574,
-                123: 0x656d,
-                124: 0x657227756f79,
-                125: 0x6f6f74,
-                126: 0x646e696c62,
-                127: 0x6f74,
-                128: 0x656573,
-                129: 0x726576654e,
-                130: 0x616e6e6f67,
-                131: 0x65766967,
-                132: 0x756f79,
-                133: 0x7075,
-                134: 0x726576654e,
-                135: 0x616e6e6f67,
-                136: 0x74656c,
-                137: 0x756f79,
-                138: 0x6e776f64,
-                139: 0x726576654e,
-                140: 0x6e7572,
-                141: 0x646e756f7261,
-                142: 0x646e61,
-                143: 0x747265736564,
-                144: 0x756f79,
-                145: 0x726576654e,
-                146: 0x616e6e6f67,
-                147: 0x656b616d,
-                148: 0x756f79,
-                149: 0x797263,
-                150: 0x726576654e,
-                151: 0x616e6e6f67,
-                152: 0x796173,
-                153: 0x657962646f6f67,
-                154: 0x726576654e,
-                155: 0xa680e2616e6e6f67}

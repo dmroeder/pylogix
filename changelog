@@ -1,3 +1,6 @@
+09/02/20
+  - Moved communications to its own module
+
 09/01/20
   - Moved some code to lgx_device and lgx_tag
   - Removed unnecessary calls to _getUDT()
