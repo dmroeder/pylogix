@@ -1,3 +1,6 @@
+09/04/20
+  - Fixed import issue
+
 09/02/20
   - Moved communications to its own module
   - Upped version to 0.7.3
