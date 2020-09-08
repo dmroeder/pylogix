@@ -1232,21 +1232,25 @@ class PLC:
         numbytes = len(data)-data_size
         counter = 0
 
+        # this is going to check if the data type was a struct
+        # if so, return the raw data
+        if data_type == 160:
+            tmp = unpack_from('<h', data, 2)[0]
+            if tmp != self.StructIdentifier:
+                d = data[2:2+len(data)]
+                vals.append(d)
+                return vals
+
         while True:
             index = 2+(counter*data_size)
             if index > numbytes:
-               break
+                break
             if data_type == 160:
-                tmp = unpack_from('<h', data, 2)[0]
-                if tmp == self.StructIdentifier:
-                    # gotta handle strings a little different
-                    index = 4+(counter*data_size)
-                    name_len = unpack_from('<L', data, index)[0]
-                    s = data[index+4:index+4+name_len]
-                    vals.append(str(s.decode(self.StringEncoding)))
-                else:
-                    d = data[index:index+len(data)]
-                    vals.append(d)
+                index = 4+(counter*data_size)
+                name_len = unpack_from('<L', data, index)[0]
+                s = data[index+4:index+4+name_len]
+                vals.append(str(s.decode(self.StringEncoding)))
+
             elif data_type == 218:
                 # remove the data type
                 data = data[2:] 
