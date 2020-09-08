@@ -1231,7 +1231,6 @@ class PLC:
         data_size = self.CIPTypes[data_type][0]
         numbytes = len(data)-data_size
         counter = 0
-        self.Offset = 0
 
         while True:
             index = 2+(counter*data_size)
