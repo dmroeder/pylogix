@@ -257,27 +257,26 @@ class PLC:
             # everything else
             request = self._add_read_service(ioi, elements)
 
+        # if we are handling structs (string), we have to
+        # remove 2 extra bytes from the data
+        if data_type == 160:
+            pad = 4
+        else:
+            pad = 2
+
         status, ret_data = self.conn.send(request)
+        data = ret_data[50:]
+        self.Offset += len(data)-pad
+        req = data
 
-        return_values = []
+        while status == 6:
+            request = self._add_partial_read_service(ioi, elements)
+            status, ret_data = self.conn.send(request)
+            data = ret_data[50+pad:]
+            self.Offset += len(data)
+            req += data
 
-        while True:
-            if status == 0 or status == 6:
-                val = self._parseReply(tag_name, elements, ret_data[50:])
-                if isinstance(val, str):
-                    return_values.append(val)
-                else:
-                    return_values.extend(val)
-            else:
-                break
-
-            if status == 0:
-                break
-
-            if status == 6:
-                # request new data if partial transfer
-                request = self._add_partial_read_service(ioi, elements)
-                status, ret_data = self.conn.send(request)
+        return_values = self._parseReply(tag_name, elements, req)
 
         if return_values:
             if len(return_values) == 1:
@@ -1196,7 +1195,6 @@ class PLC:
         In the case of BOOL arrays and bits of
             a word, we do some reformating
         """
-
         tag, base_tag, index = _parseTagName(tag_name, 0)
         data_type = self.KnownTags[base_tag][0]
         bit_count = self.CIPTypes[data_type][0] * 8
@@ -1237,8 +1235,9 @@ class PLC:
         if data_type == 160:
             tmp = unpack_from('<h', data, 2)[0]
             if tmp != self.StructIdentifier:
-                d = data[2:2+len(data)]
+                d = data[4:4+len(data)]
                 vals.append(d)
+                self.Offset += len(data)
                 return vals
 
         while True:
