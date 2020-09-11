@@ -1455,16 +1455,11 @@ class PLC:
             tag = Tag.parse(packet, programName)
 
             # filter out garbage
-            if '__DEFVAL_' in tag.TagName:
-                pass
-            elif 'Routine:' in tag.TagName:
-                pass
-            elif 'Map:' in tag.TagName:
-                pass
-            elif 'Task:' in tag.TagName:
+            if Tag.in_filter(tag.TagName):
                 pass
             else:
                 tag_list.append(tag)
+
             if not programName:
                 if 'Program:' in tag.TagName:
                     self.ProgramNames.append(tag.TagName)

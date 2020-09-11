@@ -72,7 +72,19 @@ class Tag:
                 self.Scope0,
                 self.Scope1,
                 self.Bytes)
-    
+
+    @ staticmethod
+    def in_filter(tag):
+        """
+        Check if the provided tag is in our filter
+        """
+        garbage = ['__', 'Routine:', 'Map:', 'Task:', 'UDI:']
+
+        for g in garbage:
+            if g in tag:
+                return True
+        return False
+
     @staticmethod
     def parse(packet, programName):
 
