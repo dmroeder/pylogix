@@ -1,5 +1,6 @@
 09/11/20
   - Updated tag list filter
+  - Fixed timer example
 
 09/10/20
   - Fixed getting struct raw data that was larger than a single packet

@@ -19,9 +19,9 @@ class Timer(object):
     
     def __init__(self, data):
         
-        self.PRE = unpack_from('<i', data, 6)[0]
-        self.ACC = unpack_from('<i', data, 10)[0]
-        bits = unpack_from('<i', data, 2)[0]
+        self.PRE = unpack_from('<i', data, 4)[0]
+        self.ACC = unpack_from('<i', data, 8)[0]
+        bits = unpack_from('<i', data, 0)[0]
         self.EN = get_bit(bits, 31)
         self.TT = get_bit(bits, 30)
         self.DN = get_bit(bits, 29)
