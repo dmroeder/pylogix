@@ -71,6 +71,13 @@ NOTE: If you are working with a Micro8xx PLC, you must set the Micro800 flag sin
 comm.Micro800 = True
 ```
 
+Optionally set a specific maximum size for requests/replies.  If not specified, defaults to try a Large, then a Small Forward Open (for Implicit, "Connected" sessions).
+
+```
+comm.ConnectionSize = 508
+```
+
+
 ### Other Features
 
 Pylogix has features other than simply reading/writing.  You can see all of them in the examples, I'll also list them here
@@ -86,6 +93,7 @@ Pylogix has features other than simply reading/writing.  You can see all of them
 * **Dustin Roeder** - *Maintainer* - [dmroeder](https://github.com/dmroeder)
 * **Fernando B.** - *Contributor* - [kodaman2](https://github.com/kodaman2)
 * **Ottowayi** - *Contributor* - [ottowayi](https://github.com/ottowayi)
+* **Perry Kundert** - *Contributor* - [pjkundert](https://github.com/pjkundert)
 
 ## License
 

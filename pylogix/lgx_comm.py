@@ -39,7 +39,7 @@ class Connection:
         self.SerialNumber = 0
         self.OriginatorSerialNumber = 42
         self.SequenceCounter = 1
-        self.ConnectionSize = 508
+        self.ConnectionSize = None # Default to try Large, then Small Fwd Open.
 
     def connect(self, connected=True, conn_class=3):
         """
@@ -103,13 +103,17 @@ class Connection:
             return (False, 'Register session failed')
 
         if connected:
-            # try a large forward open
-            ret = self._forward_open(4002)
+            if self.ConnectionSize is not None:
+                ret = self._forward_open()
+            else:
+                # try a large forward open by default
+                self.ConnectionSize = 4002
+                ret = self._forward_open()
 
-            # if large forward open fails, try
-            # a normal forward open
-            if not ret[0]:
-                ret = self._forward_open(508)
+                # if large forward open fails, try a normal forward open
+                if not ret[0]:
+                    self.ConnectionSize = 508
+                    ret = self._forward_open()
 
             return ret
 
@@ -138,9 +142,9 @@ class Connection:
 
     def _getBytes(self, data, connected):
         """
-        Sends data and gets the return data
+        Sends data and gets the return data, optionally asserting data size limit
         """
-        if len(data) > self.ConnectionSize:
+        if self.ConnectionSize is not None and len(data) > self.ConnectionSize:
             raise BufferError("ethernet/ip _getBytes output size exceeded: %d bytes" % len(data))
         try:
             self.Socket.send(data)
@@ -222,11 +226,10 @@ class Connection:
                     EIPContext,
                     EIPOptions)
 
-    def _forward_open(self, connection_size):
+    def _forward_open(self):
         """
-        ForwardOpen connection
+        ForwardOpen connection.
         """
-        self.ConnectionSize = connection_size
         self.Socket.send(self._buildForwardOpenPacket())
         try:
             ret_data = self.recv_data()

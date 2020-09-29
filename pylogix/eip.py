@@ -44,7 +44,7 @@ class PLC:
         self.Route = None
 
         self.conn = Connection(self)
-        self.ConnectionSize = 508
+
         self.Offset = 0
         self.UDT = {}
         self.UDTByName = {}
@@ -68,6 +68,18 @@ class PLC:
                          203: (8, "LREAL", '<d'),
                          211: (4, "DWORD", '<i'),
                          218: (1, "STRING", '<B')}
+
+    @property
+    def ConnectionSize(self):
+        """Set the ConnectionSize before initiating the first call requiring conn.connect().  The
+        default behavior is to attempt a Large followed by a Small Forward Open.  If an Explicit
+        (Unconnected) session is used, picks a sensible default.
+
+        """
+        return self.conn.ConnectionSize or 508
+    @ConnectionSize.setter
+    def ConnectionSize(self, connection_size):
+        self.conn.ConnectionSize = connection_size
 
     def __enter__(self):
         return self
