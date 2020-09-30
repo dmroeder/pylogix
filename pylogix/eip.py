@@ -18,6 +18,7 @@
 """
 
 import math
+import re
 import socket
 import sys
 import time
@@ -232,7 +233,7 @@ class PLC:
         if not conn[0]:
             return Response(tag_name, None, conn[1])
 
-        tag, base_tag, index = _parseTagName(tag_name, 0)
+        tag, base_tag, index = parse_tag_name(tag_name)
         resp = self._initial_read(tag, base_tag, data_type)
         if resp[2] != 0 and resp[2] != 6:
             return Response(tag_name, None, resp[2])
@@ -299,7 +300,7 @@ class PLC:
         if not conn[0]:
             return Response(tag_name, value, conn[1])
 
-        tag, base_tag, index = _parseTagName(tag_name, 0)
+        tag, base_tag, index = parse_tag_name(tag_name)
         resp = self._initial_read(tag, base_tag, data_type)
         if resp[2] != 0 and resp[2] != 6:
             return Response(tag_name, None, resp[2])
@@ -362,7 +363,7 @@ class PLC:
         # get a list of tags we have not read yet
         unk_tags = []
         for t in tags:
-            tag_name, base_tag, index = _parseTagName(t, 0)
+            tag_name, base_tag, index = parse_tag_name(t)
             if base_tag not in self.KnownTags:
                 unk_tags.append(t)
 
@@ -371,7 +372,7 @@ class PLC:
         while len(result) < len(unk_tags):
             if len(result) == len(unk_tags)-1:
                 tag = unk_tags[len(result):][0]
-                tag_name, base_tag, index = _parseTagName(tag, 0)
+                tag_name, base_tag, index = parse_tag_name(tag)
                 result.append(self._initial_read(tag, base_tag, None))
             else:
                 result.extend(self._multi_read(unk_tags[len(result):], True))
@@ -403,7 +404,7 @@ class PLC:
         rsp_tag_size = 52
 
         for tag in tags:
-            tag_name, base_tag, index = _parseTagName(tag, 0)
+            tag_name, base_tag, index = parse_tag_name(tag)
             ioi = self._buildTagIOI(base_tag, None)
             if first:
                 read_service = self._add_partial_read_service(ioi, 1)
@@ -455,7 +456,7 @@ class PLC:
 
         for wd in write_data:
 
-            tag_name, base_tag, index = _parseTagName(wd[0], 0)
+            tag_name, base_tag, index = parse_tag_name(wd[0])
             resp = self._initial_read(tag_name, base_tag, None)
 
             if base_tag in self.KnownTags.keys():
@@ -971,7 +972,7 @@ class PLC:
         # this loop figures out the packet length and builds our packet
         for i in range(len(tagArray)):
             if tagArray[i].endswith("]"):
-                tag, base_tag, index = _parseTagName(tagArray[i], 0)
+                tag, base_tag, index = parse_tag_name(tagArray[i])
 
                 BaseTagLenBytes = len(base_tag)
                 if data_type == 211 and i == len(tagArray)-1:
@@ -1092,7 +1093,7 @@ class PLC:
         s = tag_name.split('.')
         if data_type == 211:
             t = s[len(s)-1]
-            tag, base_tag, index = _parseTagName(t, 0)
+            tag, base_tag, index = parse_tag_name(t)
             index %= 32
         else:
             index = s[len(s)-1]
@@ -1195,7 +1196,7 @@ class PLC:
         In the case of BOOL arrays and bits of
             a word, we do some reformating
         """
-        tag, base_tag, index = _parseTagName(tag_name, 0)
+        tag, base_tag, index = parse_tag_name(tag_name)
         data_type = self.KnownTags[base_tag][0]
         bit_count = self.CIPTypes[data_type][0] * 8
 
@@ -1221,7 +1222,7 @@ class PLC:
         """
         Gather up all the values in the reply/replies
         """
-        tag, base_tag, index = _parseTagName(tag_name, 0)
+        tag, base_tag, index = parse_tag_name(tag_name)
         data_type = self.KnownTags[base_tag][0]
         fmt = self.CIPTypes[data_type][2]
         vals = []
@@ -1326,7 +1327,7 @@ class PLC:
         """
         Convert words to a list of true/false
         """
-        tag, base_tag, index = _parseTagName(tag_name, 0)
+        tag, base_tag, index = parse_tag_name(tag_name)
         data_type = self.KnownTags[base_tag][0]
         bit_count = self.CIPTypes[data_type][0] * 8
 
@@ -1365,18 +1366,18 @@ class PLC:
             # successful reply, add the value to our list
             if replyStatus == 0 and replyExtended == 0:
                 dataTypeValue = unpack_from('<B', stripped, offset+4)[0]
-                tag_name, base_tag, index = _parseTagName(tag, 0)
+                tag_name, base_tag, index = parse_tag_name(tag)
                 self.KnownTags[base_tag] = (dataTypeValue, 0)
                 # if bit of word was requested
                 if BitofWord(tag):
                     dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                     val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
-                    bitState = _getBitOfWord(tag, val)
+                    bitState = bit_of_word_state(tag, val)
                     response = Response(tag, bitState, replyStatus)
                 elif dataTypeValue == 211:
                     dataTypeFormat = self.CIPTypes[dataTypeValue][2]
                     val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
-                    bitState = _getBitOfWord(tag, val)
+                    bitState = bit_of_word_state(tag, val)
                     response = Response(tag, bitState, replyStatus)
                 elif dataTypeValue == 160:
                     strlen = unpack_from('<B', stripped, offset+8)[0]
@@ -1483,27 +1484,24 @@ class PLC:
                 work.append(0x00)
         return work
 
-def _getBitOfWord(tag, value):
+def bit_of_word_state(tag, value):
     """
-    Takes a tag name, gets the bit from the end of
-    it, then returns that bits value
+    Find the array/bit element at the end of a tag
+    and return whether that bit is true/false in the
+    value provided
+    ex: (bit 4 of the number 30313 is False)
     """
-    split_tag = tag.split('.')
-    stripped = split_tag[len(split_tag)-1]
+    bit_pattern = r'\d+$'
+    array_pattern = r'\[([\d]|[,]|[\s])*\]$'
+    try:
+        index = re.search(array_pattern, tag).group(0)
+        index = index[1:-1]
+    except:
+        index = re.search(bit_pattern, tag).group(0)
 
-    if stripped.endswith(']'):
-        val = stripped[stripped.find("[")+1:stripped.find("]")]
-        val = int(val)
-        bitPos = val & 0x1f
-        returnValue = BitValue(value, bitPos)
-    else:
-        try:
-            bitPos = int(stripped)
-            if bitPos <= 31:
-                returnValue = BitValue(value, bitPos)
-        except Exception:
-            pass
-    return returnValue
+    index = int(index) % 32
+
+    return BitValue(value, index)
 
 def _getWordCount(start, length, bits):
     """
@@ -1518,34 +1516,34 @@ def _getWordCount(start, length, bits):
     totalWords = (newEnd-1) / bits
     return int(totalWords + 1)
 
-def _parseTagName(tag, offset):
+def parse_tag_name(tag):
     """
-    parse the packet to get the base tag name
-    the offset is so that we can increment the array pointer if need be
+    Parse the tag name into it's base tag (remove array index and/or
+    bit) and get the array index if it exists
+
+    ex: MyTag.Name[42] returns:
+    MyTag.Name[42], MyTag.Name, 42
     """
-    bt = tag
-    ind = 0
+    bit_end_pattern = r'\.\d+$'
+    array_pattern = r'\[([\d]|[,]|[\s])*\]$'
+
+    # get the array index
     try:
-        if tag.endswith(']'):
-            pos = (len(tag)-tag.rindex("["))  # find position of [
-            bt = tag[:-pos]		    # remove [x]: result=SuperDuper
-            temp = tag[-pos:]		    # remove tag: result=[x]
-            ind = temp[1:-1]		    # strip the []: result=x
-            s = ind.split(',')		    # split so we can check for multi dimensin array
-            if len(s) == 1:
-                ind = int(ind)
-                newTagName = bt+'['+str(ind+offset)+']'
-            else:
-                # if we have a multi dim array, return the index
-                ind = []
-                for i in range(len(s)):
-                    s[i] = int(s[i])
-                    ind.append(s[i])
+        index = re.search(array_pattern, tag).group(0)
+        index = index[1:-1]
+        if ',' in index:
+            index = index.split(',')
+            index = list(map(int, index))
         else:
-            pass
-        return tag, bt, ind
-    except Exception:
-        return tag, bt, 0
+            index = int(index)
+    except:
+        index = 0
+
+    # get the base tag name
+    base_tag = re.sub(bit_end_pattern, '', tag)
+    base_tag = re.sub(array_pattern, '', base_tag)
+
+    return tag, base_tag, index
 
 def BitofWord(tag):
     """
