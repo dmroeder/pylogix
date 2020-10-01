@@ -1,5 +1,6 @@
 09/30/20
   - Rewrote parsing tag names
+  - Fixed writing bits of a word
 
 09/11/20
   - Updated tag list filter

@@ -244,7 +244,7 @@ class PLC:
         ioi = self._buildTagIOI(tag_name, data_type)
         if data_type == 211:
             # bool array
-            words = _getWordCount(index, elements, bit_count)
+            words = get_word_count(index, elements, bit_count)
             request = self._add_read_service(ioi, words)
         elif BitofWord(tag):
             # bits of word
@@ -252,7 +252,7 @@ class PLC:
             bit_pos = split_tag[len(split_tag)-1]
             bit_pos = int(bit_pos)
 
-            words = _getWordCount(bit_pos, elements, bit_count)
+            words = get_word_count(bit_pos, elements, bit_count)
             request = self._add_read_service(ioi, words)
         else:
             # everything else
@@ -308,7 +308,7 @@ class PLC:
         data_type = self.KnownTags[base_tag][0]
 
         # check if values passed were a list
-        if isinstance(value, list):
+        if isinstance(value, (list, tuple)):
             elements = len(value)
         else:
             elements = 1
@@ -1080,34 +1080,25 @@ class PLC:
         Writing to a bit is handled in a different way than
         other writes
         """
-        element_size = self.CIPTypes[data_type][0]
-        data_len = len(write_data)
-        byte_count = element_size*data_len
         RequestPathSize = int(len(ioi)/2)
         RequestService = 0x4E
         write_request = pack('<BB', RequestService, RequestPathSize)
         write_request += ioi
 
-        fmt = self.CIPTypes[data_type][2]
-        fmt = fmt.upper()
-        s = tag_name.split('.')
-        if data_type == 211:
-            t = s[len(s)-1]
-            tag, base_tag, index = parse_tag_name(t)
-            index %= 32
-        else:
-            index = s[len(s)-1]
-            index = int(index)
+        try:
+            pattern = r'\.\d+$'
+            index = int(re.search(pattern, tag_name).group(0)[1:])
+        except:
+            index = parse_tag_name(tag_name)[2]
 
-        write_request += pack('<h', byte_count)
-        byte = 2**(byte_count*8)-1
-        bits = 2**index
-        if write_data[0]:
-            write_request += pack(fmt, bits)
-            write_request += pack(fmt, byte)
-        else:
-            write_request += pack(fmt, 0x00)
-            write_request += pack(fmt, (byte-bits))
+        # number of bytes
+        byte_count = self.CIPTypes[data_type][0]
+        fmt = self.CIPTypes[data_type][2]
+        write_request += pack('<H', byte_count)
+        val, mask = generate_request(write_data, index, byte_count*8)
+
+        write_request += pack(fmt, val)
+        write_request += pack(fmt, mask)
 
         return write_request
 
@@ -1206,11 +1197,11 @@ class PLC:
             bit_pos = split_tag[len(split_tag)-1]
             bit_pos = int(bit_pos)
 
-            word_count = _getWordCount(bit_pos, elements, bit_count)
+            word_count = get_word_count(bit_pos, elements, bit_count)
             words = self._getReplyValues(tag_name, word_count, data)
             vals = self._wordsToBits(tag_name, words, count=elements)
         elif data_type == 211:
-            word_count = _getWordCount(index, elements, bit_count)
+            word_count = get_word_count(index, elements, bit_count)
             words = self._getReplyValues(tag_name, word_count, data)
             vals = self._wordsToBits(tag_name, words, count=elements)
         else:
@@ -1503,7 +1494,7 @@ def bit_of_word_state(tag, value):
 
     return BitValue(value, index)
 
-def _getWordCount(start, length, bits):
+def get_word_count(start, length, bits):
     """
     Get the number of words that the requested
     bits would occupy.  We have to take into account
@@ -1544,6 +1535,36 @@ def parse_tag_name(tag):
     base_tag = re.sub(array_pattern, '', base_tag)
 
     return tag, base_tag, index
+
+def bin_to_int(bits, bpw):
+    """
+    Convert a list of bits to an integer
+    """
+    sign_limit = 2**(bpw-1)-1
+    conv = (2**bpw)
+
+    value = 0
+    for bit in reversed(bits):
+        value = (value << 1) | bit
+
+    if value > sign_limit:
+        value -= conv
+
+    return value
+
+def generate_request(bits, start, bpw):
+    """
+    Generate a value and mask from a bit array for modified write request
+    """
+    start = start % bpw
+    b_value = [0 for i in range(start)] + bits
+    value = bin_to_int(b_value, bpw)
+
+    b_mask =[1 for i in range(bpw)]
+    b_mask[start:start+len(bits)] = bits
+    mask = bin_to_int(b_mask, bpw)
+
+    return value, mask
 
 def BitofWord(tag):
     """
