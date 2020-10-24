@@ -31,7 +31,7 @@ from datetime import datetime, timedelta
 from random import randrange
 from struct import pack, unpack_from
 
-class PLC:
+class PLC(object):
 
     def __init__(self, ip_address="", slot=0, timeout=5.0):
         """
@@ -74,9 +74,9 @@ class PLC:
         """Set the ConnectionSize before initiating the first call requiring conn.connect().  The
         default behavior is to attempt a Large followed by a Small Forward Open.  If an Explicit
         (Unconnected) session is used, picks a sensible default.
-
         """
         return self.conn.ConnectionSize or 508
+
     @ConnectionSize.setter
     def ConnectionSize(self, connection_size):
         self.conn.ConnectionSize = connection_size

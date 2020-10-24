@@ -16,7 +16,7 @@
 
 from struct import unpack_from
 
-class Tag:
+class Tag(object):
 
     def __init__(self):
 
@@ -110,7 +110,7 @@ class Tag:
             t.Size = 0
         return t
 
-class UDT:
+class UDT(object):
 
     def __init__(self):
 

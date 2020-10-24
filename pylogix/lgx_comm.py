@@ -19,7 +19,7 @@ import socket
 from random import randrange
 from struct import pack, unpack_from
 
-class Connection:
+class Connection(object):
 
     def __init__(self, parent):
         self.parent = parent

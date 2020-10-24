@@ -17,7 +17,7 @@
 import socket
 from struct import pack, unpack_from
 
-class Device():
+class Device(object):
     
     def __init__(self):
         # structure of a logix device

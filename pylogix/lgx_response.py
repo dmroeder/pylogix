@@ -16,7 +16,7 @@
 
 import sys
 
-class Response:
+class Response(object):
 
     def __init__(self, tag_name, value, status):
         self.TagName = tag_name
