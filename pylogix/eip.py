@@ -417,7 +417,7 @@ class PLC(object):
 
         for tag in tags:
             tag_name, base_tag, index = parse_tag_name(tag)
-            ioi = self._buildTagIOI(base_tag, None)
+            ioi = self._buildTagIOI(tag_name, None)
             if first:
                 read_service = self._add_partial_read_service(ioi, 1)
             else:
