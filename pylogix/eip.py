@@ -375,7 +375,11 @@ class PLC(object):
         # get a list of tags we have not read yet
         unk_tags = []
         for t in tags:
-            tag_name, base_tag, index = parse_tag_name(t)
+            if isinstance(t, (list, tuple)):
+                tag_name, base_tag, index = parse_tag_name(t[0])
+                self.KnownTags[base_tag] = (t[1], 0)
+            else:
+                tag_name, base_tag, index = parse_tag_name(t)
             if base_tag not in self.KnownTags:
                 unk_tags.append(t)
 
@@ -384,8 +388,12 @@ class PLC(object):
         while len(result) < len(unk_tags):
             if len(result) == len(unk_tags)-1:
                 tag = unk_tags[len(result):][0]
+                if isinstance(tag, (list, tuple)):
+                    data_type = tag[1]
+                else:
+                    data_type = None
                 tag_name, base_tag, index = parse_tag_name(tag)
-                result.append(self._initial_read(tag, base_tag, None))
+                result.append(self._initial_read(tag, base_tag, data_type))
             else:
                 result.extend(self._multi_read(unk_tags[len(result):], True))
 
@@ -416,6 +424,8 @@ class PLC(object):
         rsp_tag_size = 52
 
         for tag in tags:
+            if isinstance(tag, (list, tuple)):
+                tag = tag[0]
             tag_name, base_tag, index = parse_tag_name(tag)
             ioi = self._buildTagIOI(tag_name, None)
             if first:

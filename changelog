@@ -1,3 +1,6 @@
+11/12/20
+  - Fixed supplying data type when reading lists
+
 11/11/20
   - Fixed returning only the first array value when reading lists
 
