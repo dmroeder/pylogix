@@ -284,6 +284,15 @@ class PylogixTests(unittest.TestCase):
         self.assertEqual(len(response), len(
             tags), 'Unable to read multiple tags!')
 
+        for i in range(len(response)):
+            self.assertEqual('Success', response[i].Status)
+
+    def bool_list_fixture(self, length=8):
+        bool_list = []
+        for i in range(length):
+            bool_list.append('BaseBOOLArray[{}]'.format(i))
+        return bool_list
+
     def setUp(self):
         comm.IPAddress = plcConfig.plc_ip
         comm.ProcessorSlot = plcConfig.plc_slot
@@ -315,6 +324,10 @@ class PylogixTests(unittest.TestCase):
 
     def test_multi_read(self):
         tags = ['BaseDINT', 'BaseINT', 'BaseSTRING']
+        self.multi_read_fixture(tags)
+
+    def test_bool_list(self):
+        tags = self.bool_list_fixture(128)
         self.multi_read_fixture(tags)
 
     def test_discover(self):
