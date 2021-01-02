@@ -1,3 +1,6 @@
+01/02/21
+  - Added video link for unit testing demo on tests/README.md
+
 01/01/21
   - Fix for reading BOOL arrays
   - Upped version to 0.7.8

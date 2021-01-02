@@ -20,6 +20,10 @@ Ran 8 tests in 5.691s
 OK
 ```
 
+## Video Demo
+
+[![Demo](https://img.youtube.com/vi/RCHo5xJQIlg/0.jpg)](https://www.youtube.com/watch?v=RCHo5xJQIlg)
+
 ## Adding new tests
 
 The followings paths should guide you when deciding to create new tests:
