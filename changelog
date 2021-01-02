@@ -1,5 +1,7 @@
 01/01/21
   - Fix for reading BOOL arrays
+  - Upped version to 0.7.8
+  - Updated README
 
 11/12/20
   - Fixed supplying data type when reading lists
