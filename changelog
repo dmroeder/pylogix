@@ -1,3 +1,6 @@
+01/01/21
+  - Fix for reading BOOL arrays
+
 11/12/20
   - Fixed supplying data type when reading lists
 

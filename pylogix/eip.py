@@ -427,7 +427,14 @@ class PLC(object):
             if isinstance(tag, (list, tuple)):
                 tag = tag[0]
             tag_name, base_tag, index = parse_tag_name(tag)
-            ioi = self._buildTagIOI(tag_name, None)
+
+            # get the data type if we have accessed the tag before
+            if base_tag in self.KnownTags:
+                data_type = self.KnownTags[base_tag][0]
+            else:
+                data_type = None
+
+            ioi = self._buildTagIOI(tag_name, data_type)
             if first:
                 read_service = self._add_partial_read_service(ioi, 1)
             else:
@@ -999,6 +1006,8 @@ class PLC(object):
                 BaseTagLenBytes = len(base_tag)
                 if data_type == 211 and i == len(tagArray)-1:
                     index = int(index/32)
+                elif data_type == None:
+                    index = 0
 
                 # Assemble the packet
                 ioi += pack('<BB', 0x91, BaseTagLenBytes)
