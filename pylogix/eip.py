@@ -2,7 +2,7 @@
    Originally created by Burt Peterson
    Updated and maintained by Dustin Roeder (dmroeder@gmail.com)
 
-   Copyright 2020 Dustin Roeder
+   Copyright 2021 Dustin Roeder
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -980,7 +980,7 @@ class PLC(object):
         else:
             return Response(None, Device(), status)
 
-    def _buildTagIOI(self, tagName, data_type):
+    def _buildTagIOI(self, tag_name, data_type):
         """
         The tag IOI is basically the tag name assembled into
         an array of bytes structured in a way that the PLC will
@@ -996,28 +996,28 @@ class PLC(object):
             Oh and multi-dim arrays, program scope tags...
         """
         ioi = b""
-        tagArray = tagName.split(".")
+        tag_array = tag_name.split(".")
 
         # this loop figures out the packet length and builds our packet
-        for i in range(len(tagArray)):
-            if tagArray[i].endswith("]"):
-                tag, base_tag, index = parse_tag_name(tagArray[i])
+        for i in range(len(tag_array)):
+            if tag_array[i].endswith("]"):
+                tag, base_tag, index = parse_tag_name(tag_array[i])
 
-                BaseTagLenBytes = len(base_tag)
-                if data_type == 211 and i == len(tagArray)-1:
+                tag_size = len(base_tag)
+                if data_type == 211 and i == len(tag_array)-1:
                     index = int(index/32)
                 elif data_type == None:
                     index = 0
 
                 # Assemble the packet
-                ioi += pack('<BB', 0x91, BaseTagLenBytes)
+                ioi += pack('<BB', 0x91, tag_size)
                 ioi += base_tag.encode('utf-8')
-                if BaseTagLenBytes % 2:
-                    BaseTagLenBytes += 1
+                if tag_size % 2:
+                    tag_size += 1
                     ioi += pack('<B', 0x00)
 
-                BaseTagLenWords = BaseTagLenBytes/2
-                if i < len(tagArray):
+                BaseTagLenWords = tag_size / 2
+                if i < len(tag_array):
                     if not isinstance(index, list):
                         if index < 256:
                             ioi += pack('<BB', 0x28, index)
@@ -1043,14 +1043,14 @@ class PLC(object):
                     the individual bit in the read function.
                 """
                 try:
-                    if int(tagArray[i]) <= 31:
+                    if int(tag_array[i]) <= 31:
                         pass
                 except Exception:
-                    BaseTagLenBytes = int(len(tagArray[i]))
-                    ioi += pack('<BB', 0x91, BaseTagLenBytes)
-                    ioi += tagArray[i].encode('utf-8')
-                    if BaseTagLenBytes % 2:
-                        BaseTagLenBytes += 1
+                    tag_size = int(len(tag_array[i]))
+                    ioi += pack('<BB', 0x91, tag_size)
+                    ioi += tag_array[i].encode('utf-8')
+                    if tag_size % 2:
+                        tag_size += 1
                         ioi += pack('<B', 0x00)
 
         return ioi
@@ -1059,9 +1059,9 @@ class PLC(object):
         """
         Add the read service to the tagIOI
         """
-        RequestService = 0x4C
-        RequestPathSize = int(len(ioi)/2)
-        read_service = pack('<BB', RequestService, RequestPathSize)
+        request_service = 0x4C
+        request_size = int(len(ioi)/2)
+        read_service = pack('<BB', request_service, request_size)
         read_service += ioi
         read_service += pack('<H', int(elements))
         return read_service
@@ -1070,9 +1070,9 @@ class PLC(object):
         """
         Add the partial read service to the tag IOI
         """
-        RequestService = 0x52
-        RequestPathSize = int(len(ioi)/2)
-        read_service = pack('<BB', RequestService, RequestPathSize)
+        request_service = 0x52
+        request_size = int(len(ioi)/2)
+        read_service = pack('<BB', request_service, request_size)
         read_service += ioi
         read_service += pack('<H', int(elements))
         read_service += pack('<I', self.Offset)
@@ -1082,18 +1082,17 @@ class PLC(object):
         """
         Add the write command stuff to the tagIOI
         """
-        RequestPathSize = int(len(ioi)/2)
-        RequestService = 0x4D
-        write_service = pack('<BB', RequestService, RequestPathSize)
+        request_service = 0x4D
+        request_size = int(len(ioi)/2)
+        write_service = pack('<BB', request_service, request_size)
         write_service += ioi
 
         if data_type == 160:
-            RequestNumberOfElements = self.StructIdentifier
-            TypeCodeLen = 0x02
-            write_service += pack('<BBHH', data_type, TypeCodeLen, self.StructIdentifier, len(write_data))
+            type_len = 0x02
+            write_service += pack('<BBHH', data_type, type_len, self.StructIdentifier, len(write_data))
         else:
-            TypeCodeLen = 0x00
-            write_service += pack('<BBH', data_type, TypeCodeLen, len(write_data))
+            type_len = 0x00
+            write_service += pack('<BBH', data_type, type_len, len(write_data))
 
         for v in write_data:
             try:
@@ -1111,9 +1110,10 @@ class PLC(object):
         Writing to a bit is handled in a different way than
         other writes
         """
-        RequestPathSize = int(len(ioi)/2)
-        RequestService = 0x4E
-        write_request = pack('<BB', RequestService, RequestPathSize)
+        request_service = 0x4E
+        request_size = int(len(ioi)/2)
+
+        write_request = pack('<BB', request_service, request_size)
         write_request += ioi
 
         try:
@@ -1354,18 +1354,18 @@ class PLC(object):
         bit_count = self.CIPTypes[data_type][0] * 8
 
         if data_type == 211:
-            bitPos = index % 32
+            bit_pos = index % 32
         else:
             split_tag = tag.split('.')
-            bitPos = split_tag[len(split_tag)-1]
-            bitPos = int(bitPos)
+            bit_pos = split_tag[len(split_tag)-1]
+            bit_pos = int(bit_pos)
 
         ret = []
         for v in value:
             for i in range(0, bit_count):
                 ret.append(BitValue(v, i))
 
-        return ret[bitPos:bitPos+count]
+        return ret[bit_pos:bit_pos+count]
 
     def _multiReadParser(self, tags, data):
         """
@@ -1373,7 +1373,6 @@ class PLC(object):
         """
         # remove the beginning of the packet because we just don't care about it
         stripped = data[50:]
-        tagCount = unpack_from('<H', stripped, 0)[0]
 
         # get the offset values for each of the tags in the packet
         reply = []
@@ -1382,36 +1381,36 @@ class PLC(object):
                 tag = tag[0]
             loc = 2+(i*2)
             offset = unpack_from('<H', stripped, loc)[0]
-            replyStatus = unpack_from('<b', stripped, offset+2)[0]
-            replyExtended = unpack_from('<b', stripped, offset+3)[0]
+            status = unpack_from('<b', stripped, offset+2)[0]
+            ext_status = unpack_from('<b', stripped, offset+3)[0]
 
             # successful reply, add the value to our list
-            if replyStatus == 0 and replyExtended == 0:
-                dataTypeValue = unpack_from('<B', stripped, offset+4)[0]
+            if status == 0 and ext_status == 0:
+                data_type = unpack_from('<B', stripped, offset+4)[0]
                 tag_name, base_tag, index = parse_tag_name(tag)
-                self.KnownTags[base_tag] = (dataTypeValue, 0)
+                self.KnownTags[base_tag] = (data_type, 0)
                 # if bit of word was requested
                 if BitofWord(tag):
-                    dataTypeFormat = self.CIPTypes[dataTypeValue][2]
-                    val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
-                    bitState = bit_of_word_state(tag, val)
-                    response = Response(tag, bitState, replyStatus)
-                elif dataTypeValue == 211:
-                    dataTypeFormat = self.CIPTypes[dataTypeValue][2]
-                    val = unpack_from(dataTypeFormat, stripped, offset+6)[0]
-                    bitState = bit_of_word_state(tag, val)
-                    response = Response(tag, bitState, replyStatus)
-                elif dataTypeValue == 160:
+                    type_fmt = self.CIPTypes[data_type][2]
+                    val = unpack_from(type_fmt, stripped, offset+6)[0]
+                    bit_state = bit_of_word_state(tag, val)
+                    response = Response(tag, bit_state, status)
+                elif data_type == 211:
+                    type_fmt = self.CIPTypes[data_type][2]
+                    val = unpack_from(type_fmt, stripped, offset+6)[0]
+                    bit_state = bit_of_word_state(tag, val)
+                    response = Response(tag, bit_state, status)
+                elif data_type == 160:
                     strlen = unpack_from('<B', stripped, offset+8)[0]
                     s = stripped[offset+12:offset+12+strlen]
                     value = str(s.decode(self.StringEncoding))
-                    response = Response(tag, value, replyStatus)
+                    response = Response(tag, value, status)
                 else:
-                    dataTypeFormat = self.CIPTypes[dataTypeValue][2]
-                    value = unpack_from(dataTypeFormat, stripped, offset+6)[0]
-                    response = Response(tag, value, replyStatus)
+                    type_fmt = self.CIPTypes[data_type][2]
+                    value = unpack_from(type_fmt, stripped, offset+6)[0]
+                    response = Response(tag, value, status)
             else:
-                response = Response(tag, None, replyStatus)
+                response = Response(tag, None, status)
             reply.append(response)
 
         return reply
@@ -1464,14 +1463,14 @@ class PLC(object):
 
     def _extractTagPacket(self, data, programName):
         # the first tag in a packet starts at byte 50
-        packetStart = 50
+        packet_start = 50
         tag_list = []
 
-        while packetStart < len(data):
+        while packet_start < len(data):
             # get the length of the tag name
-            tagLen = unpack_from('<H', data, packetStart+4)[0]
+            tag_len = unpack_from('<H', data, packet_start+4)[0]
             # get a single tag from the packet
-            packet = data[packetStart:packetStart+tagLen+20]
+            packet = data[packet_start:packet_start+tag_len+20]
             # extract the offset
             self.Offset = unpack_from('<H', packet, 0)[0]
             # add the tag to our tag list
@@ -1487,7 +1486,7 @@ class PLC(object):
                 if 'Program:' in tag.TagName:
                     self.ProgramNames.append(tag.TagName)
             # increment ot the next tag in the packet
-            packetStart = packetStart+tagLen+20
+            packet_start = packet_start + tag_len + 20
 
         return tag_list
 
@@ -1532,11 +1531,11 @@ def get_word_count(start, length, bits):
     how many bits are in a word and the fact that the
     number of requested bits can span multipe words.
     """
-    newStart = start % bits
-    newEnd = newStart + length
+    new_start = start % bits
+    new_end = new_start + length
 
-    totalWords = (newEnd-1) / bits
-    return int(totalWords + 1)
+    total_words = (new_end - 1) / bits
+    return int(total_words + 1)
 
 def parse_tag_name(tag):
     """
