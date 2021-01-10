@@ -53,21 +53,21 @@ class PLC(object):
         self.ProgramNames = []
         self.StructIdentifier = 0x0fCE
         self.StringEncoding = 'utf-8'
-        self.CIPTypes = {0: (0, "UNKNOWN", '?'),
-                         160: (88, "STRUCT", '<B'),
-                         193: (1, "BOOL", '?'),
-                         194: (1, "SINT", '<b'),
-                         195: (2, "INT", '<h'),
-                         196: (4, "DINT", '<i'),
-                         197: (8, "LINT", '<q'),
-                         198: (1, "USINT", '<B'),
-                         199: (2, "UINT", '<H'),
-                         200: (4, "UDINT", '<I'),
-                         201: (8, "LWORD", '<Q'),
-                         202: (4, "REAL", '<f'),
-                         203: (8, "LREAL", '<d'),
-                         211: (4, "DWORD", '<i'),
-                         218: (1, "STRING", '<B')}
+        self.CIPTypes = {0x00: (0, "UNKNOWN", '?'),
+                         0xa0: (88, "STRUCT", '<B'),
+                         0xc1: (1, "BOOL", '?'),
+                         0xc2: (1, "SINT", '<b'),
+                         0xc3: (2, "INT", '<h'),
+                         0xc4: (4, "DINT", '<i'),
+                         0xc5: (8, "LINT", '<q'),
+                         0xc6: (1, "USINT", '<B'),
+                         0xc7: (2, "UINT", '<H'),
+                         0xc8: (4, "UDINT", '<I'),
+                         0xc9: (8, "LWORD", '<Q'),
+                         0xca: (4, "REAL", '<f'),
+                         0xcb: (8, "LREAL", '<d'),
+                         0xd3: (4, "DWORD", '<i'),
+                         0xda: (1, "STRING", '<B')}
 
     @property
     def ConnectionSize(self):
@@ -254,7 +254,7 @@ class PLC(object):
         bit_count = self.CIPTypes[data_type][0] * 8
 
         ioi = self._buildTagIOI(tag_name, data_type)
-        if data_type == 211:
+        if data_type == 0xd3:
             # bool array
             words = get_word_count(index, elements, bit_count)
             request = self._add_read_service(ioi, words)
@@ -272,7 +272,7 @@ class PLC(object):
 
         # if we are handling structs (string), we have to
         # remove 2 extra bytes from the data
-        if data_type == 160:
+        if data_type == 0xa0:
             pad = 4
         else:
             pad = 2
@@ -328,9 +328,9 @@ class PLC(object):
 
         # format the values
         for v in value:
-            if data_type == 202 or data_type == 203:
+            if data_type == 0xca or data_type == 0xcb:
                 write_data.append(float(v))
-            elif data_type == 160 or data_type == 218:
+            elif data_type == 0xa0 or data_type == 0xda:
                 write_data.append(self._makeString(v))
             else:
                 write_data.append(int(v))
@@ -352,7 +352,7 @@ class PLC(object):
                 self.Offset += len(w)*self.CIPTypes[data_type][0]
         else:
             # write fits in one packet
-            if BitofWord(tag_name) or data_type == 211:
+            if BitofWord(tag_name) or data_type == 0xd3:
                 request = self._add_mod_write_service(tag_name, ioi, write_data[0], data_type)
             else:
                 request = self._add_write_service(ioi, write_data[0], data_type)
@@ -496,9 +496,9 @@ class PLC(object):
             ioi = self._buildTagIOI(tag_name, data_type)
 
             # format the values
-            if data_type == 202 or data_type == 203:
+            if data_type == 0xca or data_type == 0xcb:
                 value = float(wd[1])
-            elif data_type == 160 or data_type == 218:
+            elif data_type == 0xa0 or data_type == 0xda:
                 value = self._makeString(wd[1])
             else:
                 value = int(wd[1])
@@ -1004,7 +1004,7 @@ class PLC(object):
                 tag, base_tag, index = parse_tag_name(tag_array[i])
 
                 tag_size = len(base_tag)
-                if data_type == 211 and i == len(tag_array)-1:
+                if data_type == 0xd3 and i == len(tag_array)-1:
                     index = int(index/32)
                 elif data_type == None:
                     index = 0
@@ -1087,7 +1087,7 @@ class PLC(object):
         write_service = pack('<BB', request_service, request_size)
         write_service += ioi
 
-        if data_type == 160:
+        if data_type == 0xa0:
             type_len = 0x02
             write_service += pack('<BBHH', data_type, type_len, self.StructIdentifier, len(write_data))
         else:
@@ -1142,7 +1142,7 @@ class PLC(object):
         request = pack('<BB', service, path_size)
         request += ioi
 
-        if data_type == 160:
+        if data_type == 0xa0:
             request += pack('<BB', data_type, 0x02)
             request += pack('<H', self.StructIdentifier)
         else:
@@ -1231,7 +1231,7 @@ class PLC(object):
             word_count = get_word_count(bit_pos, elements, bit_count)
             words = self._getReplyValues(tag_name, word_count, data)
             vals = self._wordsToBits(tag_name, words, count=elements)
-        elif data_type == 211:
+        elif data_type == 0xd3:
             word_count = get_word_count(index, elements, bit_count)
             words = self._getReplyValues(tag_name, word_count, data)
             vals = self._wordsToBits(tag_name, words, count=elements)
@@ -1255,7 +1255,7 @@ class PLC(object):
 
         # this is going to check if the data type was a struct
         # if so, return the raw data
-        if data_type == 160:
+        if data_type == 0xa0:
             tmp = unpack_from('<h', data, 2)[0]
             if tmp != self.StructIdentifier:
                 d = data[4:4+len(data)]
@@ -1267,13 +1267,13 @@ class PLC(object):
             index = 2+(counter*data_size)
             if index > numbytes:
                 break
-            if data_type == 160:
+            if data_type == 0xa0:
                 index = 4+(counter*data_size)
                 name_len = unpack_from('<L', data, index)[0]
                 s = data[index+4:index+4+name_len]
                 vals.append(str(s.decode(self.StringEncoding)))
 
-            elif data_type == 218:
+            elif data_type == 0xda:
                 # remove the data type
                 data = data[2:] 
                 while len(data) > 0:
@@ -1353,7 +1353,7 @@ class PLC(object):
         data_type = self.KnownTags[base_tag][0]
         bit_count = self.CIPTypes[data_type][0] * 8
 
-        if data_type == 211:
+        if data_type == 0xd3:
             bit_pos = index % 32
         else:
             split_tag = tag.split('.')
@@ -1395,12 +1395,12 @@ class PLC(object):
                     val = unpack_from(type_fmt, stripped, offset+6)[0]
                     bit_state = bit_of_word_state(tag, val)
                     response = Response(tag, bit_state, status)
-                elif data_type == 211:
+                elif data_type == 0xd3:
                     type_fmt = self.CIPTypes[data_type][2]
                     val = unpack_from(type_fmt, stripped, offset+6)[0]
                     bit_state = bit_of_word_state(tag, val)
                     response = Response(tag, bit_state, status)
-                elif data_type == 160:
+                elif data_type == 0xa0:
                     strlen = unpack_from('<B', stripped, offset+8)[0]
                     s = stripped[offset+12:offset+12+strlen]
                     value = str(s.decode(self.StringEncoding))
