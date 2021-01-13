@@ -51,7 +51,7 @@ class PLC(object):
         self.KnownTags = {}
         self.TagList = []
         self.ProgramNames = []
-        self.StructIdentifier = 0x0fCE
+        self.StringID = 0x0fce
         self.StringEncoding = 'utf-8'
         self.CIPTypes = {0x00: (0, "UNKNOWN", '?'),
                          0xa0: (88, "STRUCT", '<B'),
@@ -1089,7 +1089,7 @@ class PLC(object):
 
         if data_type == 0xa0:
             type_len = 0x02
-            write_service += pack('<BBHH', data_type, type_len, self.StructIdentifier, len(write_data))
+            write_service += pack('<BBHH', data_type, type_len, self.StringID, len(write_data))
         else:
             type_len = 0x00
             write_service += pack('<BBH', data_type, type_len, len(write_data))
@@ -1144,7 +1144,7 @@ class PLC(object):
 
         if data_type == 0xa0:
             request += pack('<BB', data_type, 0x02)
-            request += pack('<H', self.StructIdentifier)
+            request += pack('<H', self.StringID)
         else:
             request += pack('<H', data_type)
         request += pack('<H', count)
@@ -1257,7 +1257,7 @@ class PLC(object):
         # if so, return the raw data
         if data_type == 0xa0:
             tmp = unpack_from('<h', data, 2)[0]
-            if tmp != self.StructIdentifier:
+            if tmp != self.StringID:
                 d = data[4:4+len(data)]
                 vals.append(d)
                 self.Offset += len(data)
