@@ -64,11 +64,11 @@ def main():
 
     # add button to start updating tag value
     btnStart = Button(root, text = 'Start Update', state='normal', fg ='blue', height=1, width=10, command=startUpdateValue)
-    btnStart.place(anchor=CENTER, relx=0.44, rely=0.58)
+    btnStart.place(anchor=CENTER, relx=0.44, rely=0.6)
 
     # add button to stop updating tag value
     btnStop = Button(root, text = 'Stop Update', state='disabled', fg ='blue', height=1, width=10, command=stopUpdateValue)
-    btnStop.place(anchor=CENTER, relx=0.56, rely=0.58)
+    btnStop.place(anchor=CENTER, relx=0.56, rely=0.6)
 
     # add list boxes for Devices and Tags
     lbDevices = Listbox(root, height=11, width=45, bg='lightblue')
@@ -104,7 +104,7 @@ def main():
     btnGetTags.pack(anchor=N, side=RIGHT, padx=3, pady=3)
 
     # create a label to display our variable
-    tagValue = Label(root, text='Tag Value', fg='white', bg='blue', font='Helvetica 10', width=50)
+    tagValue = Label(root, text='Tag Value', fg='yellow', bg='navy', font='Helvetica 24', width=24)
     tagValue.place(anchor=CENTER, relx=0.5, rely=0.5)
 
     # create a label and a text box for the IPAddress entry
@@ -133,7 +133,7 @@ def main():
     lblTag = Label(root, text='Tag To Poll', fg='white', bg='black', font='Helvetica 8')
     lblTag.place(anchor=CENTER, relx=0.5, rely=0.38)
     selectedTag = StringVar()
-    tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, width=90)
+    tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, font='Helvetica 10', width=90)
     selectedTag.set(myTag)
 
     # add the "Paste" menu on the mouse right-click
