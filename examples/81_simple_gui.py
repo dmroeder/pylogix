@@ -31,19 +31,20 @@ def main():
     '''
     global root
     global comm
-    global TagValue
+    global tagValue
     global selectedProcessorSlot
     global selectedIPAddress
     global selectedTag
     global updateRunning
     global btnStart
     global btnStop
-    global LbDevices
-    global LbTags
+    global lbDevices
+    global lbTags
     global tbIPAddress
     global sbProcessorSlot
     global tbTag
-    global popup_menu
+    global popup_menu_tbTag
+    global popup_menu_tbIPAddress
 
     root = Tk()
     root.config(background='black')
@@ -62,45 +63,49 @@ def main():
     btnExit.pack(side=BOTTOM, pady=5)
 
     # add button to start updating tag value
-    btnStart = Button(root, text = 'Start Update', state='normal', fg ='blue', height=1, width=10, command=StartUpdateValue)
+    btnStart = Button(root, text = 'Start Update', state='normal', fg ='blue', height=1, width=10, command=startUpdateValue)
     btnStart.place(anchor=CENTER, relx=0.44, rely=0.58)
 
     # add button to stop updating tag value
-    btnStop = Button(root, text = 'Stop Update', state='disabled', fg ='blue', height=1, width=10, command=StopUpdateValue)
+    btnStop = Button(root, text = 'Stop Update', state='disabled', fg ='blue', height=1, width=10, command=stopUpdateValue)
     btnStop.place(anchor=CENTER, relx=0.56, rely=0.58)
 
     # add list boxes for Devices and Tags
-    LbDevices = Listbox(root, height=11, width=45, bg='lightblue')
-    LbTags = Listbox(root, height=11, width=45, bg='lightgreen')
+    lbDevices = Listbox(root, height=11, width=45, bg='lightblue')
+    lbTags = Listbox(root, height=11, width=45, bg='lightgreen')
 
-    LbDevices.pack(anchor=N, side=LEFT, padx=3, pady=3)
+    lbDevices.pack(anchor=N, side=LEFT, padx=3, pady=3)
 
     # add scrollbar for the Devices list box
-    scrollbarDevices = Scrollbar(root ,orient="vertical", command=LbDevices.yview)
+    scrollbarDevices = Scrollbar(root ,orient="vertical", command=lbDevices.yview)
     scrollbarDevices.pack(anchor=N, side=LEFT, pady=3, ipady=65)
-    LbDevices.config(yscrollcommand = scrollbarDevices.set)
+    lbDevices.config(yscrollcommand = scrollbarDevices.set)
+
+    # copy selected IP Address to the clipboard on the mouse double-click
+    # this is currently set to work for IP Address only
+    lbDevices.bind('<Double-Button-1>', lambda event: ip_copy())
 
     # add Discover Devices button
-    btnDiscoverDevices = Button(root, text = 'Discover Devices', fg ='brown', height=1, width=14, command=DiscoverDevices)
+    btnDiscoverDevices = Button(root, text = 'Discover Devices', fg ='brown', height=1, width=14, command=discoverDevices)
     btnDiscoverDevices.pack(anchor=N, side=LEFT, padx=3, pady=3)
 
     # add scrollbar for the Tags list box
-    scrollbarTags = Scrollbar(root ,orient="vertical", command=LbTags.yview)
+    scrollbarTags = Scrollbar(root ,orient="vertical", command=lbTags.yview)
     scrollbarTags.pack(anchor=N, side=RIGHT, padx=3, pady=3, ipady=65)
-    LbTags.config(yscrollcommand = scrollbarTags.set)
+    lbTags.config(yscrollcommand = scrollbarTags.set)
 
     # copy selected tag to the clipboard on the mouse double-click
-    LbTags.bind('<Double-Button-1>', lambda event: tag_copy())
+    lbTags.bind('<Double-Button-1>', lambda event: tag_copy())
 
-    LbTags.pack(anchor=N, side=RIGHT, pady=3)
+    lbTags.pack(anchor=N, side=RIGHT, pady=3)
 
     # add Get Tags button
-    btnGetTags = Button(root, text = 'Get Tags', fg ='brown', height=1, width=14, command=GetTags)
+    btnGetTags = Button(root, text = 'Get Tags', fg ='brown', height=1, width=14, command=getTags)
     btnGetTags.pack(anchor=N, side=RIGHT, padx=3, pady=3)
 
     # create a label to display our variable
-    TagValue = Label(root, text='Tag Value', fg='white', bg='blue', font='Helvetica 10', width=50)
-    TagValue.place(anchor=CENTER, relx=0.5, rely=0.5)
+    tagValue = Label(root, text='Tag Value', fg='white', bg='blue', font='Helvetica 10', width=50)
+    tagValue.place(anchor=CENTER, relx=0.5, rely=0.5)
 
     # create a label and a text box for the IPAddress entry
     lblIPAddress = Label(root, text='IP Address', fg='white', bg='black', font='Helvetica 8')
@@ -108,6 +113,12 @@ def main():
     selectedIPAddress = StringVar()
     tbIPAddress = Entry(root, justify=CENTER, textvariable=selectedIPAddress)
     selectedIPAddress.set(ipAddress)
+
+    # add the "Paste" menu on the mouse right-click
+    popup_menu_tbIPAddress = Menu(tbIPAddress, tearoff=0)
+    popup_menu_tbIPAddress.add_command(label='Paste', command=ip_paste)
+    tbIPAddress.bind('<Button-3>', lambda event: ip_menu(event, tbIPAddress))
+
     tbIPAddress.place(anchor=CENTER, relx=0.5, rely=0.15)
 
     # create a label and a spinbox for the ProcessorSlot entry
@@ -125,47 +136,47 @@ def main():
     tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, width=90)
     selectedTag.set(myTag)
 
-    # Add "Paste" menu and paste tag from the clipboard on the mouse right-click
-    popup_menu = Menu(tbTag, tearoff=0)
-    popup_menu.add_command(label='Paste', command=tag_paste)
+    # add the "Paste" menu on the mouse right-click
+    popup_menu_tbTag = Menu(tbTag, tearoff=0)
+    popup_menu_tbTag.add_command(label='Paste', command=tag_paste)
     tbTag.bind('<Button-3>', lambda event: tag_menu(event, tbTag))
 
     tbTag.place(anchor=CENTER, relx=0.5, rely=0.42)
 
-    DiscoverDevices()
-    GetTags()
+    discoverDevices()
+    getTags()
 
     root.mainloop()
     comm.Close()
 
-def DiscoverDevices():
-    LbDevices.delete(0, 'end')
+def discoverDevices():
+    lbDevices.delete(0, 'end')
 
     devices = comm.Discover()
 
     if str(devices) == 'None [] Success':
-        LbDevices.insert(1, 'No Devices Discovered')
+        lbDevices.insert(1, 'No Devices Discovered')
     else:
         i = 0
         for device in devices.Value:
-            LbDevices.insert(i * 12 + 1, '  IP Address: ' + device.IPAddress)
-            LbDevices.insert(i * 12 + 2, '  Product Name: ' + device.ProductName)
-            LbDevices.insert(i * 12 + 3, '  Product Code: ' + str(device.ProductCode))
-            LbDevices.insert(i * 12 + 4, '  Vendor: ' + device.Vendor)
-            LbDevices.insert(i * 12 + 5, '  Vendor ID: ' + str(device.VendorID))
-            LbDevices.insert(i * 12 + 6, '  Device Type: ' + str(device.DeviceType))
-            LbDevices.insert(i * 12 + 7, '  Device ID: ' + str(device.DeviceID))
-            LbDevices.insert(i * 12 + 8, '  Revision: ' +  device.Revision)
-            LbDevices.insert(i * 12 + 9, '  Serial: ' + device.SerialNumber)
-            LbDevices.insert(i * 12 + 10, '  State: ' + str(device.State))
-            LbDevices.insert(i * 12 + 11, '  Status: ' + str(device.Status))
-            LbDevices.insert(i * 12 + 12, '----------------------------------')
+            lbDevices.insert(i * 12 + 1, 'IP Address: ' + device.IPAddress)
+            lbDevices.insert(i * 12 + 2, 'Product Name: ' + device.ProductName)
+            lbDevices.insert(i * 12 + 3, 'Product Code: ' + str(device.ProductCode))
+            lbDevices.insert(i * 12 + 4, 'Vendor: ' + device.Vendor)
+            lbDevices.insert(i * 12 + 5, 'Vendor ID: ' + str(device.VendorID))
+            lbDevices.insert(i * 12 + 6, 'Device Type: ' + str(device.DeviceType))
+            lbDevices.insert(i * 12 + 7, 'Device ID: ' + str(device.DeviceID))
+            lbDevices.insert(i * 12 + 8, 'Revision: ' +  device.Revision)
+            lbDevices.insert(i * 12 + 9, 'Serial: ' + device.SerialNumber)
+            lbDevices.insert(i * 12 + 10, 'State: ' + str(device.State))
+            lbDevices.insert(i * 12 + 11, 'Status: ' + str(device.Status))
+            lbDevices.insert(i * 12 + 12, '----------------------------------')
             i = i + 1
 
-def GetTags():
+def getTags():
     global comm
 
-    LbTags.delete(0, 'end')
+    lbTags.delete(0, 'end')
 
     comm_check()
 
@@ -175,12 +186,12 @@ def GetTags():
         for t in tags.Value:
             j = 1
             if t.DataType == '':
-                LbTags.insert(j, t.TagName)
+                lbTags.insert(j, t.TagName)
             else:
-                LbTags.insert(j, t.TagName + ' (DataType - ' + t.DataType + ')')
+                lbTags.insert(j, t.TagName + ' (DataType - ' + t.DataType + ')')
             j = j + 1
     else:
-        LbTags.insert(1, 'No Tags Retrieved')
+        lbTags.insert(1, 'No Tags Retrieved')
 
 def comm_check():
     global comm
@@ -195,7 +206,7 @@ def comm_check():
         comm.IPAddress = ip
         comm.ProcessorSlot = port
 
-def StartUpdateValue():
+def startUpdateValue():
     global updateRunning
 
     '''
@@ -209,21 +220,21 @@ def StartUpdateValue():
     if not updateRunning:
         updateRunning = True
     else:
-        if not myTag == "":
-            TagValue['text'] = comm.Read(myTag).Value
-            root.after(500, StartUpdateValue)
+        if myTag != "":
+            tagValue['text'] = comm.Read(myTag).Value
+            root.after(500, startUpdateValue)
             btnStart['state'] = 'disabled'
             btnStop['state'] = 'normal'
             tbIPAddress['state'] = 'disabled'
             sbProcessorSlot['state'] = 'disabled'
             tbTag['state'] = 'disabled'
 
-def StopUpdateValue():
+def stopUpdateValue():
     global updateRunning
    
     if updateRunning:
         updateRunning = False
-        TagValue['text'] = 'Tag Value'
+        tagValue['text'] = 'Tag Value'
         btnStart['state'] = 'normal'
         btnStop['state'] = 'disabled'
         tbIPAddress['state'] = 'normal'
@@ -232,18 +243,36 @@ def StopUpdateValue():
 
 def tag_copy():
     root.clipboard_clear()
-    listboxSelectedTag = (LbTags.get(ANCHOR)).split(" ")[0]
+    listboxSelectedTag = (lbTags.get(ANCHOR)).split(" ")[0]
     root.clipboard_append(listboxSelectedTag)
 
 def tag_menu(event, tbTag):
     if root.clipboard_get() != "" and tbTag['state'] == 'normal':
         tbTag.select_range(0, 'end')
-        popup_menu.post(event.x_root, event.y_root)
+        popup_menu_tbTag.post(event.x_root, event.y_root)
 
 def tag_paste():
+    # user clicked the "Paste" option so paste the tag from the clipboard
     selectedTag.set(root.clipboard_get())
     tbTag.select_range(0, 'end')
     tbTag.icursor('end')
+
+def ip_copy():
+    if (lbDevices.get(ANCHOR)).split(" ")[0] == "IP":
+        root.clipboard_clear()
+        listboxSelectedIPAddress = (lbDevices.get(ANCHOR)).split(" ")[2]
+        root.clipboard_append(listboxSelectedIPAddress)
+
+def ip_menu(event, tbIPAddress):
+    if root.clipboard_get() != "" and tbIPAddress['state'] == 'normal':
+        tbIPAddress.select_range(0, 'end')
+        popup_menu_tbIPAddress.post(event.x_root, event.y_root)
+
+def ip_paste():
+    # user clicked the "Paste" option so paste the IP Address from the clipboard
+    selectedIPAddress.set(root.clipboard_get())
+    tbIPAddress.select_range(0, 'end')
+    tbIPAddress.icursor('end')
 
 if __name__=='__main__':
     main()
