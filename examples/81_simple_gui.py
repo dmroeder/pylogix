@@ -51,8 +51,6 @@ def main():
     root.title('Pylogix GUI Test')
     root.geometry('800x600')
 
-    comm = PLC()
-
     updateRunning = True
 
     # bind the "q" keyboard key to quit
@@ -143,6 +141,8 @@ def main():
 
     tbTag.place(anchor=CENTER, relx=0.5, rely=0.42)
 
+    comm = PLC()
+
     discoverDevices()
     getTags()
 
@@ -171,7 +171,22 @@ def discoverDevices():
             lbDevices.insert(i * 12 + 10, 'State: ' + str(device.State))
             lbDevices.insert(i * 12 + 11, 'Status: ' + str(device.Status))
             lbDevices.insert(i * 12 + 12, '----------------------------------')
-            i = i + 1
+            i += 1
+
+        for device in devices.Value:
+            if device.DeviceID == 14:
+                lbDevices.insert(i * 12 + 1, "Modules at " + device.IPAddress)
+
+                '''
+                Query each slot for a module
+                '''
+                with PLC() as c:
+                    c.IPAddress = device.IPAddress
+
+                    for j in range(17):
+                        x = c.GetModuleProperties(j)
+                        lbDevices.insert(i * 12 + 2 + j, "Slot " + str(j) + " " + x.Value.ProductName + " rev: " + x.Value.Revision)
+                i += 1
 
 def getTags():
     global comm
