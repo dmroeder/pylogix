@@ -5,14 +5,17 @@ import sys
 sys.path.append('..')
 
 '''
-Create a simple Tkinter window to display discovered devices,
-tags and a single variable.
-Tkinter doesn't come preinstalled on all
-Linux distributions, so you may need to install it.
+Create a simple Tkinter window to display discovered devices, tags and a single variable.
+Tkinter doesn't come preinstalled on all Linux distributions, so you may need to install it.
 For Ubuntu: sudo apt-get install python-tk
 
-Tkinter vs tkinter - Reference: https://stackoverflow.com/questions/17843596/difference-between-tkinter-and-tkinter
+Tkinter vs tkinter:
+Reference: https://stackoverflow.com/questions/17843596/difference-between-tkinter-and-tkinter
 '''
+
+import threading
+import socket
+import pylogix
 
 from pylogix import PLC
 
@@ -21,9 +24,30 @@ try:
 except ImportError:
     from tkinter import *
 
+class device_discovery_thread(threading.Thread):
+   def __init__(self):
+      threading.Thread.__init__(self)
+   def run(self):
+      discoverDevices()
+
+class get_tags_thread(threading.Thread):
+   def __init__(self):
+      threading.Thread.__init__(self)
+   def run(self):
+      getTags()
+
+class connection_thread(threading.Thread):
+   def __init__(self):
+      threading.Thread.__init__(self)
+   def run(self):
+      comm_check()
+
+# startup default values
 myTag = 'CT_STRING'
 ipAddress = '192.168.1.24'
 processorSlot = 3
+
+ver = pylogix.__version__
 
 def main():
     '''
@@ -31,11 +55,13 @@ def main():
     '''
     global root
     global comm
-    global tagValue
+    global checkVar
     global selectedProcessorSlot
     global selectedIPAddress
+    global chbMicro800
     global selectedTag
     global updateRunning
+    global changePLC
     global btnStart
     global btnStop
     global lbDevices
@@ -43,6 +69,7 @@ def main():
     global tbIPAddress
     global sbProcessorSlot
     global tbTag
+    global tagValue
     global popup_menu_tbTag
     global popup_menu_tbIPAddress
 
@@ -52,13 +79,52 @@ def main():
     root.geometry('800x600')
 
     updateRunning = True
+    changePLC = IntVar()
+    changePLC.set(0)
 
     # bind the "q" keyboard key to quit
     root.bind('q', lambda event:root.destroy())
 
-    # add Exit button
-    btnExit = Button(root, text = 'Exit', fg ='red', height=1, width=10, command=root.destroy)
-    btnExit.pack(side=BOTTOM, pady=5)
+    # add a frame to hold top widgets
+    frame1 = Frame(root, background='black')
+    frame1.pack(side=TOP, fill=X)
+
+    # add list boxes for Device Discovery and Get Tags
+    lbDevices = Listbox(frame1, height=11, width=45, bg='lightblue')
+    lbTags = Listbox(frame1, height=11, width=45, bg='lightgreen')
+
+    lbDevices.pack(anchor=N, side=LEFT, padx=3, pady=3)
+
+    # add a scrollbar for the Devices list box
+    scrollbarDevices = Scrollbar(frame1, orient='vertical', command=lbDevices.yview)
+    scrollbarDevices.pack(anchor=N, side=LEFT, pady=3, ipady=65)
+    lbDevices.config(yscrollcommand = scrollbarDevices.set)
+
+    # copy selected IP Address to the clipboard on the mouse double-click
+    # this is currently set to work for IP Address only
+    lbDevices.bind('<Double-Button-1>', lambda event: ip_copy())
+
+    # add the Discover Devices button
+    btnDiscoverDevices = Button(frame1, text = 'Discover Devices', fg ='green', height=1, width=14, command=start_discover_devices)
+    btnDiscoverDevices.pack(anchor=N, side=LEFT, padx=3, pady=3)
+
+    # add a scrollbar for the Tags list box
+    scrollbarTags = Scrollbar(frame1, orient='vertical', command=lbTags.yview)
+    scrollbarTags.pack(anchor=N, side=RIGHT, padx=3, pady=3, ipady=65)
+    lbTags.config(yscrollcommand = scrollbarTags.set)
+
+    # copy selected tag to the clipboard on the mouse double-click
+    lbTags.bind('<Double-Button-1>', lambda event: tag_copy())
+
+    lbTags.pack(anchor=N, side=RIGHT, pady=3)
+
+    # add the Get Tags button
+    btnGetTags = Button(frame1, text = 'Get Tags', fg ='green', height=1, width=14, command=start_get_tags)
+    btnGetTags.pack(anchor=N, side=RIGHT, padx=3, pady=3)
+
+    # create a label to display the tag value
+    tagValue = Label(root, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=52, relief=SUNKEN)
+    tagValue.place(anchor=CENTER, relx=0.5, rely=0.5)
 
     # add button to start updating tag value
     btnStart = Button(root, text = 'Start Update', state='normal', fg ='blue', height=1, width=10, command=startUpdateValue)
@@ -68,46 +134,9 @@ def main():
     btnStop = Button(root, text = 'Stop Update', state='disabled', fg ='blue', height=1, width=10, command=stopUpdateValue)
     btnStop.place(anchor=CENTER, relx=0.56, rely=0.6)
 
-    # add list boxes for Devices and Tags
-    lbDevices = Listbox(root, height=11, width=45, bg='lightblue')
-    lbTags = Listbox(root, height=11, width=45, bg='lightgreen')
-
-    lbDevices.pack(anchor=N, side=LEFT, padx=3, pady=3)
-
-    # add scrollbar for the Devices list box
-    scrollbarDevices = Scrollbar(root ,orient="vertical", command=lbDevices.yview)
-    scrollbarDevices.pack(anchor=N, side=LEFT, pady=3, ipady=65)
-    lbDevices.config(yscrollcommand = scrollbarDevices.set)
-
-    # copy selected IP Address to the clipboard on the mouse double-click
-    # this is currently set to work for IP Address only
-    lbDevices.bind('<Double-Button-1>', lambda event: ip_copy())
-
-    # add Discover Devices button
-    btnDiscoverDevices = Button(root, text = 'Discover Devices', fg ='brown', height=1, width=14, command=discoverDevices)
-    btnDiscoverDevices.pack(anchor=N, side=LEFT, padx=3, pady=3)
-
-    # add scrollbar for the Tags list box
-    scrollbarTags = Scrollbar(root ,orient="vertical", command=lbTags.yview)
-    scrollbarTags.pack(anchor=N, side=RIGHT, padx=3, pady=3, ipady=65)
-    lbTags.config(yscrollcommand = scrollbarTags.set)
-
-    # copy selected tag to the clipboard on the mouse double-click
-    lbTags.bind('<Double-Button-1>', lambda event: tag_copy())
-
-    lbTags.pack(anchor=N, side=RIGHT, pady=3)
-
-    # add Get Tags button
-    btnGetTags = Button(root, text = 'Get Tags', fg ='brown', height=1, width=14, command=getTags)
-    btnGetTags.pack(anchor=N, side=RIGHT, padx=3, pady=3)
-
-    # create a label to display our variable
-    tagValue = Label(root, text='Tag Value', fg='yellow', bg='navy', font='Helvetica 24', width=24)
-    tagValue.place(anchor=CENTER, relx=0.5, rely=0.5)
-
     # create a label and a text box for the IPAddress entry
     lblIPAddress = Label(root, text='IP Address', fg='white', bg='black', font='Helvetica 8')
-    lblIPAddress.place(anchor=CENTER, relx=0.5, rely=0.12)
+    lblIPAddress.place(anchor=CENTER, relx=0.5, rely=0.1)
     selectedIPAddress = StringVar()
     tbIPAddress = Entry(root, justify=CENTER, textvariable=selectedIPAddress)
     selectedIPAddress.set(ipAddress)
@@ -117,18 +146,18 @@ def main():
     popup_menu_tbIPAddress.add_command(label='Paste', command=ip_paste)
     tbIPAddress.bind('<Button-3>', lambda event: ip_menu(event, tbIPAddress))
 
-    tbIPAddress.place(anchor=CENTER, relx=0.5, rely=0.15)
+    tbIPAddress.place(anchor=CENTER, relx=0.5, rely=0.13)
 
     # create a label and a spinbox for the ProcessorSlot entry
     lblProcessorSlot = Label(root, text='Processor Slot', fg='white', bg='black', font='Helvetica 8')
-    lblProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.22)
+    lblProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.18)
     selectedProcessorSlot = StringVar()
     sbProcessorSlot = Spinbox(root, width=10, justify=CENTER, from_ = 0, to = 20, increment=1, textvariable=selectedProcessorSlot, state='readonly')
     selectedProcessorSlot.set(processorSlot)
-    sbProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.25)
+    sbProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.21)
 
     # create a label and a text box for the Tag entry
-    lblTag = Label(root, text='Tag To Poll', fg='white', bg='black', font='Helvetica 8')
+    lblTag = Label(root, text='Tag To Read', fg='white', bg='black', font='Helvetica 8')
     lblTag.place(anchor=CENTER, relx=0.5, rely=0.38)
     selectedTag = StringVar()
     tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, font='Helvetica 10', width=90)
@@ -141,18 +170,72 @@ def main():
 
     tbTag.place(anchor=CENTER, relx=0.5, rely=0.42)
 
+    # add a frame to hold the label for pylogix version and Micro800 checkbox
+    frame3 = Frame(root, background='black')
+    frame3.pack(side=BOTTOM, fill=X)
+
+    # create a label to show pylogix version
+    lblVersion = Label(frame3, text='pylogix v' + ver, fg='grey', bg='black', font='Helvetica 9')
+    lblVersion.pack(side=LEFT, padx=3, pady=5)
+
+    # add Micro800 checkbox
+    checkVar = IntVar()
+    chbMicro800 = Checkbutton(frame3, text="PLC is Micro800", variable=checkVar, command=check_micro800)
+    checkVar.set(0)
+    chbMicro800.pack(side=RIGHT, padx=5, pady=4)
+
+    # add Exit button
+    btnExit = Button(root, text = 'Exit', fg ='red', height=1, width=10, command=root.destroy)
+    btnExit.place(anchor=CENTER, relx=0.5, rely=0.97)
+
     comm = PLC()
 
-    discoverDevices()
-    getTags()
+    start_connection()
 
     root.mainloop()
+
     comm.Close()
+
+def start_connection():
+    try:
+        thread1 = connection_thread()
+        thread1.setDaemon(True)
+        thread1.start()
+    except Exception as e:
+        print('unable to start thread1 - connection_thread, ' + str(e))
+
+def start_discover_devices():
+    try:
+        thread2 = device_discovery_thread()
+        thread2.setDaemon(True)
+        thread2.start()
+    except Exception as e:
+        print('unable to start thread2 - device_discovery_thread, ' + str(e))
+
+def start_get_tags():
+    try:
+        thread3 = get_tags_thread()
+        thread3.setDaemon(True)
+        thread3.start()
+    except Exception as e:
+        print('unable to start thread3 - get_tags_thread, ' + str(e))
+
+def check_micro800():
+    if checkVar.get() == 1:
+        sbProcessorSlot['state'] = 'disabled'
+    else:
+        sbProcessorSlot['state'] = 'normal'
+
+    changePLC.set(1)
+    start_connection()
 
 def discoverDevices():
     lbDevices.delete(0, 'end')
 
-    devices = comm.Discover()
+    try:
+        devices = comm.Discover()
+    except:
+        discoverDevices()
 
     if str(devices) == 'None [] Success':
         lbDevices.insert(1, 'No Devices Discovered')
@@ -195,7 +278,10 @@ def getTags():
 
     comm_check()
 
-    tags = comm.GetTagList()
+    try:
+        tags = comm.GetTagList()
+    except:
+        getTags()
 
     if not tags.Value is None:
         for t in tags.Value:
@@ -214,12 +300,20 @@ def comm_check():
     ip = selectedIPAddress.get()
     port = int(selectedProcessorSlot.get())
 
-    if (comm.IPAddress != ip or comm.ProcessorSlot != port):
+    if (comm.IPAddress != ip or comm.ProcessorSlot != port or changePLC.get() == 1):
         comm.Close()
         comm = None
         comm = PLC()
         comm.IPAddress = ip
-        comm.ProcessorSlot = port
+
+        if checkVar.get() == 0:
+            comm.ProcessorSlot = port
+            comm.Micro800 = False
+        else:
+            comm.ProcessorSlot = 0
+            comm.Micro800 = True
+
+    changePLC.set(0)
 
 def startUpdateValue():
     global updateRunning
@@ -241,7 +335,9 @@ def startUpdateValue():
             btnStart['state'] = 'disabled'
             btnStop['state'] = 'normal'
             tbIPAddress['state'] = 'disabled'
-            sbProcessorSlot['state'] = 'disabled'
+            if checkVar.get() == 1:
+                sbProcessorSlot['state'] = 'disabled'
+            chbMicro800['state'] = 'disabled'
             tbTag['state'] = 'disabled'
 
 def stopUpdateValue():
@@ -249,11 +345,13 @@ def stopUpdateValue():
    
     if updateRunning:
         updateRunning = False
-        tagValue['text'] = 'Tag Value'
+        tagValue['text'] = '~'
         btnStart['state'] = 'normal'
         btnStop['state'] = 'disabled'
         tbIPAddress['state'] = 'normal'
-        sbProcessorSlot['state'] = 'normal'
+        chbMicro800['state'] = 'normal'
+        if checkVar.get() == 0:
+            sbProcessorSlot['state'] = 'normal'
         tbTag['state'] = 'normal'
 
 def tag_copy():
