@@ -42,6 +42,12 @@ class connection_thread(threading.Thread):
    def run(self):
       comm_check()
 
+class update_thread(threading.Thread):
+   def __init__(self):
+      threading.Thread.__init__(self)
+   def run(self):
+      startUpdateValue()
+
 # startup default values
 myTag = 'CT_STRING'
 ipAddress = '192.168.1.24'
@@ -60,12 +66,15 @@ def main():
     global selectedIPAddress
     global chbMicro800
     global selectedTag
+    global connected
     global updateRunning
     global changePLC
     global btnStart
     global btnStop
     global lbDevices
     global lbTags
+    global lbConnectionMessage
+    global lbErrorMessage
     global tbIPAddress
     global sbProcessorSlot
     global tbTag
@@ -78,6 +87,7 @@ def main():
     root.title('Pylogix GUI Test')
     root.geometry('800x600')
 
+    connected = False
     updateRunning = True
     changePLC = IntVar()
     changePLC.set(0)
@@ -122,12 +132,26 @@ def main():
     btnGetTags = Button(frame1, text = 'Get Tags', fg ='green', height=1, width=14, command=start_get_tags)
     btnGetTags.pack(anchor=N, side=RIGHT, padx=3, pady=3)
 
+    # add a frame to hold the label for pylogix version and Micro800 checkbox
+    frame2 = Frame(root, background='black')
+    frame2.pack(fill=X)
+
+    # create a label to show pylogix version
+    lblVersion = Label(frame2, text='pylogix v' + ver, fg='grey', bg='black', font='Helvetica 9')
+    lblVersion.pack(side=LEFT, padx=3, pady=5)
+
+    # add Micro800 checkbox
+    checkVar = IntVar()
+    chbMicro800 = Checkbutton(frame2, text="PLC is Micro800", variable=checkVar, command=check_micro800)
+    checkVar.set(0)
+    chbMicro800.pack(side=RIGHT, padx=5, pady=4)
+
     # create a label to display the tag value
     tagValue = Label(root, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=52, relief=SUNKEN)
     tagValue.place(anchor=CENTER, relx=0.5, rely=0.5)
 
     # add button to start updating tag value
-    btnStart = Button(root, text = 'Start Update', state='normal', fg ='blue', height=1, width=10, command=startUpdateValue)
+    btnStart = Button(root, text = 'Start Update', state='disabled', fg ='blue', height=1, width=10, command=start_update)
     btnStart.place(anchor=CENTER, relx=0.44, rely=0.6)
 
     # add button to stop updating tag value
@@ -150,17 +174,17 @@ def main():
 
     # create a label and a spinbox for the ProcessorSlot entry
     lblProcessorSlot = Label(root, text='Processor Slot', fg='white', bg='black', font='Helvetica 8')
-    lblProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.18)
+    lblProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.175)
     selectedProcessorSlot = StringVar()
     sbProcessorSlot = Spinbox(root, width=10, justify=CENTER, from_ = 0, to = 20, increment=1, textvariable=selectedProcessorSlot, state='readonly')
     selectedProcessorSlot.set(processorSlot)
-    sbProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.21)
+    sbProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.205)
 
     # create a label and a text box for the Tag entry
     lblTag = Label(root, text='Tag To Read', fg='white', bg='black', font='Helvetica 8')
-    lblTag.place(anchor=CENTER, relx=0.5, rely=0.38)
+    lblTag.place(anchor=CENTER, relx=0.5, rely=0.4)
     selectedTag = StringVar()
-    tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, font='Helvetica 10', width=90)
+    tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, font='Helvetica 11', width=90)
     selectedTag.set(myTag)
 
     # add the "Paste" menu on the mouse right-click
@@ -168,21 +192,19 @@ def main():
     popup_menu_tbTag.add_command(label='Paste', command=tag_paste)
     tbTag.bind('<Button-3>', lambda event: tag_menu(event, tbTag))
 
-    tbTag.place(anchor=CENTER, relx=0.5, rely=0.42)
+    tbTag.place(anchor=CENTER, relx=0.5, rely=0.44)
 
-    # add a frame to hold the label for pylogix version and Micro800 checkbox
+    # add a frame to hold connection and error messages listboxes
     frame3 = Frame(root, background='black')
     frame3.pack(side=BOTTOM, fill=X)
 
-    # create a label to show pylogix version
-    lblVersion = Label(frame3, text='pylogix v' + ver, fg='grey', bg='black', font='Helvetica 9')
-    lblVersion.pack(side=LEFT, padx=3, pady=5)
+    # add a list box for connection messages
+    lbConnectionMessage = Listbox(frame3, justify=CENTER, height=1, width=45, fg='blue', bg='lightgrey')
+    lbConnectionMessage.pack(anchor=S, side=LEFT, padx=3, pady=3)
 
-    # add Micro800 checkbox
-    checkVar = IntVar()
-    chbMicro800 = Checkbutton(frame3, text="PLC is Micro800", variable=checkVar, command=check_micro800)
-    checkVar.set(0)
-    chbMicro800.pack(side=RIGHT, padx=5, pady=4)
+    # add a listbox for error messages
+    lbErrorMessage = Listbox(frame3, justify=CENTER, height=1, width=45, fg='red', bg='lightgrey')
+    lbErrorMessage.pack(anchor=S, side=RIGHT, padx=3, pady=3)
 
     # add Exit button
     btnExit = Button(root, text = 'Exit', fg ='red', height=1, width=10, command=root.destroy)
@@ -220,6 +242,14 @@ def start_get_tags():
     except Exception as e:
         print('unable to start thread3 - get_tags_thread, ' + str(e))
 
+def start_update():
+    try:
+        thread4 = update_thread()
+        thread4.setDaemon(True)
+        thread4.start()
+    except Exception as e:
+        print('unable to start thread4 - update_thread, ' + str(e))
+
 def check_micro800():
     if checkVar.get() == 1:
         sbProcessorSlot['state'] = 'disabled'
@@ -227,6 +257,8 @@ def check_micro800():
         sbProcessorSlot['state'] = 'normal'
 
     changePLC.set(1)
+    lbDevices.delete(0, 'end')
+    lbTags.delete(0, 'end')
     start_connection()
 
 def discoverDevices():
@@ -276,31 +308,38 @@ def getTags():
 
     lbTags.delete(0, 'end')
 
-    comm_check()
+    if not connected:
+        comm_check()
+
+    tags = None
 
     try:
         tags = comm.GetTagList()
     except:
         getTags()
 
-    if not tags.Value is None:
-        for t in tags.Value:
-            j = 1
-            if t.DataType == '':
-                lbTags.insert(j, t.TagName)
-            else:
-                lbTags.insert(j, t.TagName + ' (DataType - ' + t.DataType + ')')
-            j = j + 1
+    if not tags is None:
+        if not tags.Value is None:
+            for t in tags.Value:
+                j = 1
+                if t.DataType == '':
+                    lbTags.insert(j, t.TagName)
+                else:
+                    lbTags.insert(j, t.TagName + ' (DataType - ' + t.DataType + ')')
+                j = j + 1
+        else:
+            lbTags.insert(1, 'No Tags Retrieved')
     else:
         lbTags.insert(1, 'No Tags Retrieved')
 
 def comm_check():
     global comm
+    global connected
 
     ip = selectedIPAddress.get()
     port = int(selectedProcessorSlot.get())
 
-    if (comm.IPAddress != ip or comm.ProcessorSlot != port or changePLC.get() == 1):
+    if (not connected or comm.IPAddress != ip or comm.ProcessorSlot != port or changePLC.get() == 1):
         comm.Close()
         comm = None
         comm = PLC()
@@ -310,35 +349,77 @@ def comm_check():
             comm.ProcessorSlot = port
             comm.Micro800 = False
         else:
-            comm.ProcessorSlot = 0
             comm.Micro800 = True
+
+        lbConnectionMessage.delete(0, 'end')
+        lbErrorMessage.delete(0, 'end')
+
+        plcTime = comm.GetPLCTime()
+
+        if plcTime.Value is None:
+            if btnStop['state'] == 'disabled':
+                btnStart['state'] = 'disabled'
+            lbConnectionMessage.insert(1, 'Not Connected')
+            lbErrorMessage.insert(1, plcTime.Status)
+            connected = False
+            root.after(5000, comm_check)
+        else:
+            lbConnectionMessage.insert(1, 'Connected')
+            if btnStop['state'] == 'disabled':
+                btnStart['state'] = 'normal'
+            connected = True
 
     changePLC.set(0)
 
 def startUpdateValue():
     global updateRunning
+    global connected
 
     '''
     Call ourself to update the screen
     '''
 
-    comm_check()
+    if not connected:
+        comm_check()
 
     myTag = selectedTag.get()
 
     if not updateRunning:
         updateRunning = True
     else:
-        if myTag != "":
-            tagValue['text'] = comm.Read(myTag).Value
-            root.after(500, startUpdateValue)
-            btnStart['state'] = 'disabled'
-            btnStop['state'] = 'normal'
-            tbIPAddress['state'] = 'disabled'
-            if checkVar.get() == 1:
-                sbProcessorSlot['state'] = 'disabled'
-            chbMicro800['state'] = 'disabled'
-            tbTag['state'] = 'disabled'
+        if myTag != "" and connected:
+            try:
+                response = comm.Read(myTag)
+            except:
+                response = None
+
+            if not response == None:
+                if not response.Value is None:
+                    tagValue['text'] = response.Value
+                else:
+                    connected = False
+                    lbDevices.delete(0, 'end')
+                    lbTags.delete(0, 'end')
+
+                    if response.Status == 'Connection lost':
+                        lbConnectionMessage.delete(0, 'end')
+                        lbConnectionMessage.insert(1, response.Status)
+                        lbErrorMessage.delete(0, 'end')
+                        tagValue['text'] = '~'
+                    else:
+                        lbErrorMessage.delete(0, 'end')
+                        lbErrorMessage.insert(1, response.Status)
+ 
+            if btnStart['state'] != 'disabled':
+                btnStart['state'] = 'disabled'
+                btnStop['state'] = 'normal'
+                tbIPAddress['state'] = 'disabled'
+                if checkVar.get() == 1:
+                    sbProcessorSlot['state'] = 'disabled'
+                chbMicro800['state'] = 'disabled'
+                tbTag['state'] = 'disabled'
+
+        root.after(500, startUpdateValue)
 
 def stopUpdateValue():
     global updateRunning
