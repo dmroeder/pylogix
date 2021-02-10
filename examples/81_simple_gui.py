@@ -441,7 +441,12 @@ def tag_copy():
     root.clipboard_append(listboxSelectedTag)
 
 def tag_menu(event, tbTag):
-    if root.clipboard_get() != "" and tbTag['state'] == 'normal':
+    try:
+        old_clip = root.clipboard_get()
+    except:
+        old_clip = None
+
+    if (not old_clip is None) and (type(old_clip) is str) and tbTag['state'] == 'normal':
         tbTag.select_range(0, 'end')
         popup_menu_tbTag.post(event.x_root, event.y_root)
 
@@ -458,7 +463,12 @@ def ip_copy():
         root.clipboard_append(listboxSelectedIPAddress)
 
 def ip_menu(event, tbIPAddress):
-    if root.clipboard_get() != "" and tbIPAddress['state'] == 'normal':
+    try:
+        old_clip = root.clipboard_get()
+    except:
+        old_clip = None
+
+    if (not old_clip is None) and (type(old_clip) is str) and tbIPAddress['state'] == 'normal':
         tbIPAddress.select_range(0, 'end')
         popup_menu_tbIPAddress.post(event.x_root, event.y_root)
 
