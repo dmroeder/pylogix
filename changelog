@@ -1,3 +1,6 @@
+02/12/21
+  - Fixed reading large boolean arrays
+
 01/13/21
   - Reference data types by their hex value
   - Rename StructIdentifier > StringID

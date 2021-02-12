@@ -283,7 +283,10 @@ class PLC(object):
         req = data
 
         while status == 6:
-            request = self._add_partial_read_service(ioi, elements)
+            if data_type == 0xd3:
+                request = self._add_partial_read_service(ioi, words)
+            else:
+                request = self._add_partial_read_service(ioi, elements)
             status, ret_data = self.conn.send(request)
             data = ret_data[50+pad:]
             self.Offset += len(data)
