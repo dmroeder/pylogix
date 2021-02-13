@@ -395,57 +395,62 @@ def startUpdateValue():
     if not connected:
         comm_check()
 
-    myTag = selectedTag.get()
-
     if not updateRunning:
         updateRunning = True
     else:
-        if connected:
-            # remove all the spaces
-            displayTag = (selectedTag.get()).replace(' ', '')
+        # remove all the spaces
+        displayTag = (selectedTag.get()).replace(' ', '')
 
-            if displayTag != '':
-                myTag = []
-                if ',' in displayTag:
-                    tags = displayTag.split(',')
-                    for tag in tags:
-                        if not str(tag) == '':
-                            myTag.append(str(tag))
-                else:
-                    myTag.append(displayTag)
-
-            try:
-                response = comm.Read(myTag)
-            except:
-                response = None
-
-            if not response is None:
-                allValues = ''
-                for tag in response:
-                    allValues += str(tag.Value) + ', '
-                tagValue['text'] = allValues[:-2]
+        if displayTag != '':
+            myTag = []
+            if ',' in displayTag:
+                tags = displayTag.split(',')
+                for tag in tags:
+                    if not str(tag) == '':
+                        myTag.append(str(tag))
             else:
-                connected = False
-                lbDevices.delete(0, 'end')
-                lbTags.delete(0, 'end')
+                myTag.append(displayTag)
 
-                if response.Status == 'Connection lost':
+        try:
+            response = comm.Read(myTag)
+        except:
+            response = None
+
+        if not response is None:
+            allValues = ''
+
+            for tag in response:
+                if tag.Status == 'Success':
+                    allValues += str(tag.Value) + ', '
+                elif tag.Status == 'Connection lost':
+                    connected = False
+
                     lbConnectionMessage.delete(0, 'end')
-                    lbConnectionMessage.insert(1, response.Status)
+                    lbConnectionMessage.insert(1, tag.Status)
                     lbErrorMessage.delete(0, 'end')
-                    tagValue['text'] = '~'
+                    allValues = ''
+                    tagValue['text'] = 'Connection lost'
+                    break
                 else:
+                    connected = False
+
                     lbErrorMessage.delete(0, 'end')
-                    lbErrorMessage.insert(1, response.Status)
+                    lbErrorMessage.insert(1, tag.Status)
+                    allValues = ''
+                    tagValue['text'] = '~'
+                    break
+
+            if allValues != '':
+                tagValue['text'] = allValues[:-2]
  
-            if btnStart['state'] != 'disabled':
-                btnStart['state'] = 'disabled'
-                btnStop['state'] = 'normal'
-                tbIPAddress['state'] = 'disabled'
-                if checkVar.get() == 1:
-                    sbProcessorSlot['state'] = 'disabled'
-                chbMicro800['state'] = 'disabled'
-                tbTag['state'] = 'disabled'
+        if btnStart['state'] == 'normal':
+            btnStart['state'] = 'disabled'
+            btnStop['state'] = 'normal'
+            tbIPAddress['state'] = 'disabled'
+            if checkVar.get() == 1:
+                sbProcessorSlot['state'] = 'disabled'
+            chbMicro800['state'] = 'disabled'
+            tbTag['state'] = 'disabled'
 
         root.after(500, startUpdateValue)
 
