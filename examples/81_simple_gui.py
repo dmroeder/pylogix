@@ -318,7 +318,8 @@ def getTags():
 
     commGT = PLC()
     commGT.IPAddress = selectedIPAddress.get()
-    commGT.ProcessorSlot = int(selectedProcessorSlot.get())
+    if checkVar.get() == 0:
+        commGT.ProcessorSlot = int(selectedProcessorSlot.get())
 
     tags = None
 
@@ -447,7 +448,7 @@ def startUpdateValue():
             btnStart['state'] = 'disabled'
             btnStop['state'] = 'normal'
             tbIPAddress['state'] = 'disabled'
-            if checkVar.get() == 1:
+            if checkVar.get() == 0:
                 sbProcessorSlot['state'] = 'disabled'
             chbMicro800['state'] = 'disabled'
             tbTag['state'] = 'disabled'
