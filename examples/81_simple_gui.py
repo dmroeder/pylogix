@@ -181,7 +181,7 @@ def main():
     sbProcessorSlot.place(anchor=CENTER, relx=0.5, rely=0.205)
 
     # create a label and a text box for the Tag entry
-    lblTag = Label(root, text='Tag To Read', fg='white', bg='black', font='Helvetica 8')
+    lblTag = Label(root, text='Tag(s) To Read', fg='white', bg='black', font='Helvetica 8')
     lblTag.place(anchor=CENTER, relx=0.5, rely=0.4)
     selectedTag = StringVar()
     tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, font='Helvetica 11', width=90)
@@ -264,10 +264,13 @@ def check_micro800():
 def discoverDevices():
     lbDevices.delete(0, 'end')
 
+    commDD = PLC()
+
     try:
-        devices = comm.Discover()
+        devices = commDD.Discover()
     except:
-        discoverDevices()
+        commDD.Close()
+        commDD = None
 
     if str(devices) == 'None [] Success':
         lbDevices.insert(1, 'No Devices Discovered')
@@ -301,22 +304,29 @@ def discoverDevices():
                     for j in range(17):
                         x = c.GetModuleProperties(j)
                         lbDevices.insert(i * 12 + 2 + j, "Slot " + str(j) + " " + x.Value.ProductName + " rev: " + x.Value.Revision)
+
+                c.Close()
+                c = None
+
                 i += 1
 
-def getTags():
-    global comm
+    commDD.Close()
+    commDD = None
 
+def getTags():
     lbTags.delete(0, 'end')
 
-    if not connected:
-        comm_check()
+    commGT = PLC()
+    commGT.IPAddress = selectedIPAddress.get()
+    commGT.ProcessorSlot = int(selectedProcessorSlot.get())
 
     tags = None
 
     try:
-        tags = comm.GetTagList()
+        tags = commGT.GetTagList()
     except:
-        getTags()
+        commGT.Close()
+        commGT = None
 
     if not tags is None:
         if not tags.Value is None:
@@ -331,6 +341,9 @@ def getTags():
             lbTags.insert(1, 'No Tags Retrieved')
     else:
         lbTags.insert(1, 'No Tags Retrieved')
+
+    commGT.Close()
+    commGT = None
 
 def comm_check():
     global comm
@@ -387,28 +400,43 @@ def startUpdateValue():
     if not updateRunning:
         updateRunning = True
     else:
-        if myTag != "" and connected:
+        if connected:
+            # remove all the spaces
+            displayTag = (selectedTag.get()).replace(' ', '')
+
+            if displayTag != '':
+                myTag = []
+                if ',' in displayTag:
+                    tags = displayTag.split(',')
+                    for tag in tags:
+                        if not str(tag) == '':
+                            myTag.append(str(tag))
+                else:
+                    myTag.append(displayTag)
+
             try:
                 response = comm.Read(myTag)
             except:
                 response = None
 
-            if not response == None:
-                if not response.Value is None:
-                    tagValue['text'] = response.Value
-                else:
-                    connected = False
-                    lbDevices.delete(0, 'end')
-                    lbTags.delete(0, 'end')
+            if not response is None:
+                allValues = ''
+                for tag in response:
+                    allValues += str(tag.Value) + ', '
+                tagValue['text'] = allValues[:-2]
+            else:
+                connected = False
+                lbDevices.delete(0, 'end')
+                lbTags.delete(0, 'end')
 
-                    if response.Status == 'Connection lost':
-                        lbConnectionMessage.delete(0, 'end')
-                        lbConnectionMessage.insert(1, response.Status)
-                        lbErrorMessage.delete(0, 'end')
-                        tagValue['text'] = '~'
-                    else:
-                        lbErrorMessage.delete(0, 'end')
-                        lbErrorMessage.insert(1, response.Status)
+                if response.Status == 'Connection lost':
+                    lbConnectionMessage.delete(0, 'end')
+                    lbConnectionMessage.insert(1, response.Status)
+                    lbErrorMessage.delete(0, 'end')
+                    tagValue['text'] = '~'
+                else:
+                    lbErrorMessage.delete(0, 'end')
+                    lbErrorMessage.insert(1, response.Status)
  
             if btnStart['state'] != 'disabled':
                 btnStart['state'] = 'disabled'
@@ -423,7 +451,7 @@ def startUpdateValue():
 
 def stopUpdateValue():
     global updateRunning
-   
+
     if updateRunning:
         updateRunning = False
         tagValue['text'] = '~'
