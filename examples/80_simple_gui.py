@@ -14,7 +14,11 @@ Linux distributions, so you may need to install it.
 For Ubuntu: sudo apt-get install python-tk
 '''
 from pylogix import PLC
-from Tkinter import *
+
+try:
+    from Tkinter import *
+except ImportError:
+    from tkinter import *
 
 tagName = 'Time.Second'
 ipAddress = '192.168.1.9'
