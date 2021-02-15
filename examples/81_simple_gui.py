@@ -49,9 +49,7 @@ class update_thread(threading.Thread):
       startUpdateValue()
 
 # startup default values
-myTag = 'CT_STRING'
-ipAddress = '192.168.1.24'
-processorSlot = 3
+myTag, ipAddress, processorSlot = 'CT_STRING', '192.168.1.24', 3;
 
 ver = pylogix.__version__
 
@@ -68,6 +66,7 @@ def main():
     global selectedTag
     global connected
     global updateRunning
+    global connectionInProgress
     global changePLC
     global btnStart
     global btnStop
@@ -87,8 +86,8 @@ def main():
     root.title('Pylogix GUI Test')
     root.geometry('800x600')
 
-    connected = False
-    updateRunning = True
+    connectionInProgress, connected, updateRunning = False, False, True;
+
     changePLC = IntVar()
     changePLC.set(0)
 
@@ -216,7 +215,8 @@ def main():
 
     root.mainloop()
 
-    comm.Close()
+    if not comm is None:
+        comm.Close()
 
 def start_connection():
     try:
@@ -348,14 +348,19 @@ def getTags():
 
 def comm_check():
     global comm
+    global updateRunning
     global connected
+    global connectionInProgress
 
+    connectionInProgress = True
     ip = selectedIPAddress.get()
     port = int(selectedProcessorSlot.get())
 
     if (not connected or comm.IPAddress != ip or comm.ProcessorSlot != port or changePLC.get() == 1):
-        comm.Close()
-        comm = None
+        if not comm is None:
+            comm.Close()
+            comm = None
+
         comm = PLC()
         comm.IPAddress = ip
 
@@ -379,9 +384,13 @@ def comm_check():
             root.after(5000, start_connection)
         else:
             lbConnectionMessage.insert(1, 'Connected')
+            connectionInProgress = False
+            connected = True
             if btnStop['state'] == 'disabled':
                 btnStart['state'] = 'normal'
-            connected = True
+                updateRunning = True
+            else:
+                start_update()
 
     changePLC.set(0)
 
@@ -393,67 +402,97 @@ def startUpdateValue():
     Call ourself to update the screen
     '''
 
+    # allow reading either a single tag or multiple tags separated by semicolon (';')
+    # single tag example: CT_2D_DINTArray[0,0] or CT_STRING or CT_BOOLArray[252]
+    # multi tag example: CT_DINT; CT_REAL; CT_3D_DINTArray[0,3,1]
+
+    # allow reading multiple elements of an array with the following tag format: tagName[x]{y}
+    # where 'x' is the starting array index and 'y' is the number of consecutive elements to read
+    # this has to be entered as a single tag, example: CT_DINTArray[0,1,0]{7}
+
+    readArray = False
+    arrayElementCount = 0
+
     if not connected:
-        comm_check()
-
-    if not updateRunning:
-        updateRunning = True
+        if not connectionInProgress:
+            start_connection()
     else:
-        # remove all the spaces
-        displayTag = (selectedTag.get()).replace(' ', '')
+        if not updateRunning:
+            updateRunning = True
+        else:
+            # remove all the spaces
+            displayTag = (selectedTag.get()).replace(' ', '')
 
-        if displayTag != '':
-            myTag = []
-            if ',' in displayTag:
-                tags = displayTag.split(',')
-                for tag in tags:
-                    if not str(tag) == '':
-                        myTag.append(str(tag))
-            else:
-                myTag.append(displayTag)
-
-        try:
-            response = comm.Read(myTag)
-        except:
-            response = None
-
-        if not response is None:
-            allValues = ''
-
-            for tag in response:
-                if tag.Status == 'Success':
-                    allValues += str(tag.Value) + ', '
-                elif tag.Status == 'Connection lost':
-                    connected = False
-
-                    lbConnectionMessage.delete(0, 'end')
-                    lbConnectionMessage.insert(1, tag.Status)
-                    lbErrorMessage.delete(0, 'end')
-                    allValues = ''
-                    tagValue['text'] = 'Connection lost'
-                    break
+            if displayTag != '':
+                myTag = []
+                if ';' in displayTag:
+                    tags = displayTag.split(';')
+                    for tag in tags:
+                        if not str(tag) == '':
+                            myTag.append(str(tag))
+                elif '{' in displayTag and '}' in displayTag: # array
+                    try:
+                        arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
+                        readArray = True
+                        myTag.append(displayTag[0:displayTag.index('{')])
+                    except:
+                        myTag.append(displayTag)
                 else:
-                    connected = False
+                    myTag.append(displayTag)
 
-                    lbErrorMessage.delete(0, 'end')
-                    lbErrorMessage.insert(1, tag.Status)
-                    allValues = ''
-                    tagValue['text'] = '~'
-                    break
+            try:
+                if readArray and arrayElementCount > 0:
+                    response = comm.Read(myTag[0], arrayElementCount)
+                else:
+                    response = comm.Read(myTag)
+            except:
+                response = None
 
-            if allValues != '':
-                tagValue['text'] = allValues[:-2]
+            if not response is None:
+                allValues = ''
+
+                if readArray and arrayElementCount > 0:
+                    if not response.Value is None:
+                        for val in response.Value:
+                            if val == '':
+                                allValues += '{}, '
+                            else:
+                                allValues += str(val) + ', '
+                else:
+                    for tag in response:
+                        if tag.Status == 'Success':
+                            allValues += str(tag.Value) + ', '
+                        elif tag.Status == 'Connection lost':
+                            connected = False
+
+                            lbConnectionMessage.delete(0, 'end')
+                            lbConnectionMessage.insert(1, tag.Status)
+                            lbErrorMessage.delete(0, 'end')
+                            allValues = ''
+                            tagValue['text'] = 'Connection lost'
+                            break
+                        else:
+                            connected = False
+
+                            lbErrorMessage.delete(0, 'end')
+                            lbErrorMessage.insert(1, tag.Status)
+                            allValues = ''
+                            tagValue['text'] = '~'
+                            break
+
+                if allValues != '':
+                    tagValue['text'] = allValues[:-2]
  
-        if btnStart['state'] == 'normal':
-            btnStart['state'] = 'disabled'
-            btnStop['state'] = 'normal'
-            tbIPAddress['state'] = 'disabled'
-            if checkVar.get() == 0:
-                sbProcessorSlot['state'] = 'disabled'
-            chbMicro800['state'] = 'disabled'
-            tbTag['state'] = 'disabled'
+            if btnStart['state'] == 'normal':
+                btnStart['state'] = 'disabled'
+                btnStop['state'] = 'normal'
+                tbIPAddress['state'] = 'disabled'
+                if checkVar.get() == 0:
+                    sbProcessorSlot['state'] = 'disabled'
+                chbMicro800['state'] = 'disabled'
+                tbTag['state'] = 'disabled'
 
-        root.after(500, startUpdateValue)
+            root.after(500, startUpdateValue)
 
 def stopUpdateValue():
     global updateRunning
