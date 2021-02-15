@@ -1,3 +1,11 @@
+# This example allows reading either a single tag or multiple tags separated by semicolon (';').
+# Single tag example: CT_2D_DINTArray[0,0] or CT_STRING or CT_BOOLArray[252].
+# Multi tag example: CT_DINT; CT_REAL; CT_3D_DINTArray[0,3,1].
+
+# It also allows reading multiple elements of an array with the following tag format: tagName[x]{y}
+# where 'x' is the starting array index(es) and 'y' is the number of consecutive elements to read.
+# This has to be entered as a single tag, example: CT_REALArray[0]{15} or CT_DINTArray[0,1,0]{7}
+
 '''
 the following import is only necessary because eip.py is not in this directory
 '''
@@ -49,7 +57,7 @@ class update_thread(threading.Thread):
       startUpdateValue()
 
 # startup default values
-myTag, ipAddress, processorSlot = 'CT_STRING', '192.168.1.24', 3;
+myTag, ipAddress, processorSlot = ['CT_STRING', 'CT_REAL', 'CT_DINT'], '192.168.1.24', 3;
 
 ver = pylogix.__version__
 
@@ -184,7 +192,7 @@ def main():
     lblTag.place(anchor=CENTER, relx=0.5, rely=0.4)
     selectedTag = StringVar()
     tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, font='Helvetica 11', width=90)
-    selectedTag.set(myTag)
+    selectedTag.set((str(myTag).replace(',', ';'))[1:-1].replace('\'', ''))
 
     # add the "Paste" menu on the mouse right-click
     popup_menu_tbTag = Menu(tbTag, tearoff=0)
@@ -401,14 +409,6 @@ def startUpdateValue():
     '''
     Call ourself to update the screen
     '''
-
-    # allow reading either a single tag or multiple tags separated by semicolon (';')
-    # single tag example: CT_2D_DINTArray[0,0] or CT_STRING or CT_BOOLArray[252]
-    # multi tag example: CT_DINT; CT_REAL; CT_3D_DINTArray[0,3,1]
-
-    # allow reading multiple elements of an array with the following tag format: tagName[x]{y}
-    # where 'x' is the starting array index and 'y' is the number of consecutive elements to read
-    # this has to be entered as a single tag, example: CT_DINTArray[0,1,0]{7}
 
     readArray = False
     arrayElementCount = 0
