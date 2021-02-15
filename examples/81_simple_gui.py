@@ -365,10 +365,10 @@ def comm_check():
         else:
             comm.Micro800 = True
 
+        plcTime = comm.GetPLCTime()
+
         lbConnectionMessage.delete(0, 'end')
         lbErrorMessage.delete(0, 'end')
-
-        plcTime = comm.GetPLCTime()
 
         if plcTime.Value is None:
             if btnStop['state'] == 'disabled':
@@ -376,7 +376,7 @@ def comm_check():
             lbConnectionMessage.insert(1, 'Not Connected')
             lbErrorMessage.insert(1, plcTime.Status)
             connected = False
-            root.after(5000, comm_check)
+            root.after(5000, start_connection)
         else:
             lbConnectionMessage.insert(1, 'Connected')
             if btnStop['state'] == 'disabled':
