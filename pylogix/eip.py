@@ -941,7 +941,7 @@ class PLC(object):
                         AttributeInstanceType,
                         AttributeInstance)
 
-        status, ret_data = self.conn.send(request, False, 0)
+        status, ret_data = self.conn.send(request, False, slot)
         pad = pack('<I', 0x00)
         ret_data = pad + ret_data
 

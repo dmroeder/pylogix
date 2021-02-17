@@ -1,3 +1,6 @@
+02/16/21
+  - Fixed requesting module properties only requesting slot 0
+
 02/12/21
   - Fixed reading large boolean arrays
 

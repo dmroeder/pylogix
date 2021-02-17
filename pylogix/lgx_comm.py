@@ -54,13 +54,12 @@ class Connection(object):
         """
         if connected:
             eip_header = self._buildEIPHeader(request)
-            return self._getBytes(eip_header, connected)
         else:
             path = self._unconnectedPath(slot)
-
-            frame = self._buildCIPUnconnectedSend() + request + path
+            frame = self._buildCIPUnconnectedSend(len(request)) + request + path
             eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
-            return self._getBytes(eip_header, connected)
+        
+        return self._getBytes(eip_header, connected)
 
     def close(self):
         """
@@ -401,7 +400,7 @@ class Connection(object):
                     EIPItem2Type,
                     EIPItem2Length)
 
-    def _buildCIPUnconnectedSend(self):
+    def _buildCIPUnconnectedSend(self, service_size):
         """
         build unconnected send to request tag database
         """
@@ -415,7 +414,7 @@ class Connection(object):
         CIPInstance = 0x01
         CIPPriority = 0x0A
         CIPTimeoutTicks = 0x0e
-        ServiceSize = 0x06
+        ServiceSize = service_size
 
         return pack('<BBBBBBBBH',
                     CIPService,
