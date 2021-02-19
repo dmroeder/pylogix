@@ -1,3 +1,5 @@
+# See screenshots here: https://github.com/dmroeder/pylogix/issues/156
+
 # This example allows reading either a single tag or multiple tags separated by semicolon (';').
 # Single tag example: CT_2D_DINTArray[0,0] or CT_STRING or CT_BOOLArray[252].
 # Multi tag example: CT_DINT; CT_REAL; CT_3D_DINTArray[0,3,1].
@@ -57,7 +59,7 @@ class update_thread(threading.Thread):
       startUpdateValue()
 
 # startup default values
-myTag, ipAddress, processorSlot = ['CT_STRING', 'CT_REAL', 'CT_DINT'], '192.168.1.24', 3
+myTag, ipAddress, processorSlot = ['CT_STRING', 'CT_REAL', 'CT_DINT'], '192.168.1.20', 3
 
 ver = pylogix.__version__
 
@@ -475,7 +477,8 @@ def startUpdateValue():
                     response = comm.Read(myTag[0], arrayElementCount)
                 else:
                     response = comm.Read(myTag)
-            except:
+            except Exception as e:
+                tagValue['text'] = str(e)
                 response = None
 
             if not response is None:
