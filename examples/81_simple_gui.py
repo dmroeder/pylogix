@@ -22,8 +22,8 @@ Reference: https://stackoverflow.com/questions/17843596/difference-between-tkint
 '''
 
 import threading
-import socket
 import pylogix
+import datetime
 
 from pylogix import PLC
 
@@ -57,7 +57,7 @@ class update_thread(threading.Thread):
       startUpdateValue()
 
 # startup default values
-myTag, ipAddress, processorSlot = ['CT_STRING', 'CT_REAL', 'CT_DINT'], '192.168.1.24', 3;
+myTag, ipAddress, processorSlot = ['CT_STRING', 'CT_REAL', 'CT_DINT'], '192.168.1.24', 3
 
 ver = pylogix.__version__
 
@@ -68,6 +68,8 @@ def main():
     global root
     global comm
     global checkVar
+    global checkVarSaveTags
+    global checkVarLogTagValues
     global selectedProcessorSlot
     global selectedIPAddress
     global chbMicro800
@@ -88,13 +90,14 @@ def main():
     global tagValue
     global popup_menu_tbTag
     global popup_menu_tbIPAddress
+    global popup_menu_save_tags_list
 
     root = Tk()
     root.config(background='black')
     root.title('Pylogix GUI Test')
     root.geometry('800x600')
 
-    connectionInProgress, connected, updateRunning = False, False, True;
+    connectionInProgress, connected, updateRunning = False, False, True
 
     changePLC = IntVar()
     changePLC.set(0)
@@ -147,11 +150,28 @@ def main():
     lblVersion = Label(frame2, text='pylogix v' + ver, fg='grey', bg='black', font='Helvetica 9')
     lblVersion.pack(side=LEFT, padx=3, pady=5)
 
+    # add 'Log tag values' checkbox
+    checkVarLogTagValues = IntVar()
+    chbLogTagValues = Checkbutton(frame2, text="Log tag(s) values", variable=checkVarLogTagValues)
+    checkVarLogTagValues.set(0)
+    chbLogTagValues.pack(side=LEFT, padx=95, pady=4)
+
     # add Micro800 checkbox
     checkVar = IntVar()
     chbMicro800 = Checkbutton(frame2, text="PLC is Micro800", variable=checkVar, command=check_micro800)
     checkVar.set(0)
     chbMicro800.pack(side=RIGHT, padx=5, pady=4)
+
+    # add 'Save tags' checkbox
+    checkVarSaveTags = IntVar()
+    chbSaveTags = Checkbutton(frame2, text="Save tags list", variable=checkVarSaveTags)
+    checkVarSaveTags.set(0)
+    chbSaveTags.pack(side=RIGHT, padx=80, pady=4)
+
+    # add the "Paste" menu on the mouse right-click
+    popup_menu_save_tags_list = Menu(chbSaveTags, bg='lightblue', tearoff=0)
+    popup_menu_save_tags_list.add_command(label='Click the Get Tags button to save the list')
+    chbSaveTags.bind('<Button-1>', lambda event: save_tags_list(event, chbSaveTags))
 
     # create a label to display the tag value
     tagValue = Label(root, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=52, relief=SUNKEN)
@@ -336,6 +356,15 @@ def getTags():
 
         if not tags is None:
             if not tags.Value is None:
+                # save tags to a file
+                if checkVarSaveTags.get() == 1:
+                    with open('tags_list.txt', 'w') as f:
+                        for t in tags.Value:
+                            if t.DataType == '':
+                                f.write(t.TagName + '\n')
+                            else:
+                                f.write(t.TagName + ' (DataType - ' + t.DataType + ')\n')
+
                 for t in tags.Value:
                     j = 1
                     if t.DataType == '':
@@ -405,6 +434,7 @@ def comm_check():
 def startUpdateValue():
     global updateRunning
     global connected
+    global checkVarLogTagValues
 
     '''
     Call ourself to update the screen
@@ -482,6 +512,11 @@ def startUpdateValue():
 
                 if allValues != '':
                     tagValue['text'] = allValues[:-2]
+                    if checkVarLogTagValues.get() == 1:
+                        with open('tag_values_log.txt', 'a') as log_file:
+                            strValue = str(datetime.datetime.now()) + ': ' + allValues[:-2] + '\n'
+                            log_file.write(strValue)
+
  
             if btnStart['state'] == 'normal':
                 btnStart['state'] = 'disabled'
@@ -507,6 +542,11 @@ def stopUpdateValue():
         if checkVar.get() == 0:
             sbProcessorSlot['state'] = 'normal'
         tbTag['state'] = 'normal'
+
+def save_tags_list(event, chbSaveTags):
+    if checkVarSaveTags.get() == 0:
+        popup_menu_save_tags_list.post(event.x_root, event.y_root)
+        checkVarSaveTags.set(1)
 
 def tag_copy():
     root.clipboard_clear()
