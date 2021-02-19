@@ -1,3 +1,11 @@
+# This example allows reading either a single tag or multiple tags separated by semicolon (';').
+# Single tag example: CT_2D_DINTArray[0,0] or CT_STRING or CT_BOOLArray[252].
+# Multi tag example: CT_DINT; CT_REAL; CT_3D_DINTArray[0,3,1].
+
+# It also allows reading multiple elements of an array with the following tag format: tagName[x]{y}
+# where 'x' is the starting array index(es) and 'y' is the number of consecutive elements to read.
+# This has to be entered as a single tag, example: CT_REALArray[0]{15} or CT_DINTArray[0,1,0]{7}
+
 '''
 the following import is only necessary because eip.py is not in this directory
 '''
@@ -14,8 +22,8 @@ Reference: https://stackoverflow.com/questions/17843596/difference-between-tkint
 '''
 
 import threading
-import socket
 import pylogix
+import datetime
 
 from pylogix import PLC
 
@@ -49,9 +57,7 @@ class update_thread(threading.Thread):
       startUpdateValue()
 
 # startup default values
-myTag = 'CT_STRING'
-ipAddress = '192.168.1.24'
-processorSlot = 3
+myTag, ipAddress, processorSlot = ['CT_STRING', 'CT_REAL', 'CT_DINT'], '192.168.1.24', 3
 
 ver = pylogix.__version__
 
@@ -62,12 +68,15 @@ def main():
     global root
     global comm
     global checkVar
+    global checkVarSaveTags
+    global checkVarLogTagValues
     global selectedProcessorSlot
     global selectedIPAddress
     global chbMicro800
     global selectedTag
     global connected
     global updateRunning
+    global connectionInProgress
     global changePLC
     global btnStart
     global btnStop
@@ -81,14 +90,15 @@ def main():
     global tagValue
     global popup_menu_tbTag
     global popup_menu_tbIPAddress
+    global popup_menu_save_tags_list
 
     root = Tk()
     root.config(background='black')
     root.title('Pylogix GUI Test')
     root.geometry('800x600')
 
-    connected = False
-    updateRunning = True
+    connectionInProgress, connected, updateRunning = False, False, True
+
     changePLC = IntVar()
     changePLC.set(0)
 
@@ -140,11 +150,28 @@ def main():
     lblVersion = Label(frame2, text='pylogix v' + ver, fg='grey', bg='black', font='Helvetica 9')
     lblVersion.pack(side=LEFT, padx=3, pady=5)
 
+    # add 'Log tag values' checkbox
+    checkVarLogTagValues = IntVar()
+    chbLogTagValues = Checkbutton(frame2, text="Log tag(s) values", variable=checkVarLogTagValues)
+    checkVarLogTagValues.set(0)
+    chbLogTagValues.pack(side=LEFT, padx=95, pady=4)
+
     # add Micro800 checkbox
     checkVar = IntVar()
     chbMicro800 = Checkbutton(frame2, text="PLC is Micro800", variable=checkVar, command=check_micro800)
     checkVar.set(0)
     chbMicro800.pack(side=RIGHT, padx=5, pady=4)
+
+    # add 'Save tags' checkbox
+    checkVarSaveTags = IntVar()
+    chbSaveTags = Checkbutton(frame2, text="Save tags list", variable=checkVarSaveTags)
+    checkVarSaveTags.set(0)
+    chbSaveTags.pack(side=RIGHT, padx=80, pady=4)
+
+    # add the "Paste" menu on the mouse right-click
+    popup_menu_save_tags_list = Menu(chbSaveTags, bg='lightblue', tearoff=0)
+    popup_menu_save_tags_list.add_command(label='Click the Get Tags button to save the list')
+    chbSaveTags.bind('<Button-1>', lambda event: save_tags_list(event, chbSaveTags))
 
     # create a label to display the tag value
     tagValue = Label(root, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=52, relief=SUNKEN)
@@ -185,7 +212,7 @@ def main():
     lblTag.place(anchor=CENTER, relx=0.5, rely=0.4)
     selectedTag = StringVar()
     tbTag = Entry(root, justify=CENTER, textvariable=selectedTag, font='Helvetica 11', width=90)
-    selectedTag.set(myTag)
+    selectedTag.set((str(myTag).replace(',', ';'))[1:-1].replace('\'', ''))
 
     # add the "Paste" menu on the mouse right-click
     popup_menu_tbTag = Menu(tbTag, tearoff=0)
@@ -216,7 +243,8 @@ def main():
 
     root.mainloop()
 
-    comm.Close()
+    if not comm is None:
+        comm.Close()
 
 def start_connection():
     try:
@@ -328,6 +356,15 @@ def getTags():
 
         if not tags is None:
             if not tags.Value is None:
+                # save tags to a file
+                if checkVarSaveTags.get() == 1:
+                    with open('tags_list.txt', 'w') as f:
+                        for t in tags.Value:
+                            if t.DataType == '':
+                                f.write(t.TagName + '\n')
+                            else:
+                                f.write(t.TagName + ' (DataType - ' + t.DataType + ')\n')
+
                 for t in tags.Value:
                     j = 1
                     if t.DataType == '':
@@ -348,14 +385,19 @@ def getTags():
 
 def comm_check():
     global comm
+    global updateRunning
     global connected
+    global connectionInProgress
 
+    connectionInProgress = True
     ip = selectedIPAddress.get()
     port = int(selectedProcessorSlot.get())
 
     if (not connected or comm.IPAddress != ip or comm.ProcessorSlot != port or changePLC.get() == 1):
-        comm.Close()
-        comm = None
+        if not comm is None:
+            comm.Close()
+            comm = None
+
         comm = PLC()
         comm.IPAddress = ip
 
@@ -379,81 +421,113 @@ def comm_check():
             root.after(5000, start_connection)
         else:
             lbConnectionMessage.insert(1, 'Connected')
+            connectionInProgress = False
+            connected = True
             if btnStop['state'] == 'disabled':
                 btnStart['state'] = 'normal'
-            connected = True
+                updateRunning = True
+            else:
+                start_update()
 
     changePLC.set(0)
 
 def startUpdateValue():
     global updateRunning
     global connected
+    global checkVarLogTagValues
 
     '''
     Call ourself to update the screen
     '''
 
+    readArray = False
+    arrayElementCount = 0
+
     if not connected:
-        comm_check()
-
-    if not updateRunning:
-        updateRunning = True
+        if not connectionInProgress:
+            start_connection()
     else:
-        # remove all the spaces
-        displayTag = (selectedTag.get()).replace(' ', '')
+        if not updateRunning:
+            updateRunning = True
+        else:
+            # remove all the spaces
+            displayTag = (selectedTag.get()).replace(' ', '')
 
-        if displayTag != '':
-            myTag = []
-            if ',' in displayTag:
-                tags = displayTag.split(',')
-                for tag in tags:
-                    if not str(tag) == '':
-                        myTag.append(str(tag))
-            else:
-                myTag.append(displayTag)
-
-        try:
-            response = comm.Read(myTag)
-        except:
-            response = None
-
-        if not response is None:
-            allValues = ''
-
-            for tag in response:
-                if tag.Status == 'Success':
-                    allValues += str(tag.Value) + ', '
-                elif tag.Status == 'Connection lost':
-                    connected = False
-
-                    lbConnectionMessage.delete(0, 'end')
-                    lbConnectionMessage.insert(1, tag.Status)
-                    lbErrorMessage.delete(0, 'end')
-                    allValues = ''
-                    tagValue['text'] = 'Connection lost'
-                    break
+            if displayTag != '':
+                myTag = []
+                if ';' in displayTag:
+                    tags = displayTag.split(';')
+                    for tag in tags:
+                        if not str(tag) == '':
+                            myTag.append(str(tag))
+                elif '{' in displayTag and '}' in displayTag: # array
+                    try:
+                        arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
+                        readArray = True
+                        myTag.append(displayTag[0:displayTag.index('{')])
+                    except:
+                        myTag.append(displayTag)
                 else:
-                    connected = False
+                    myTag.append(displayTag)
 
-                    lbErrorMessage.delete(0, 'end')
-                    lbErrorMessage.insert(1, tag.Status)
-                    allValues = ''
-                    tagValue['text'] = '~'
-                    break
+            try:
+                if readArray and arrayElementCount > 0:
+                    response = comm.Read(myTag[0], arrayElementCount)
+                else:
+                    response = comm.Read(myTag)
+            except:
+                response = None
 
-            if allValues != '':
-                tagValue['text'] = allValues[:-2]
+            if not response is None:
+                allValues = ''
+
+                if readArray and arrayElementCount > 0:
+                    if not response.Value is None:
+                        for val in response.Value:
+                            if val == '':
+                                allValues += '{}, '
+                            else:
+                                allValues += str(val) + ', '
+                else:
+                    for tag in response:
+                        if tag.Status == 'Success':
+                            allValues += str(tag.Value) + ', '
+                        elif tag.Status == 'Connection lost':
+                            connected = False
+
+                            lbConnectionMessage.delete(0, 'end')
+                            lbConnectionMessage.insert(1, tag.Status)
+                            lbErrorMessage.delete(0, 'end')
+                            allValues = ''
+                            tagValue['text'] = 'Connection lost'
+                            break
+                        else:
+                            connected = False
+
+                            lbErrorMessage.delete(0, 'end')
+                            lbErrorMessage.insert(1, tag.Status)
+                            allValues = ''
+                            tagValue['text'] = '~'
+                            break
+
+                if allValues != '':
+                    tagValue['text'] = allValues[:-2]
+                    if checkVarLogTagValues.get() == 1:
+                        with open('tag_values_log.txt', 'a') as log_file:
+                            strValue = str(datetime.datetime.now()) + ': ' + allValues[:-2] + '\n'
+                            log_file.write(strValue)
+
  
-        if btnStart['state'] == 'normal':
-            btnStart['state'] = 'disabled'
-            btnStop['state'] = 'normal'
-            tbIPAddress['state'] = 'disabled'
-            if checkVar.get() == 0:
-                sbProcessorSlot['state'] = 'disabled'
-            chbMicro800['state'] = 'disabled'
-            tbTag['state'] = 'disabled'
+            if btnStart['state'] == 'normal':
+                btnStart['state'] = 'disabled'
+                btnStop['state'] = 'normal'
+                tbIPAddress['state'] = 'disabled'
+                if checkVar.get() == 0:
+                    sbProcessorSlot['state'] = 'disabled'
+                chbMicro800['state'] = 'disabled'
+                tbTag['state'] = 'disabled'
 
-        root.after(500, startUpdateValue)
+            root.after(500, startUpdateValue)
 
 def stopUpdateValue():
     global updateRunning
@@ -468,6 +542,11 @@ def stopUpdateValue():
         if checkVar.get() == 0:
             sbProcessorSlot['state'] = 'normal'
         tbTag['state'] = 'normal'
+
+def save_tags_list(event, chbSaveTags):
+    if checkVarSaveTags.get() == 0:
+        popup_menu_save_tags_list.post(event.x_root, event.y_root)
+        checkVarSaveTags.set(1)
 
 def tag_copy():
     root.clipboard_clear()
