@@ -481,6 +481,8 @@ def startUpdateValue():
                     response = comm.Read(myTag)
             except Exception as e:
                 tagValue['text'] = str(e)
+                connected = False
+                start_connection()
                 response = None
 
             if not response is None:
