@@ -23,6 +23,7 @@ Tkinter vs tkinter:
 Reference: https://stackoverflow.com/questions/17843596/difference-between-tkinter-and-tkinter
 '''
 
+import platform
 import threading
 import pylogix
 import datetime
@@ -75,6 +76,7 @@ def main():
     global selectedProcessorSlot
     global selectedIPAddress
     global chbMicro800
+    global chbSaveTags
     global selectedTag
     global connected
     global updateRunning
@@ -172,7 +174,7 @@ def main():
 
     # add the "Paste" menu on the mouse right-click
     popup_menu_save_tags_list = Menu(chbSaveTags, bg='lightblue', tearoff=0)
-    popup_menu_save_tags_list.add_command(label='Click the Get Tags button to save the list')
+    popup_menu_save_tags_list.add_command(label='Click the Get Tags button to save the list', command=set_checkbox_state)
     chbSaveTags.bind('<Button-1>', lambda event: save_tags_list(event, chbSaveTags))
 
     # create a label to display the tag value
@@ -479,6 +481,8 @@ def startUpdateValue():
                     response = comm.Read(myTag)
             except Exception as e:
                 tagValue['text'] = str(e)
+                connected = False
+                start_connection()
                 response = None
 
             if not response is None:
@@ -549,7 +553,12 @@ def stopUpdateValue():
 def save_tags_list(event, chbSaveTags):
     if checkVarSaveTags.get() == 0:
         popup_menu_save_tags_list.post(event.x_root, event.y_root)
-        checkVarSaveTags.set(1)
+        # Windows users can also click outside of the popup so set the checkbox state here
+        if platform.system() == 'Windows':
+            chbSaveTags.select()
+
+def set_checkbox_state():
+    chbSaveTags.select()
 
 def tag_copy():
     root.clipboard_clear()
