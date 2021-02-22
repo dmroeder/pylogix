@@ -469,17 +469,18 @@ def comm_check():
             root.after(5000, start_connection)
         else:
             lbConnectionMessage.insert(1, 'Connected')
+
             if not updateRunning:
                 updateRunning = True
+
+            connected = True
+            connectionInProgress = False
 
             if btnStop['state'] == 'disabled':
                 btnStart['state'] = 'normal'
                 btnStart['bg'] = 'lime'
             else:
                 start_update()
-
-            connected = True
-            connectionInProgress = False
 
     changePLC.set(0)
 
