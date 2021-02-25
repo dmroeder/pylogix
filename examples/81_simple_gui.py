@@ -27,14 +27,17 @@ import platform
 import threading
 import pylogix
 import datetime
-import tkinter.font as tkfont
 
 from pylogix import PLC
 
 try:
+    # Python 2
     from Tkinter import *
+    import Tkinter.font as tkfont
 except ImportError:
+    # Python 3
     from tkinter import *
+    import tkinter.font as tkfont
 
 class device_discovery_thread(threading.Thread):
    def __init__(self):
