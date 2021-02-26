@@ -21,6 +21,10 @@ For Ubuntu: sudo apt-get install python-tk
 
 Tkinter vs tkinter:
 Reference: https://stackoverflow.com/questions/17843596/difference-between-tkinter-and-tkinter
+
+Window/widget resizing:
+Reference: https://stackoverflow.com/questions/22835289/how-to-get-tkinter-canvas-to-dynamically-resize-to-window-width
+
 '''
 
 import platform
@@ -38,6 +42,30 @@ except ImportError:
     # Python 3
     from tkinter import *
     import tkinter.font as tkfont
+
+# width wise resizing of the tag label (window)
+class LabelResizing(Label):
+    def __init__(self,parent,**kwargs):
+        Label.__init__(self,parent,**kwargs)
+        self.bind("<Configure>", self.on_resize)
+        self.width = self.winfo_width()
+
+    def on_resize(self,event):
+        if self.width > 0:
+            self.width = int((event.width/self.width) * self.width)
+            self.config(width=self.width, wraplength=self.width)
+
+# width wise resizing of the tag entry box (window)
+class EntryResizing(Entry):
+    def __init__(self,parent,**kwargs):
+        Entry.__init__(self,parent,**kwargs)
+        self.bind("<Configure>", self.on_resize)
+        self.width = self.winfo_width()
+
+    def on_resize(self,event):
+        if self.width > 0:
+            self.width = int((event.width/self.width) * self.width)
+            self.config(width=self.width)
 
 class device_discovery_thread(threading.Thread):
    def __init__(self):
@@ -215,7 +243,7 @@ def main():
     fnt = tkfont.Font(family="Helvetica", size=11, weight="normal")
     char_width = fnt.measure("0")
     selectedTag = StringVar()
-    tbTag = Entry(frame4, justify='center', textvariable=selectedTag, font='Helvetica 11', width=(int(800 / char_width) - 24))
+    tbTag = EntryResizing(frame4, justify='center', textvariable=selectedTag, font='Helvetica 11', width=(int(800 / char_width) - 24))
     selectedTag.set((str(myTag).replace(',', ';'))[1:-1].replace('\'', ''))
 
     # add the 'Paste' menu on the mouse right-click
@@ -223,7 +251,7 @@ def main():
     popup_menu_tbTag.add_command(label='Paste', command=tag_paste)
     tbTag.bind('<Button-3>', lambda event: tag_menu(event, tbTag))
 
-    tbTag.place(anchor='center', relx=0.5, rely=0.775)
+    tbTag.pack(side='left', fill=X)
 
     # add a frame to hold the label displaying the tag value
     frame5 = Frame(root, background='black')
@@ -232,7 +260,7 @@ def main():
     # create a label to display the tag value
     fnt = tkfont.Font(family="Helvetica", size=18, weight="normal")
     char_width = fnt.measure("0")
-    tagValue = Label(frame5, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=(int(800 / char_width - 4.5)), wraplength=800, relief=SUNKEN)
+    tagValue = LabelResizing(frame5, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=(int(800 / char_width - 4.5)), wraplength=800, relief=SUNKEN)
     tagValue.pack(anchor='center', pady=5)
 
     # add a frame to hold the IPAddress / Slot labels
