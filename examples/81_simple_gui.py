@@ -133,7 +133,7 @@ def main():
 
     root = Tk()
     root.config(background='black')
-    root.title('Pylogix GUI Test')
+    root.title('Pylogix GUI Test - Python v' + pythonVersion)
     root.geometry('800x600')
 
     connectionInProgress, connected, updateRunning = False, False, True
