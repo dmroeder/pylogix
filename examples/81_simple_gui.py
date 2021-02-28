@@ -37,11 +37,12 @@ from pylogix import PLC
 try:
     # Python 2
     from Tkinter import *
-    import Tkinter.font as tkfont
 except ImportError:
     # Python 3
     from tkinter import *
     import tkinter.font as tkfont
+
+pythonVersion = platform.python_version()
 
 # width wise resizing of the tag label (window)
 class LabelResizing(Label):
@@ -216,11 +217,11 @@ def main():
     frame3.pack(side='bottom', fill=X)
 
     # add a list box for connection messages
-    lbConnectionMessage = Listbox(frame3, justify='center', height=1, width=45, fg='blue', bg='lightgrey')
+    lbConnectionMessage = Listbox(frame3, height=1, width=45, fg='blue', bg='lightgrey')
     lbConnectionMessage.pack(anchor=S, side='left', padx=3, pady=3)
 
     # add a listbox for error messages
-    lbErrorMessage = Listbox(frame3, justify='center', height=1, width=45, fg='red', bg='lightgrey')
+    lbErrorMessage = Listbox(frame3, height=1, width=45, fg='red', bg='lightgrey')
     lbErrorMessage.pack(anchor=S, side='right', padx=3, pady=3)
 
     # add a frame to hold the tag label, tag entry box and the update buttons
@@ -240,8 +241,12 @@ def main():
     btnStop.pack(side='right', padx=5, pady=1)
 
     # create a text box for the Tag entry
-    fnt = tkfont.Font(family="Helvetica", size=11, weight="normal")
-    char_width = fnt.measure("0")
+    char_width = 5
+
+    if int(pythonVersion[0]) >= 3:
+        fnt = tkfont.Font(family="Helvetica", size=11, weight="normal")
+        char_width = fnt.measure("0")
+    
     selectedTag = StringVar()
     tbTag = EntryResizing(frame4, justify='center', textvariable=selectedTag, font='Helvetica 11', width=(int(800 / char_width) - 24))
     selectedTag.set((str(myTag).replace(',', ';'))[1:-1].replace('\'', ''))
@@ -258,8 +263,10 @@ def main():
     frame5.pack(fill=X)
 
     # create a label to display the tag value
-    fnt = tkfont.Font(family="Helvetica", size=18, weight="normal")
-    char_width = fnt.measure("0")
+    if int(pythonVersion[0]) >= 3:
+        fnt = tkfont.Font(family="Helvetica", size=11, weight="normal")
+        char_width = fnt.measure("0")
+    
     tagValue = LabelResizing(frame5, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=(int(800 / char_width - 4.5)), wraplength=800, relief=SUNKEN)
     tagValue.pack(anchor='center', pady=5)
 
@@ -494,12 +501,12 @@ def comm_check():
             if btnStop['state'] == 'disabled':
                 btnStart['state'] = 'disabled'
                 btnStart['bg'] = 'lightgrey'
-            lbConnectionMessage.insert(1, 'Not Connected')
-            lbErrorMessage.insert(1, plcTime.Status)
+            lbConnectionMessage.insert(1, ' Not Connected')
+            lbErrorMessage.insert(1, ' ' + plcTime.Status)
             connected = False
             root.after(5000, start_connection)
         else:
-            lbConnectionMessage.insert(1, 'Connected')
+            lbConnectionMessage.insert(1, ' Connected')
 
             if not updateRunning:
                 updateRunning = True
@@ -605,7 +612,7 @@ def startUpdateValue():
                             connected = False
 
                             lbErrorMessage.delete(0, 'end')
-                            lbErrorMessage.insert(1, tag.Status)
+                            lbErrorMessage.insert(1, ' ' + tag.Status)
                             allValues = ''
                             tagValue['text'] = '~'
                             break
