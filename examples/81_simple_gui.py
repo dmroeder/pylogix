@@ -49,11 +49,11 @@ class LabelResizing(Label):
     def __init__(self,parent,**kwargs):
         Label.__init__(self,parent,**kwargs)
         self.bind("<Configure>", self.on_resize)
-        self.width = self.winfo_width()
+        self.width = self.winfo_reqwidth()
 
     def on_resize(self,event):
         if self.width > 0:
-            self.width = int((event.width/self.width) * self.width)
+            self.width = int(event.width)
             self.config(width=self.width, wraplength=self.width)
 
 # width wise resizing of the tag entry box (window)
@@ -61,11 +61,11 @@ class EntryResizing(Entry):
     def __init__(self,parent,**kwargs):
         Entry.__init__(self,parent,**kwargs)
         self.bind("<Configure>", self.on_resize)
-        self.width = self.winfo_width()
+        self.width = self.winfo_reqwidth()
 
     def on_resize(self,event):
         if self.width > 0:
-            self.width = int((event.width/self.width) * self.width)
+            self.width = int(event.width)
             self.config(width=self.width)
 
 class device_discovery_thread(threading.Thread):
@@ -516,7 +516,7 @@ def comm_check():
 
             if btnStop['state'] == 'disabled':
                 btnStart['state'] = 'normal'
-                btnStart['bg'] = 'lime'
+                btnStart['bg'] = 'lightgreen'
             else:
                 start_update()
 
@@ -640,7 +640,7 @@ def startUpdateValue():
                 btnStart['state'] = 'disabled'
                 btnStart['bg'] = 'lightgrey'
                 btnStop['state'] = 'normal'
-                btnStop['bg'] = 'lime'
+                btnStop['bg'] = 'lightgreen'
                 tbIPAddress['state'] = 'disabled'
                 if checkVarMicro800.get() == 0:
                     sbProcessorSlot['state'] = 'disabled'
@@ -657,7 +657,7 @@ def stopUpdateValue():
         tagValue['text'] = '~'
         if not connectionInProgress:
             btnStart['state'] = 'normal'
-            btnStart['bg'] = 'lime'
+            btnStart['bg'] = 'lightgreen'
         btnStop['state'] = 'disabled'
         btnStop['bg'] = 'lightgrey'
         tbIPAddress['state'] = 'normal'
