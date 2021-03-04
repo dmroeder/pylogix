@@ -395,7 +395,7 @@ def discoverDevices():
                 lbDevices.insert(i * 12 + 6, 'Device Type: ' + str(device.DeviceType))
                 lbDevices.insert(i * 12 + 7, 'Device ID: ' + str(device.DeviceID))
                 lbDevices.insert(i * 12 + 8, 'Revision: ' +  device.Revision)
-                lbDevices.insert(i * 12 + 9, 'Serial: ' + device.SerialNumber)
+                lbDevices.insert(i * 12 + 9, 'Serial: ' + str(int(device.SerialNumber, 0)))
                 lbDevices.insert(i * 12 + 10, 'State: ' + str(device.State))
                 lbDevices.insert(i * 12 + 11, 'Status: ' + str(device.Status))
                 lbDevices.insert(i * 12 + 12, '----------------------------------')
