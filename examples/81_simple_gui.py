@@ -268,7 +268,7 @@ def main():
         char_width = fnt.measure("0")
     
     tagValue = LabelResizing(frame5, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=(int(800 / char_width - 4.5)), wraplength=800, relief=SUNKEN)
-    tagValue.pack(anchor='center', pady=5)
+    tagValue.pack(anchor='center', padx=3, pady=5)
 
     # add a frame to hold the IPAddress / Slot labels
     frameIPSlotLabels = Frame(root, background='black')
@@ -598,7 +598,18 @@ def startUpdateValue():
                 else:
                     for tag in response:
                         if tag.Status == 'Success':
-                            allValues += str(tag.Value) + ', '
+                            if tag.Value == True:
+                                if checkVarBoolDisplay.get() == 1:
+                                    allValues += '1, '
+                                else:
+                                    allValues += str(tag.Value) + ', '
+                            elif tag.Value == False:
+                                if checkVarBoolDisplay.get() == 1:
+                                    allValues += '0, '
+                                else:
+                                    allValues += str(tag.Value) + ', '
+                            else:
+                                allValues += str(tag.Value) + ', '
                         elif tag.Status == 'Connection lost':
                             connected = False
 
