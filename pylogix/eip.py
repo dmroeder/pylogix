@@ -278,6 +278,8 @@ class PLC(object):
             pad = 2
 
         status, ret_data = self.conn.send(request)
+        if not ret_data:
+            return Response(tag_name, None, status)
         data = ret_data[50:]
         self.Offset += len(data)-pad
         req = data
@@ -362,6 +364,9 @@ class PLC(object):
 
             status, ret_data = self.conn.send(request)
 
+        if len(value) == 1:
+            value = value[0]
+
         return Response(tag_name, value, status)
 
     def _batchRead(self, tags):
@@ -373,7 +378,7 @@ class PLC(object):
 
         conn = self.conn.connect()
         if not conn[0]:
-            return [Response(None, None, conn[1])]
+            return [Response(t, None, conn[1]) for t in tags]
 
         # get a list of tags we have not read yet
         unk_tags = []
@@ -471,6 +476,10 @@ class PLC(object):
         request = header + segmentCount + offsets + segments
         status, ret_data = self.conn.send(request)
 
+        # return error if no data is returned
+        if not ret_data:
+            return [Response(t, None, status) for t in tags]
+
         return self._multiReadParser(tags_effective, ret_data)
 
     def _multiWrite(self, write_data):
@@ -484,7 +493,7 @@ class PLC(object):
 
         conn = self.conn.connect()
         if not conn[0]:
-            return [Response(None, write_data, conn[1])]
+            return [Response(w[0], w[1], conn[1]) for w in write_data]
 
         for wd in write_data:
 
@@ -527,6 +536,10 @@ class PLC(object):
 
         request = header + segmentCount + offsets + segments
         status, ret_data = self.conn.send(request)
+
+        # return error if no data is returned
+        if not ret_data:
+            return [Response(w[0], w[1], status) for w in write_data]
 
         return self._multiWriteParser(write_data, ret_data)
 
