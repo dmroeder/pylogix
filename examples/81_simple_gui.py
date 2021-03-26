@@ -273,7 +273,7 @@ def main():
         fnt = tkfont.Font(family="Helvetica", size=11, weight="normal")
         char_width = fnt.measure("0")
     
-    tagValue = LabelResizing(frame5, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=(int(800 / char_width - 4.5)), wraplength=800, relief=SUNKEN)
+    tagValue = LabelResizing(frame5, text='~', justify='left', fg='yellow', bg='navy', font='Helvetica 18', width=(int(800 / char_width - 4.5)), wraplength=800, relief=SUNKEN)
     tagValue.pack(anchor='center', padx=3, pady=5)
 
     # add a frame to hold the IPAddress / Slot labels
@@ -603,7 +603,7 @@ def startUpdateValue():
 
                         if not response[0].Value is None:
                             for i in range(0, len(response)):
-                                allValues += response[i].TagName + ' ~ '
+                                allValues += response[i].TagName + ' : '
 
                                 if (checkVarBoolDisplay.get() == 1) and (str(response[i].Value) == 'True' or str(response[i].Value) == 'False'):
                                     allValues += '1, ' if str(response[i].Value) == 'True' else '0, '
@@ -620,7 +620,7 @@ def startUpdateValue():
                             response = comm.Read(tg, arrayTags[tg])
 
                             if not response.Value is None:
-                                allValues += response.TagName + ' ~ '
+                                allValues += response.TagName + ' : '
 
                                 if (checkVarBoolDisplay.get() == 1) and (str(response.Value[0]) == 'True' or str(response.Value[0]) == 'False'):
                                     newBoolArray = []
