@@ -591,6 +591,8 @@ def startUpdateValue():
 
                         if not response[0].Value is None:
                             for i in range(0, len(response)):
+                                allValues += response[i].TagName + ' ~ '
+
                                 if (checkVarBoolDisplay.get() == 1) and (str(response[i].Value) == 'True' or str(response[i].Value) == 'False'):
                                     allValues += '1, ' if str(response[i].Value) == 'True' else '0, '
                                 else:
@@ -599,11 +601,15 @@ def startUpdateValue():
                                     else:
                                         allValues += str(response[i].Value) + ', '
 
+                                allValues += '\n'
+
                     if len(arrayTags) > 0:
                         for tg in arrayTags:
                             response = comm.Read(tg, arrayTags[tg])
 
                             if not response.Value is None:
+                                allValues += response.TagName + ' ~ '
+
                                 if (checkVarBoolDisplay.get() == 1) and (str(response.Value[0]) == 'True' or str(response.Value[0]) == 'False'):
                                     newBoolArray = []
                                     for val in range(0, len(response.Value)):
@@ -612,6 +618,8 @@ def startUpdateValue():
                                     allValues += str(newBoolArray) + ', '
                                 else:
                                     allValues += str(response.Value) + ', '
+
+                                allValues += '\n'
                 except Exception as e:
                     tagValue['text'] = str(e)
                     connected = False
