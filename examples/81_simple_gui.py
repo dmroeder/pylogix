@@ -127,16 +127,22 @@ def main():
     global sbProcessorSlot
     global tbTag
     global tagValue
+    global tagsSet
     global popup_menu_tbTag
     global popup_menu_tbIPAddress
     global popup_menu_save_tags_list
+    global regularTags
+    global arrayTags
 
     root = Tk()
     root.config(background='black')
     root.title('Pylogix GUI Test - Python v' + pythonVersion)
     root.geometry('800x600')
 
-    connectionInProgress, connected, updateRunning = False, False, True
+    connectionInProgress, connected, updateRunning, tagsSet = False, False, True, False
+
+    regularTags = []
+    arrayTags = dict()
 
     changePLC = IntVar()
     changePLC.set(0)
@@ -528,6 +534,9 @@ def startUpdateValue():
     global connected
     global checkVarLogTagValues
     global headerAdded
+    global tagsSet
+    global regularTags
+    global arrayTags
 
     '''
     Call ourself to update the screen
@@ -548,42 +557,45 @@ def startUpdateValue():
             allValues = ''
 
             if displayTag != '':
-                regularTags = []
-                arrayTags = dict()
+                if not tagsSet:
+                    regularTags = []
+                    arrayTags = dict()
 
-                if ';' in displayTag:
-                    tags = displayTag.split(';')
-                    for tag in tags:
-                        t = str(tag)
+                    if ';' in displayTag:
+                        tags = displayTag.split(';')
+                        for tag in tags:
+                            t = str(tag)
 
-                        if not t == '':
-                            if t.endswith('}') and '{' in t: # 1 or 2 or 3 dimensional array tag
-                                try:
-                                    arrayElementCount = int(t[t.index('{') + 1:t.index('}')])
+                            if not t == '':
+                                if t.endswith('}') and '{' in t: # 1 or 2 or 3 dimensional array tag
+                                    try:
+                                        arrayElementCount = int(t[t.index('{') + 1:t.index('}')])
 
-                                    if arrayElementCount < 2:
+                                        if arrayElementCount < 2:
+                                            regularTags.append(t[:t.index('{')])
+                                        else:
+                                            readArray = True
+                                            t = t[:t.index('{')]
+                                            arrayTags.update( {t : arrayElementCount} )
+                                    except:
                                         regularTags.append(t[:t.index('{')])
-                                    else:
-                                        readArray = True
-                                        t = t[:t.index('{')]
-                                        arrayTags.update( {t : arrayElementCount} )
-                                except:
-                                    regularTags.append(t[:t.index('{')])
-                            else:
-                                regularTags.append(t)
-                elif displayTag.endswith('}') and '{' in displayTag: # 1 or 2 or 3 dimensional array tag
-                    try:
-                        arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
+                                else:
+                                    regularTags.append(t)
+                    elif displayTag.endswith('}') and '{' in displayTag: # 1 or 2 or 3 dimensional array tag
+                        try:
+                            arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
 
-                        if arrayElementCount < 2:
+                            if arrayElementCount < 2:
+                                regularTags.append(displayTag[:displayTag.index('{')])
+                            else:
+                                readArray = True
+                                arrayTags.update( {displayTag[:displayTag.index('{')] : arrayElementCount} )
+                        except:
                             regularTags.append(displayTag[:displayTag.index('{')])
-                        else:
-                            readArray = True
-                            arrayTags.update( {displayTag[:displayTag.index('{')] : arrayElementCount} )
-                    except:
-                        regularTags.append(displayTag[:displayTag.index('{')])
-                else:
-                    regularTags.append(displayTag)
+                    else:
+                        regularTags.append(displayTag)
+
+                    tagsSet = True
 
                 try:
                     if len(regularTags) > 0:
@@ -674,6 +686,7 @@ def setWidgetState():
 
 def stopUpdateValue():
     global updateRunning
+    global tagsSet
 
     if updateRunning:
         updateRunning = False
@@ -688,6 +701,7 @@ def stopUpdateValue():
         if checkVarMicro800.get() == 0:
             sbProcessorSlot['state'] = 'normal'
         tbTag['state'] = 'normal'
+        tagsSet = False
 
 def save_tags_list(event, chbSaveTags):
     if checkVarSaveTags.get() == 0:
