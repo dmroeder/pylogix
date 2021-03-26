@@ -574,8 +574,12 @@ def startUpdateValue():
                 elif displayTag.endswith('}') and '{' in displayTag: # 1 or 2 or 3 dimensional array tag
                     try:
                         arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
-                        readArray = True
-                        arrayTags.update( {displayTag[:displayTag.index('{')] : arrayElementCount} )
+
+                        if arrayElementCount <= 0:
+                            regularTags.append(displayTag[:displayTag.index('{')])
+                        else:
+                            readArray = True
+                            arrayTags.update( {displayTag[:displayTag.index('{')] : arrayElementCount} )
                     except:
                         regularTags.append(displayTag[:displayTag.index('{')])
                 else:
