@@ -127,12 +127,14 @@ def main():
     global sbProcessorSlot
     global tbTag
     global tagValue
-    global tagsSet
     global popup_menu_tbTag
     global popup_menu_tbIPAddress
     global popup_menu_save_tags_list
     global regularTags
     global arrayTags
+    global tagsSet
+    global logHeader
+    global logValues
 
     root = Tk()
     root.config(background='black')
@@ -143,6 +145,8 @@ def main():
 
     regularTags = []
     arrayTags = dict()
+
+    logHeader, logValues = '', ''
 
     changePLC = IntVar()
     changePLC.set(0)
@@ -537,12 +541,13 @@ def startUpdateValue():
     global tagsSet
     global regularTags
     global arrayTags
+    global logHeader
+    global logValues
 
     '''
     Call ourself to update the screen
     '''
 
-    readArray = False
     arrayElementCount = 0
 
     if not connected:
@@ -574,7 +579,6 @@ def startUpdateValue():
                                         if arrayElementCount < 2:
                                             regularTags.append(t[:t.index('{')])
                                         else:
-                                            readArray = True
                                             t = t[:t.index('{')]
                                             arrayTags.update( {t : arrayElementCount} )
                                     except:
@@ -593,11 +597,25 @@ def startUpdateValue():
                         except:
                             regularTags.append(displayTag[:displayTag.index('{')])
                     else:
+                        if checkVarLogTagValues.get() == 1:
+                            logHeader += t + ', '
+
                         regularTags.append(displayTag)
+
+                    if checkVarLogTagValues.get() == 1:
+                        if len(regularTags) > 0:
+                            for i in range(0, len(regularTags)):
+                                logHeader += regularTags[i] + ', '
+
+                        if len(arrayTags) > 0:
+                            for key in arrayTags:
+                                logHeader += key + ', '
 
                     tagsSet = True
 
                 try:
+                    logValues = ''
+
                     if len(regularTags) > 0:
                         response = comm.Read(regularTags)
 
@@ -606,11 +624,20 @@ def startUpdateValue():
                                 allValues += response[i].TagName + ' : '
 
                                 if (checkVarBoolDisplay.get() == 1) and (str(response[i].Value) == 'True' or str(response[i].Value) == 'False'):
+                                    if checkVarLogTagValues.get() == 1:
+                                        logValues += '1, ' if str(response[i].Value) == 'True' else '0, '
+
                                     allValues += '1, ' if str(response[i].Value) == 'True' else '0, '
                                 else:
                                     if str(response[i].Value) == '':
+                                        if checkVarLogTagValues.get() == 1:
+                                            logValues += '{}, '
+
                                         allValues += '{}, '
                                     else:
+                                        if checkVarLogTagValues.get() == 1:
+                                            logValues += str(response[i].Value) + ', '
+
                                         allValues += str(response[i].Value) + ', '
 
                                 allValues += '\n'
@@ -627,8 +654,14 @@ def startUpdateValue():
                                     for val in range(0, len(response.Value)):
                                         newBoolArray.append(1 if str(response.Value[val]) == 'True' else 0)
 
+                                    if checkVarLogTagValues.get() == 1:
+                                        logValues += str(newBoolArray).replace(',', ';') + ', '
+
                                     allValues += str(newBoolArray) + ', '
                                 else:
+                                    if checkVarLogTagValues.get() == 1:
+                                        logValues += str(response.Value).replace(',', ';') + ', '
+
                                     allValues += str(response.Value) + ', '
 
                                 allValues += '\n'
@@ -641,21 +674,15 @@ def startUpdateValue():
                     return
 
                 if allValues != '':
-                    tagValue['text'] = allValues[:-2]
+                    tagValue['text'] = allValues[:-3]
                     if checkVarLogTagValues.get() == 1:
                         with open('tag_values_log.txt', 'a') as log_file:
                             if headerAdded:
-                                strValue = str(datetime.datetime.now()) + ', ' + allValues[:-2] + '\n'
+                                strValue = str(datetime.datetime.now()).replace(' ', '/') + ', ' + logValues[:-2] + '\n'
                                 log_file.write(strValue)
                             else:
-                                tags = ((selectedTag.get()).replace(' ', '')).split(';')
-                                allTags = ''
-
-                                for tag in tags:
-                                    allTags += tag + ', '
-
                                 # add header with 'Date / Time' and all the tags being read
-                                header = 'Date / Time, ' + allTags[:-2] + '\n'
+                                header = 'Date / Time, ' + logHeader[:-2] + '\n'
                                 log_file.write(header)
                                 headerAdded = True
                 else:
