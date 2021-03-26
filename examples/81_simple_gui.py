@@ -597,9 +597,6 @@ def startUpdateValue():
                         except:
                             regularTags.append(displayTag[:displayTag.index('{')])
                     else:
-                        if checkVarLogTagValues.get() == 1:
-                            logHeader += t + ', '
-
                         regularTags.append(displayTag)
 
                     if checkVarLogTagValues.get() == 1:
