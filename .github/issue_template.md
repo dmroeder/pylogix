@@ -1,7 +1,7 @@
 ### Preflight checks
 
-- [ ] Have you tried the examples?
-- [ ] Have you tried [pylogix-tester](https://github.com/kodaman2/pylogix-tester)?
+- [ ] Have you tried the [examples](https://github.com/dmroeder/pylogix/tree/master/examples)?
+- [ ] Have you tried [pylogix-tester](https://github.com/TheFern2/pylogix-tester)?
 - [ ] Have you read previous issues?
 
 ## Type of issue
