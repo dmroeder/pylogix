@@ -6,7 +6,7 @@
 
 # It also allows reading multiple elements of an array with the following tag format: tagName[startIndex]{elementCount}
 # where 'startIndex' is the starting array index (x or x,y or x,y,z) and 'elementCount' is the number of consecutive elements to read.
-# This has to be entered as a single tag, example: CT_REALArray[0]{15} or CT_DINTArray[0,1,0]{7}
+# Example: CT_REALArray[0]{15} or CT_DINTArray[0,1,0]{7}
 
 '''
 the following import is only necessary because eip.py is not in this directory
@@ -93,7 +93,7 @@ class update_thread(threading.Thread):
       startUpdateValue()
 
 # startup default values
-myTag, ipAddress, processorSlot = ['CT_STRING', 'CT_REAL', 'CT_DINT'], '192.168.1.20', 3
+myTag, ipAddress, processorSlot = ['CT_STRING', 'CT_REAL', 'CT_DINT', 'CT_DINT.2{7}'], '192.168.1.15', 3
 headerAdded = False
 
 ver = pylogix.__version__
@@ -127,16 +127,22 @@ def main():
     global sbProcessorSlot
     global tbTag
     global tagValue
+    global tagsSet
     global popup_menu_tbTag
     global popup_menu_tbIPAddress
     global popup_menu_save_tags_list
+    global regularTags
+    global arrayTags
 
     root = Tk()
     root.config(background='black')
     root.title('Pylogix GUI Test - Python v' + pythonVersion)
     root.geometry('800x600')
 
-    connectionInProgress, connected, updateRunning = False, False, True
+    connectionInProgress, connected, updateRunning, tagsSet = False, False, True, False
+
+    regularTags = []
+    arrayTags = dict()
 
     changePLC = IntVar()
     changePLC.set(0)
@@ -191,7 +197,7 @@ def main():
 
     # add 'Log tag values' checkbox
     checkVarLogTagValues = IntVar()
-    chbLogTagValues = Checkbutton(frame2, text='Log tag(s) values', variable=checkVarLogTagValues)
+    chbLogTagValues = Checkbutton(frame2, text='Log tags values', variable=checkVarLogTagValues)
     checkVarLogTagValues.set(0)
     chbLogTagValues.pack(side='left', padx=95, pady=4)
 
@@ -229,7 +235,7 @@ def main():
     frame4.pack(fill=X)
 
     # create a label for the Tag entry
-    lblTag = Label(frame4, text='Tag(s) To Read', fg='white', bg='black', font='Helvetica 8')
+    lblTag = Label(frame4, text='Tags To Read (separate with semicolon)', fg='white', bg='black', font='Helvetica 8')
     lblTag.pack(anchor='center', pady=10)
 
     # add button to start updating tag value
@@ -243,7 +249,7 @@ def main():
     # create a text box for the Tag entry
     char_width = 5
 
-    if int(pythonVersion[0]) >= 3:
+    if int(pythonVersion[0]) > 2:
         fnt = tkfont.Font(family="Helvetica", size=11, weight="normal")
         char_width = fnt.measure("0")
     
@@ -263,11 +269,11 @@ def main():
     frame5.pack(fill=X)
 
     # create a label to display the tag value
-    if int(pythonVersion[0]) >= 3:
+    if int(pythonVersion[0]) > 2:
         fnt = tkfont.Font(family="Helvetica", size=11, weight="normal")
         char_width = fnt.measure("0")
     
-    tagValue = LabelResizing(frame5, text='~', fg='yellow', bg='navy', font='Helvetica 18', width=(int(800 / char_width - 4.5)), wraplength=800, relief=SUNKEN)
+    tagValue = LabelResizing(frame5, text='~', justify='left', fg='yellow', bg='navy', font='Helvetica 18', width=(int(800 / char_width - 4.5)), wraplength=800, relief=SUNKEN)
     tagValue.pack(anchor='center', padx=3, pady=5)
 
     # add a frame to hold the IPAddress / Slot labels
@@ -523,10 +529,14 @@ def comm_check():
     changePLC.set(0)
 
 def startUpdateValue():
+    global comm
     global updateRunning
     global connected
     global checkVarLogTagValues
     global headerAdded
+    global tagsSet
+    global regularTags
+    global arrayTags
 
     '''
     Call ourself to update the screen
@@ -544,89 +554,91 @@ def startUpdateValue():
         else:
             # remove all the spaces
             displayTag = (selectedTag.get()).replace(' ', '')
+            allValues = ''
 
             if displayTag != '':
-                myTag = []
-                if ';' in displayTag:
-                    tags = displayTag.split(';')
-                    for tag in tags:
-                        if not str(tag) == '':
-                            myTag.append(str(tag))
-                elif '{' in displayTag and '}' in displayTag: # array
-                    try:
-                        arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
-                        readArray = True
-                        myTag.append(displayTag[0:displayTag.index('{')])
-                    except:
-                        myTag.append(displayTag)
-                else:
-                    myTag.append(displayTag)
+                if not tagsSet:
+                    regularTags = []
+                    arrayTags = dict()
 
-            try:
-                if readArray and arrayElementCount > 0:
-                    response = comm.Read(myTag[0], arrayElementCount)
-                else:
-                    response = comm.Read(myTag)
-            except Exception as e:
-                tagValue['text'] = str(e)
-                connected = False
-                response = None
-                start_connection()
-                return
+                    if ';' in displayTag:
+                        tags = displayTag.split(';')
+                        for tag in tags:
+                            t = str(tag)
 
-            if not response is None:
-                allValues = ''
+                            if not t == '':
+                                if t.endswith('}') and '{' in t: # 1 or 2 or 3 dimensional array tag
+                                    try:
+                                        arrayElementCount = int(t[t.index('{') + 1:t.index('}')])
 
-                if readArray and arrayElementCount > 0:
-                    if not response.Value is None:
-                        for val in response.Value:
-                            if checkVarBoolDisplay.get() == 1:
-                                if val == True:
-                                    allValues += '1, '
-                                elif val == False:
-                                    allValues += '0, '
+                                        if arrayElementCount < 2:
+                                            regularTags.append(t[:t.index('{')])
+                                        else:
+                                            readArray = True
+                                            t = t[:t.index('{')]
+                                            arrayTags.update( {t : arrayElementCount} )
+                                    except:
+                                        regularTags.append(t[:t.index('{')])
                                 else:
-                                    if val == '':
+                                    regularTags.append(t)
+                    elif displayTag.endswith('}') and '{' in displayTag: # 1 or 2 or 3 dimensional array tag
+                        try:
+                            arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
+
+                            if arrayElementCount < 2:
+                                regularTags.append(displayTag[:displayTag.index('{')])
+                            else:
+                                readArray = True
+                                arrayTags.update( {displayTag[:displayTag.index('{')] : arrayElementCount} )
+                        except:
+                            regularTags.append(displayTag[:displayTag.index('{')])
+                    else:
+                        regularTags.append(displayTag)
+
+                    tagsSet = True
+
+                try:
+                    if len(regularTags) > 0:
+                        response = comm.Read(regularTags)
+
+                        if not response[0].Value is None:
+                            for i in range(0, len(response)):
+                                allValues += response[i].TagName + ' : '
+
+                                if (checkVarBoolDisplay.get() == 1) and (str(response[i].Value) == 'True' or str(response[i].Value) == 'False'):
+                                    allValues += '1, ' if str(response[i].Value) == 'True' else '0, '
+                                else:
+                                    if str(response[i].Value) == '':
                                         allValues += '{}, '
                                     else:
-                                        allValues += str(val) + ', '
-                            else:
-                                if val == '':
-                                    allValues += '{}, '
-                                else:
-                                    allValues += str(val) + ', '
-                else:
-                    for tag in response:
-                        if tag.Status == 'Success':
-                            if tag.Value == True:
-                                if checkVarBoolDisplay.get() == 1:
-                                    allValues += '1, '
-                                else:
-                                    allValues += str(tag.Value) + ', '
-                            elif tag.Value == False:
-                                if checkVarBoolDisplay.get() == 1:
-                                    allValues += '0, '
-                                else:
-                                    allValues += str(tag.Value) + ', '
-                            else:
-                                allValues += str(tag.Value) + ', '
-                        elif tag.Status == 'Connection lost':
-                            connected = False
+                                        allValues += str(response[i].Value) + ', '
 
-                            lbConnectionMessage.delete(0, 'end')
-                            lbConnectionMessage.insert(1, tag.Status)
-                            lbErrorMessage.delete(0, 'end')
-                            allValues = ''
-                            tagValue['text'] = 'Connection lost'
-                            break
-                        else:
-                            connected = False
+                                allValues += '\n'
 
-                            lbErrorMessage.delete(0, 'end')
-                            lbErrorMessage.insert(1, ' ' + tag.Status)
-                            allValues = ''
-                            tagValue['text'] = '~'
-                            break
+                    if len(arrayTags) > 0:
+                        for tg in arrayTags:
+                            response = comm.Read(tg, arrayTags[tg])
+
+                            if not response.Value is None:
+                                allValues += response.TagName + ' : '
+
+                                if (checkVarBoolDisplay.get() == 1) and (str(response.Value[0]) == 'True' or str(response.Value[0]) == 'False'):
+                                    newBoolArray = []
+                                    for val in range(0, len(response.Value)):
+                                        newBoolArray.append(1 if str(response.Value[val]) == 'True' else 0)
+
+                                    allValues += str(newBoolArray) + ', '
+                                else:
+                                    allValues += str(response.Value) + ', '
+
+                                allValues += '\n'
+                except Exception as e:
+                    tagValue['text'] = str(e)
+                    connected = False
+                    response = None
+                    setWidgetState()
+                    start_connection()
+                    return
 
                 if allValues != '':
                     tagValue['text'] = allValues[:-2]
@@ -646,22 +658,35 @@ def startUpdateValue():
                                 header = 'Date / Time, ' + allTags[:-2] + '\n'
                                 log_file.write(header)
                                 headerAdded = True
- 
-            if btnStart['state'] == 'normal':
-                btnStart['state'] = 'disabled'
-                btnStart['bg'] = 'lightgrey'
-                btnStop['state'] = 'normal'
-                btnStop['bg'] = 'lightgreen'
-                tbIPAddress['state'] = 'disabled'
-                if checkVarMicro800.get() == 0:
-                    sbProcessorSlot['state'] = 'disabled'
-                chbMicro800['state'] = 'disabled'
-                tbTag['state'] = 'disabled'
+                else:
+                    plcTime = comm.GetPLCTime()
+                    if plcTime.Value is None:
+                        tagValue['text'] = 'Connection Lost'
+                        if not connectionInProgress:
+                            connected = False
+                            start_connection()
+                    else:
+                        tagValue['text'] = 'Check Tag(s)'
+
+            setWidgetState()
 
             root.after(500, startUpdateValue)
 
+def setWidgetState():
+    if btnStart['state'] == 'normal':
+        btnStart['state'] = 'disabled'
+        btnStart['bg'] = 'lightgrey'
+        btnStop['state'] = 'normal'
+        btnStop['bg'] = 'lightgreen'
+        tbIPAddress['state'] = 'disabled'
+        if checkVarMicro800.get() == 0:
+            sbProcessorSlot['state'] = 'disabled'
+        chbMicro800['state'] = 'disabled'
+        tbTag['state'] = 'disabled'
+
 def stopUpdateValue():
     global updateRunning
+    global tagsSet
 
     if updateRunning:
         updateRunning = False
@@ -676,6 +701,7 @@ def stopUpdateValue():
         if checkVarMicro800.get() == 0:
             sbProcessorSlot['state'] = 'normal'
         tbTag['state'] = 'normal'
+        tagsSet = False
 
 def save_tags_list(event, chbSaveTags):
     if checkVarSaveTags.get() == 0:
