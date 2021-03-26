@@ -561,7 +561,7 @@ def startUpdateValue():
                                 try:
                                     arrayElementCount = int(t[t.index('{') + 1:t.index('}')])
 
-                                    if arrayElementCount <= 0:
+                                    if arrayElementCount < 2:
                                         regularTags.append(t[:t.index('{')])
                                     else:
                                         readArray = True
@@ -575,7 +575,7 @@ def startUpdateValue():
                     try:
                         arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
 
-                        if arrayElementCount <= 0:
+                        if arrayElementCount < 2:
                             regularTags.append(displayTag[:displayTag.index('{')])
                         else:
                             readArray = True
