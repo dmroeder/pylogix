@@ -606,7 +606,7 @@ def startUpdateValue():
 
                         if len(arrayTags) > 0:
                             for key in arrayTags:
-                                logHeader += key + ', '
+                                logHeader += key + '{' + str(arrayTags[key]) + '}, '
 
                     tagsSet = True
 
