@@ -27,6 +27,7 @@ Reference: https://stackoverflow.com/questions/22835289/how-to-get-tkinter-canva
 
 '''
 
+import os.path
 import platform
 import threading
 import pylogix
@@ -565,6 +566,7 @@ def startUpdateValue():
                 if not tagsSet:
                     regularTags = []
                     arrayTags = dict()
+                    logHeader = ''
 
                     if ';' in displayTag:
                         tags = displayTag.split(';')
@@ -599,14 +601,13 @@ def startUpdateValue():
                     else:
                         regularTags.append(displayTag)
 
-                    if checkVarLogTagValues.get() == 1:
-                        if len(regularTags) > 0:
-                            for i in range(0, len(regularTags)):
-                                logHeader += regularTags[i] + ', '
+                    if len(regularTags) > 0:
+                        for i in range(0, len(regularTags)):
+                            logHeader += regularTags[i] + ', '
 
-                        if len(arrayTags) > 0:
-                            for key in arrayTags:
-                                logHeader += key + '{' + str(arrayTags[key]) + '}, '
+                    if len(arrayTags) > 0:
+                        for key in arrayTags:
+                            logHeader += key + '{' + str(arrayTags[key]) + '}, '
 
                     tagsSet = True
 
@@ -673,6 +674,9 @@ def startUpdateValue():
                 if allValues != '':
                     tagValue['text'] = allValues[:-3]
                     if checkVarLogTagValues.get() == 1:
+                        if not os.path.exists('tag_values_log.txt'):
+                            headerAdded = False
+
                         with open('tag_values_log.txt', 'a') as log_file:
                             if headerAdded:
                                 strValue = str(datetime.datetime.now()).replace(' ', '/') + ', ' + logValues[:-2] + '\n'
