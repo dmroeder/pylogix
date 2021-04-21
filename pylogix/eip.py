@@ -660,6 +660,7 @@ class PLC(object):
                     else:
                         return Response(None, None, status)
 
+        self.TagList = tags
         return Response(None, tags, status)
 
     def _getProgramTagList(self, programName):

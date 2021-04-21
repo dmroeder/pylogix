@@ -1,3 +1,6 @@
+04/21/21
+  - Save tag list in TagList
+
 03/05/21
   - Fixed crashing when reading/writing and connection is lost
 
