@@ -14,45 +14,49 @@ There are currently no dependencies so you can get going quickly without having 
 
 Install pylogix with pip (Latest version):
 
-```
-pip install pylogix
+```console
+pylogix@pylogix-kde:~$ pip install pylogix
 ```
 
 To install previous version before major changes (0.3.7):
 
-```
-pip install pylogix==0.3.7
+```console
+pylogix@pylogix-kde:~$ pip install pylogix==0.3.7
 ```
 
 To upgrade to the latest version:
 
-```
-pip install pylogix --upgrade
+```console
+pylogix@pylogix-kde:~$ pip install pylogix --upgrade
 ```
 
 Alternatively, you can clone the repo and manually install it:
 
-```
-git clone https://github.com/dmroeder/pylogix.git
-cd pylogix
-python setup.py install --user
+```console
+pylogix@pylogix-kde:~$ git clone https://github.com/dmroeder/pylogix.git
+pylogix@pylogix-kde:~$ cd pylogix
+pylogix@pylogix-kde:~/pylogix$ python setup.py install --user
 ```
 
 ### Verifying Installation
 
 To verify the installation on Linux, open the terminal and use the following commands:
 
-```
-python
-import pylogix
-pylogix.__version__
+```console
+pylogix@pylogix-kde:~$ python3
+Python 3.8.5 (default, Jan 27 2021, 15:41:15) 
+[GCC 9.3.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import pylogix
+>>> pylogix.__version__
+'0.7.10'
 ```
 
 ### Your First Script:
 
 The cloned repository will come with many examples, I'll give one here.  We'll read one simple tag and print out the value.  All methods will return the Response class, which contains TagName, Value and Status.
 
-```
+```python
 from pylogix import PLC
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
@@ -81,13 +85,9 @@ comm.ConnectionSize = 508
 
 ### Other Features
 
-Pylogix has features other than simply reading/writing.  You can see all of them in the examples, I'll also list them here
+Pylogix has features other than simply reading/writing.  See the [documentation](docs/) for more info, see the examples directory
+simple use cases for the various methods.
 
-* Discover()
-* GetPLCTime()
-* SetPLCTime()
-* GetTagList()
-* GetModuleProperties(slot=0)
 
 ## Authors
 * **Burt Peterson** - *Initial work*
