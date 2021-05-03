@@ -517,10 +517,12 @@ class PLC(object):
                 value = self._makeString(wd[1])
             else:
                 value = int(wd[1])
+
             if BitofWord(tag_name) or data_type == 0xd3:
                 write_service = self._add_mod_write_service(tag_name, ioi, [value], data_type)
             else:
                 write_service = self._add_write_service(ioi, [value], data_type)
+
             serviceSegments.append(write_service)
 
         header = self._buildMultiServiceHeader()
