@@ -85,7 +85,7 @@ comm.ConnectionSize = 508
 
 ### Other Features
 
-Pylogix has features other than simply reading/writing.  See the [documentation](docs/) for more info, see the examples directory
+Pylogix has features other than simply reading/writing.  See the [documentation](docs/Documentation.md) for more info, see the examples directory
 simple use cases for the various methods.
 
 
