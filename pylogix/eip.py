@@ -115,7 +115,7 @@ class PLC(object):
         """
         if isinstance(tag, (list, tuple)):
             if len(tag) == 1:
-                return self._writeTag(*tag[0])
+                return [self._writeTag(*tag[0])]
             else:
                 return self._multiWrite(tag)
         else:
