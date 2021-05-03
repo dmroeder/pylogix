@@ -114,7 +114,10 @@ class PLC(object):
         returns Response class (.TagName, .Value, .Status)
         """
         if isinstance(tag, (list, tuple)):
-            return self._multiWrite(tag)
+            if len(tag) == 1:
+                return self._writeTag(*tag[0])
+            else:
+                return self._multiWrite(tag)
         else:
             if value == None:
                 raise TypeError('You must provide a value to write')
@@ -306,7 +309,7 @@ class PLC(object):
 
         return Response(tag_name, value, status)
 
-    def _writeTag(self, tag_name, value, data_type):
+    def _writeTag(self, tag_name, value, data_type=None):
         """
         Processes the write request
         """
