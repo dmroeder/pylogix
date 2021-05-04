@@ -137,11 +137,15 @@ def main():
     global tagsSet
     global logHeader
     global logValues
+    global app_closing
 
     root = Tk()
     root.config(background='black')
     root.title('Pylogix GUI Test - Python v' + pythonVersion)
     root.geometry('800x600')
+    root.bind('<Destroy>', on_exit)
+
+    app_closing = False
 
     connectionInProgress, connected, updateRunning, tagsSet = False, False, True, False
 
@@ -347,13 +351,18 @@ def main():
     except:
         pass
 
+def on_exit(*args):
+    global app_closing
+
+    app_closing = True
+
 def start_connection():
     try:
         thread1 = connection_thread()
         thread1.setDaemon(True)
         thread1.start()
     except Exception as e:
-        print('unable to start thread1 - connection_thread, ' + str(e))
+        print('unable to start connection_thread, ' + str(e))
 
 def start_discover_devices():
     try:
@@ -361,7 +370,7 @@ def start_discover_devices():
         thread2.setDaemon(True)
         thread2.start()
     except Exception as e:
-        print('unable to start thread2 - device_discovery_thread, ' + str(e))
+        print('unable to start device_discovery_thread, ' + str(e))
 
 def start_get_tags():
     try:
@@ -369,7 +378,7 @@ def start_get_tags():
         thread3.setDaemon(True)
         thread3.start()
     except Exception as e:
-        print('unable to start thread3 - get_tags_thread, ' + str(e))
+        print('unable to start get_tags_thread, ' + str(e))
 
 def start_update():
     try:
@@ -377,7 +386,7 @@ def start_update():
         thread4.setDaemon(True)
         thread4.start()
     except Exception as e:
-        print('unable to start thread4 - update_thread, ' + str(e))
+        print('unable to start update_thread, ' + str(e))
 
 def check_micro800():
     if checkVarMicro800.get() == 1:
@@ -438,10 +447,15 @@ def discoverDevices():
 
         commDD.Close()
         commDD = None
-    except:
-        if not comDD is None:
+    except Exception as e:
+        if not commDD is None:
             commDD.Close()
             commDD = None
+
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def getTags():
     try:
@@ -479,10 +493,15 @@ def getTags():
 
         commGT.Close()
         commGT = None
-    except:
+    except Exception as e:
         if not commGT is None:
             commGT.Close()
             commGT = None
+
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def comm_check():
     global comm
@@ -537,8 +556,11 @@ def comm_check():
                     start_update()
 
         changePLC.set(0)
-    except:
-        pass
+    except Exception as e:
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def startUpdateValue():
     global comm
@@ -707,8 +729,11 @@ def startUpdateValue():
                 setWidgetState()
 
                 root.after(500, startUpdateValue)
-    except:
-        pass
+    except Exception as e:
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def setWidgetState():
     try:
@@ -722,8 +747,11 @@ def setWidgetState():
                 sbProcessorSlot['state'] = 'disabled'
             chbMicro800['state'] = 'disabled'
             tbTag['state'] = 'disabled'
-    except:
-        pass
+    except Exception as e:
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def stopUpdateValue():
     global updateRunning
@@ -744,8 +772,11 @@ def stopUpdateValue():
                 sbProcessorSlot['state'] = 'normal'
             tbTag['state'] = 'normal'
             tagsSet = False
-    except:
-        pass
+    except Exception as e:
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def save_tags_list(event, chbSaveTags):
     if checkVarSaveTags.get() == 0:
