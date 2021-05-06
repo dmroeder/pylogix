@@ -516,7 +516,8 @@ class PLC(object):
             elif data_type == 0xa0 or data_type == 0xda:
                 value = self._makeString(wd[1])
             else:
-                value = int(wd[1])
+                typ = type(wd[1])
+                value = typ(wd[1])
 
             if BitofWord(tag_name) or data_type == 0xd3:
                 write_service = self._add_mod_write_service(tag_name, ioi, [value], data_type)
