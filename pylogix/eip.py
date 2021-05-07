@@ -383,30 +383,8 @@ class PLC(object):
         if not conn[0]:
             return [Response(t, None, conn[1]) for t in tags]
 
-        # get a list of tags we have not read yet
-        unk_tags = []
-        for t in tags:
-            if isinstance(t, (list, tuple)):
-                tag_name, base_tag, index = parse_tag_name(t[0])
-                self.KnownTags[base_tag] = (t[1], 0)
-            else:
-                tag_name, base_tag, index = parse_tag_name(t)
-            if base_tag not in self.KnownTags:
-                unk_tags.append(t)
-
-        # get the unknown tags
-        result = []
-        while len(result) < len(unk_tags):
-            if len(result) == len(unk_tags)-1:
-                tag = unk_tags[len(result):][0]
-                if isinstance(tag, (list, tuple)):
-                    data_type = tag[1]
-                else:
-                    data_type = None
-                tag_name, base_tag, index = parse_tag_name(tag)
-                result.append(self._initial_read(tag, base_tag, data_type))
-            else:
-                result.extend(self._multi_read(unk_tags[len(result):], True))
+        # get data types of unknown tags
+        self._get_unknown_types(tags)
 
         result = []
         while len(result) < len(tags):
@@ -498,10 +476,24 @@ class PLC(object):
         if not conn[0]:
             return [Response(w[0], w[1], conn[1]) for w in write_data]
 
+        # reduce our write data to just the tag name or a tuple
+        # of tag name and data type
+        tags = []
+        for w in write_data:
+            if isinstance(w,(list, tuple)):
+                if len(w) == 3:
+                    tags.append((w[0], w[2]))
+                else:
+                    tags.append(w[0])
+            else:
+                tags.append(w)
+
+        # get the data types of unknown tags
+        self._get_unknown_types(tags)
+
         for wd in write_data:
 
             tag_name, base_tag, index = parse_tag_name(wd[0])
-            resp = self._initial_read(tag_name, base_tag, None)
 
             if base_tag in self.KnownTags.keys():
                 data_type = self.KnownTags[base_tag][0]
@@ -1320,6 +1312,34 @@ class PLC(object):
             counter += 1
 
         return vals
+
+    def _get_unknown_types(self, tags):
+        """
+        Retrieve the data types of tags we have not read yet
+        """
+        unk_tags = []
+        for t in tags:
+            if isinstance(t, (list, tuple)):
+                tag_name, base_tag, index = parse_tag_name(t[0])
+                self.KnownTags[base_tag] = (t[1], 0)
+            else:
+                tag_name, base_tag, index = parse_tag_name(t)
+            if base_tag not in self.KnownTags:
+                unk_tags.append(t)
+
+        # get the unknown tags
+        result = []
+        while len(result) < len(unk_tags):
+            if len(result) == len(unk_tags)-1:
+                tag = unk_tags[len(result):][0]
+                if isinstance(tag, (list, tuple)):
+                    data_type = tag[1]
+                else:
+                    data_type = None
+                tag_name, base_tag, index = parse_tag_name(tag)
+                result.append(self._initial_read(tag, base_tag, data_type))
+            else:
+                result.extend(self._multi_read(unk_tags[len(result):], True))
 
     def _initial_read(self, tag, base_tag, data_type):
         """
