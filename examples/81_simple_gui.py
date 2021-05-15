@@ -9,6 +9,11 @@
 # Example: CT_REALArray[0]{15} or CT_DINTArray[0,1,0]{7}
 # Multi tag example: CT_DINT; CT_DINT.0{5}; CT_REAL; CT_3D_DINTArray[0,3,1]; CT_DINTArray[0,1,0]{7}.
 
+# Enabling logging will log values of the current tags
+# Enabling logging will force bool/bit values to always be logged as True/False for uniformity of the log file
+# Changing tags when logging is enabled will always overwrite the log file (save it manually if needed)
+# Not changing tags when logging is enabled allows to Stop/Start updating of the values and continue appending them 
+
 '''
 the following import is only necessary because eip.py is not in this directory
 '''
@@ -114,6 +119,8 @@ def main():
     global selectedProcessorSlot
     global chbMicro800
     global chbSaveTags
+    global chbLogTagValues
+    global chbBoolDisplay
     global selectedTag
     global connected
     global updateRunning
@@ -135,8 +142,7 @@ def main():
     global regularTags
     global arrayTags
     global tagsSet
-    global logHeader
-    global logValues
+    global previousLogHeader
     global app_closing
 
     root = Tk()
@@ -147,12 +153,13 @@ def main():
 
     app_closing = False
 
-    connectionInProgress, connected, updateRunning, tagsSet = False, False, True, False
+    connectionInProgress, connected, updateRunning = False, False, True
 
     regularTags = []
     arrayTags = dict()
 
-    logHeader, logValues = '', ''
+    previousLogHeader = ''
+    tagsSet = False
 
     changePLC = IntVar()
     changePLC.set(0)
@@ -207,7 +214,7 @@ def main():
 
     # add 'Log tag values' checkbox
     checkVarLogTagValues = IntVar()
-    chbLogTagValues = Checkbutton(frame2, text='Log tags values', variable=checkVarLogTagValues)
+    chbLogTagValues = Checkbutton(frame2, text='Log tags values', variable=checkVarLogTagValues, command=setBoolDisplayForLogging)
     checkVarLogTagValues.set(0)
     chbLogTagValues.pack(side='left', padx=95, pady=4)
 
@@ -399,6 +406,15 @@ def check_micro800():
     lbTags.delete(0, 'end')
     start_connection()
 
+def setBoolDisplayForLogging():
+    global checkVarBoolDisplay
+
+    if checkVarLogTagValues.get() == 1: # force logging bool/bit values as True/False for uniformity
+        checkVarBoolDisplay.set(0)
+        chbBoolDisplay['state'] = 'disabled'
+    else:
+        chbBoolDisplay['state'] = 'normal'
+
 def discoverDevices():
     try:
         lbDevices.delete(0, 'end')
@@ -567,18 +583,18 @@ def startUpdateValue():
     global updateRunning
     global connected
     global checkVarLogTagValues
+    global previousLogHeader
     global headerAdded
-    global tagsSet
     global regularTags
     global arrayTags
-    global logHeader
-    global logValues
+    global tagsSet
 
     '''
     Call ourself to update the screen
     '''
 
     try:
+        tagsChanged = False
         arrayElementCount = 0
 
         if not connected:
@@ -591,12 +607,15 @@ def startUpdateValue():
                 # remove all the spaces
                 displayTag = (selectedTag.get()).replace(' ', '')
                 allValues = ''
+                logHeader = ''
+                logValues = ''
 
                 if displayTag != '':
+                    chbLogTagValues['state'] = 'disabled'
+
                     if not tagsSet:
                         regularTags = []
                         arrayTags = dict()
-                        logHeader = ''
 
                         if ';' in displayTag:
                             tags = displayTag.split(';')
@@ -640,10 +659,10 @@ def startUpdateValue():
                                 logHeader += key + '{' + str(arrayTags[key]) + '}, '
 
                         tagsSet = True
+                        if previousLogHeader != logHeader:
+                            tagsChanged = True
 
                     try:
-                        logValues = ''
-
                         if len(regularTags) > 0:
                             response = comm.Read(regularTags)
 
@@ -704,14 +723,16 @@ def startUpdateValue():
                     if allValues != '':
                         tagValue['text'] = allValues[:-1]
                         if checkVarLogTagValues.get() == 1:
-                            if not os.path.exists('tag_values_log.txt'):
+                            if not os.path.exists('tag_values_log.txt') or tagsChanged:
                                 headerAdded = False
 
-                            with open('tag_values_log.txt', 'a') as log_file:
-                                if headerAdded:
+                            if headerAdded:
+                                with open('tag_values_log.txt', 'a') as log_file:
                                     strValue = str(datetime.datetime.now()).replace(' ', '/') + ', ' + logValues[:-2] + '\n'
                                     log_file.write(strValue)
-                                else:
+                            else:
+                                with open('tag_values_log.txt', 'w') as log_file:
+                                    previousLogHeader = logHeader
                                     # add header with 'Date / Time' and all the tags being read
                                     header = 'Date / Time, ' + logHeader[:-2] + '\n'
                                     log_file.write(header)
@@ -761,6 +782,7 @@ def stopUpdateValue():
         if updateRunning:
             updateRunning = False
             tagValue['text'] = '~'
+            chbLogTagValues['state'] = 'normal'
             if not connectionInProgress:
                 btnStart['state'] = 'normal'
                 btnStart['bg'] = 'lightgreen'
