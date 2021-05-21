@@ -7,6 +7,12 @@
 # It also allows reading multiple elements of an array with the following tag format: tagName[startIndex]{elementCount}
 # where 'startIndex' is the starting array index (x or x,y or x,y,z) and 'elementCount' is the number of consecutive elements to read.
 # Example: CT_REALArray[0]{15} or CT_DINTArray[0,1,0]{7}
+# Multi tag example: CT_DINT; CT_DINT.0{5}; CT_REAL; CT_3D_DINTArray[0,3,1]; CT_DINTArray[0,1,0]{7}.
+
+# Enabling logging will log values of the current tags
+# Enabling logging will force bool/bit values to always be logged as True/False for uniformity of the log file
+# Changing tags when logging is enabled will always overwrite the log file (save it manually if needed)
+# Not changing tags when logging is enabled allows to Stop/Start updating of the values and continue appending them 
 
 '''
 the following import is only necessary because eip.py is not in this directory
@@ -30,8 +36,8 @@ Reference: https://stackoverflow.com/questions/22835289/how-to-get-tkinter-canva
 import os.path
 import platform
 import threading
-import pylogix
 import datetime
+import pylogix
 
 from pylogix import PLC
 
@@ -113,6 +119,8 @@ def main():
     global selectedProcessorSlot
     global chbMicro800
     global chbSaveTags
+    global chbLogTagValues
+    global chbBoolDisplay
     global selectedTag
     global connected
     global updateRunning
@@ -134,20 +142,24 @@ def main():
     global regularTags
     global arrayTags
     global tagsSet
-    global logHeader
-    global logValues
+    global previousLogHeader
+    global app_closing
 
     root = Tk()
     root.config(background='black')
     root.title('Pylogix GUI Test - Python v' + pythonVersion)
     root.geometry('800x600')
+    root.bind('<Destroy>', on_exit)
 
-    connectionInProgress, connected, updateRunning, tagsSet = False, False, True, False
+    app_closing = False
+
+    connectionInProgress, connected, updateRunning = False, False, True
 
     regularTags = []
     arrayTags = dict()
 
-    logHeader, logValues = '', ''
+    previousLogHeader = ''
+    tagsSet = False
 
     changePLC = IntVar()
     changePLC.set(0)
@@ -202,7 +214,7 @@ def main():
 
     # add 'Log tag values' checkbox
     checkVarLogTagValues = IntVar()
-    chbLogTagValues = Checkbutton(frame2, text='Log tags values', variable=checkVarLogTagValues)
+    chbLogTagValues = Checkbutton(frame2, text='Log tags values', variable=checkVarLogTagValues, command=setBoolDisplayForLogging)
     checkVarLogTagValues.set(0)
     chbLogTagValues.pack(side='left', padx=95, pady=4)
 
@@ -332,15 +344,24 @@ def main():
     # set the minimum window size to the current size
     root.update()
     root.minsize(root.winfo_width(), root.winfo_height())
-    
+
     comm = None
 
     start_connection()
 
     root.mainloop()
 
-    if not comm is None:
-        comm.Close()
+    try:
+        if not comm is None:
+            comm.Close()
+            comm = None
+    except:
+        pass
+
+def on_exit(*args):
+    global app_closing
+
+    app_closing = True
 
 def start_connection():
     try:
@@ -348,7 +369,7 @@ def start_connection():
         thread1.setDaemon(True)
         thread1.start()
     except Exception as e:
-        print('unable to start thread1 - connection_thread, ' + str(e))
+        print('unable to start connection_thread, ' + str(e))
 
 def start_discover_devices():
     try:
@@ -356,7 +377,7 @@ def start_discover_devices():
         thread2.setDaemon(True)
         thread2.start()
     except Exception as e:
-        print('unable to start thread2 - device_discovery_thread, ' + str(e))
+        print('unable to start device_discovery_thread, ' + str(e))
 
 def start_get_tags():
     try:
@@ -364,7 +385,7 @@ def start_get_tags():
         thread3.setDaemon(True)
         thread3.start()
     except Exception as e:
-        print('unable to start thread3 - get_tags_thread, ' + str(e))
+        print('unable to start get_tags_thread, ' + str(e))
 
 def start_update():
     try:
@@ -372,7 +393,7 @@ def start_update():
         thread4.setDaemon(True)
         thread4.start()
     except Exception as e:
-        print('unable to start thread4 - update_thread, ' + str(e))
+        print('unable to start update_thread, ' + str(e))
 
 def check_micro800():
     if checkVarMicro800.get() == 1:
@@ -385,12 +406,21 @@ def check_micro800():
     lbTags.delete(0, 'end')
     start_connection()
 
+def setBoolDisplayForLogging():
+    global checkVarBoolDisplay
+
+    if checkVarLogTagValues.get() == 1: # force logging bool/bit values as True/False for uniformity
+        checkVarBoolDisplay.set(0)
+        chbBoolDisplay['state'] = 'disabled'
+    else:
+        chbBoolDisplay['state'] = 'normal'
+
 def discoverDevices():
-    lbDevices.delete(0, 'end')
-
-    commDD = PLC()
-
     try:
+        lbDevices.delete(0, 'end')
+
+        commDD = PLC()
+
         devices = commDD.Discover()
 
         if str(devices) == 'None [] Success':
@@ -433,21 +463,25 @@ def discoverDevices():
 
         commDD.Close()
         commDD = None
-    except:
-        commDD.Close()
-        commDD = None
+    except Exception as e:
+        if not commDD is None:
+            commDD.Close()
+            commDD = None
+
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def getTags():
-    lbTags.delete(0, 'end')
-
-    commGT = PLC()
-    commGT.IPAddress = selectedIPAddress.get()
-    if checkVarMicro800.get() == 0:
-        commGT.ProcessorSlot = int(selectedProcessorSlot.get())
-
-    tags = None
-
     try:
+        lbTags.delete(0, 'end')
+
+        commGT = PLC()
+        commGT.IPAddress = selectedIPAddress.get()
+        if checkVarMicro800.get() == 0:
+            commGT.ProcessorSlot = int(selectedProcessorSlot.get())
+
         tags = commGT.GetTagList()
 
         if not tags is None:
@@ -475,9 +509,15 @@ def getTags():
 
         commGT.Close()
         commGT = None
-    except:
-        commGT.Close()
-        commGT = None
+    except Exception as e:
+        if not commGT is None:
+            commGT.Close()
+            commGT = None
+
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def comm_check():
     global comm
@@ -485,251 +525,280 @@ def comm_check():
     global connected
     global connectionInProgress
 
-    connectionInProgress = True
-    ip = selectedIPAddress.get()
-    port = int(selectedProcessorSlot.get())
+    try:
+        connectionInProgress = True
+        ip = selectedIPAddress.get()
+        port = int(selectedProcessorSlot.get())
 
-    if (not connected or comm.IPAddress != ip or comm.ProcessorSlot != port or changePLC.get() == 1):
-        if not comm is None:
-            comm.Close()
-            comm = None
+        if (not connected or comm.IPAddress != ip or comm.ProcessorSlot != port or changePLC.get() == 1):
+            if not comm is None:
+                comm.Close()
+                comm = None
 
-        comm = PLC()
-        comm.IPAddress = ip
+            comm = PLC()
+            comm.IPAddress = ip
 
-        if checkVarMicro800.get() == 0:
-            comm.ProcessorSlot = port
-            comm.Micro800 = False
-        else:
-            comm.Micro800 = True
-
-        plcTime = comm.GetPLCTime()
-
-        lbConnectionMessage.delete(0, 'end')
-        lbErrorMessage.delete(0, 'end')
-
-        if plcTime.Value is None:
-            if btnStop['state'] == 'disabled':
-                btnStart['state'] = 'disabled'
-                btnStart['bg'] = 'lightgrey'
-            lbConnectionMessage.insert(1, ' Not Connected')
-            lbErrorMessage.insert(1, ' ' + plcTime.Status)
-            connected = False
-            root.after(5000, start_connection)
-        else:
-            lbConnectionMessage.insert(1, ' Connected')
-
-            if not updateRunning:
-                updateRunning = True
-
-            connected = True
-            connectionInProgress = False
-
-            if btnStop['state'] == 'disabled':
-                btnStart['state'] = 'normal'
-                btnStart['bg'] = 'lightgreen'
+            if checkVarMicro800.get() == 0:
+                comm.ProcessorSlot = port
+                comm.Micro800 = False
             else:
-                start_update()
+                comm.Micro800 = True
 
-    changePLC.set(0)
+            plcTime = comm.GetPLCTime()
+
+            lbConnectionMessage.delete(0, 'end')
+            lbErrorMessage.delete(0, 'end')
+
+            if plcTime.Value is None:
+                if btnStop['state'] == 'disabled':
+                    btnStart['state'] = 'disabled'
+                    btnStart['bg'] = 'lightgrey'
+                lbConnectionMessage.insert(1, ' Not Connected')
+                lbErrorMessage.insert(1, ' ' + plcTime.Status)
+                connected = False
+                root.after(5000, start_connection)
+            else:
+                lbConnectionMessage.insert(1, ' Connected')
+                if not updateRunning:
+                    updateRunning = True
+
+                connected = True
+                connectionInProgress = False
+
+                if btnStop['state'] == 'disabled':
+                    btnStart['state'] = 'normal'
+                    btnStart['bg'] = 'lightgreen'
+                else:
+                    start_update()
+
+        changePLC.set(0)
+    except Exception as e:
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def startUpdateValue():
     global comm
     global updateRunning
     global connected
     global checkVarLogTagValues
+    global previousLogHeader
     global headerAdded
-    global tagsSet
     global regularTags
     global arrayTags
-    global logHeader
-    global logValues
+    global tagsSet
 
     '''
     Call ourself to update the screen
     '''
 
-    arrayElementCount = 0
+    try:
+        tagsChanged = False
+        arrayElementCount = 0
 
-    if not connected:
-        if not connectionInProgress:
-            start_connection()
-    else:
-        if not updateRunning:
-            updateRunning = True
+        if not connected:
+            if not connectionInProgress:
+                start_connection()
         else:
-            # remove all the spaces
-            displayTag = (selectedTag.get()).replace(' ', '')
-            allValues = ''
+            if not updateRunning:
+                updateRunning = True
+            else:
+                # remove all the spaces
+                displayTag = (selectedTag.get()).replace(' ', '')
+                allValues = ''
+                logHeader = ''
+                logValues = ''
 
-            if displayTag != '':
-                if not tagsSet:
-                    regularTags = []
-                    arrayTags = dict()
-                    logHeader = ''
+                if displayTag != '':
+                    chbLogTagValues['state'] = 'disabled'
 
-                    if ';' in displayTag:
-                        tags = displayTag.split(';')
-                        for tag in tags:
-                            t = str(tag)
+                    if not tagsSet:
+                        regularTags = []
+                        arrayTags = dict()
 
-                            if not t == '':
-                                if t.endswith('}') and '{' in t: # 1 or 2 or 3 dimensional array tag
-                                    try:
-                                        arrayElementCount = int(t[t.index('{') + 1:t.index('}')])
+                        if ';' in displayTag:
+                            tags = displayTag.split(';')
+                            for tag in tags:
+                                t = str(tag)
 
-                                        if arrayElementCount < 2:
+                                if not t == '':
+                                    if t.endswith('}') and '{' in t: # 1 or 2 or 3 dimensional array tag
+                                        try:
+                                            arrayElementCount = int(t[t.index('{') + 1:t.index('}')])
+
+                                            if arrayElementCount < 2:
+                                                regularTags.append(t[:t.index('{')])
+                                            else:
+                                                t = t[:t.index('{')]
+                                                arrayTags.update( {t : arrayElementCount} )
+                                        except:
                                             regularTags.append(t[:t.index('{')])
-                                        else:
-                                            t = t[:t.index('{')]
-                                            arrayTags.update( {t : arrayElementCount} )
-                                    except:
-                                        regularTags.append(t[:t.index('{')])
-                                else:
-                                    regularTags.append(t)
-                    elif displayTag.endswith('}') and '{' in displayTag: # 1 or 2 or 3 dimensional array tag
-                        try:
-                            arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
+                                    else:
+                                        regularTags.append(t)
+                        elif displayTag.endswith('}') and '{' in displayTag: # 1 or 2 or 3 dimensional array tag
+                            try:
+                                arrayElementCount = int(displayTag[displayTag.index('{') + 1:displayTag.index('}')])
 
-                            if arrayElementCount < 2:
+                                if arrayElementCount < 2:
+                                    regularTags.append(displayTag[:displayTag.index('{')])
+                                else:
+                                    readArray = True
+                                    arrayTags.update( {displayTag[:displayTag.index('{')] : arrayElementCount} )
+                            except:
                                 regularTags.append(displayTag[:displayTag.index('{')])
-                            else:
-                                readArray = True
-                                arrayTags.update( {displayTag[:displayTag.index('{')] : arrayElementCount} )
-                        except:
-                            regularTags.append(displayTag[:displayTag.index('{')])
-                    else:
-                        regularTags.append(displayTag)
+                        else:
+                            regularTags.append(displayTag)
 
-                    if len(regularTags) > 0:
-                        for i in range(0, len(regularTags)):
-                            logHeader += regularTags[i] + ', '
+                        if len(regularTags) > 0:
+                            for i in range(0, len(regularTags)):
+                                logHeader += regularTags[i] + ', '
 
-                    if len(arrayTags) > 0:
-                        for key in arrayTags:
-                            logHeader += key + '{' + str(arrayTags[key]) + '}, '
+                        if len(arrayTags) > 0:
+                            for key in arrayTags:
+                                logHeader += key + '{' + str(arrayTags[key]) + '}, '
 
-                    tagsSet = True
+                        tagsSet = True
+                        if previousLogHeader != logHeader:
+                            tagsChanged = True
 
-                try:
-                    logValues = ''
+                    try:
+                        if len(regularTags) > 0:
+                            response = comm.Read(regularTags)
 
-                    if len(regularTags) > 0:
-                        response = comm.Read(regularTags)
+                            if not response[0].Value is None:
+                                for i in range(0, len(response)):
+                                    allValues += response[i].TagName + ' : '
 
-                        if not response[0].Value is None:
-                            for i in range(0, len(response)):
-                                allValues += response[i].TagName + ' : '
-
-                                if (checkVarBoolDisplay.get() == 1) and (str(response[i].Value) == 'True' or str(response[i].Value) == 'False'):
-                                    if checkVarLogTagValues.get() == 1:
-                                        logValues += '1, ' if str(response[i].Value) == 'True' else '0, '
-
-                                    allValues += '1, ' if str(response[i].Value) == 'True' else '0, '
-                                else:
-                                    if str(response[i].Value) == '':
+                                    if (checkVarBoolDisplay.get() == 1) and (str(response[i].Value) == 'True' or str(response[i].Value) == 'False'):
                                         if checkVarLogTagValues.get() == 1:
-                                            logValues += '{}, '
+                                            logValues += '1, ' if str(response[i].Value) == 'True' else '0, '
 
-                                        allValues += '{}, '
+                                        allValues += '1, ' if str(response[i].Value) == 'True' else '0, '
+                                    else:
+                                        if str(response[i].Value) == '':
+                                            if checkVarLogTagValues.get() == 1:
+                                                logValues += '{}, '
+
+                                            allValues += '{}, '
+                                        else:
+                                            if checkVarLogTagValues.get() == 1:
+                                                logValues += str(response[i].Value) + ', '
+
+                                            allValues += str(response[i].Value)
+
+                                    allValues += '\n'
+
+                        if len(arrayTags) > 0:
+                            for tg in arrayTags:
+                                response = comm.Read(tg, arrayTags[tg])
+
+                                if not response.Value is None:
+                                    allValues += response.TagName + '{' + str(arrayTags[tg]) + '} : '
+
+                                    if (checkVarBoolDisplay.get() == 1) and (str(response.Value[0]) == 'True' or str(response.Value[0]) == 'False'):
+                                        newBoolArray = []
+                                        for val in range(0, len(response.Value)):
+                                            newBoolArray.append(1 if str(response.Value[val]) == 'True' else 0)
+
+                                        if checkVarLogTagValues.get() == 1:
+                                            logValues += str(newBoolArray).replace(',', ';') + ', '
+
+                                        allValues += str(newBoolArray)
                                     else:
                                         if checkVarLogTagValues.get() == 1:
-                                            logValues += str(response[i].Value) + ', '
+                                            logValues += str(response.Value).replace(',', ';') + ', '
 
-                                        allValues += str(response[i].Value) + ', '
+                                        allValues += str(response.Value)
 
-                                allValues += '\n'
+                                    allValues += '\n'
+                    except Exception as e:
+                        tagValue['text'] = str(e)
+                        connected = False
+                        response = None
+                        setWidgetState()
+                        start_connection()
+                        return
 
-                    if len(arrayTags) > 0:
-                        for tg in arrayTags:
-                            response = comm.Read(tg, arrayTags[tg])
+                    if allValues != '':
+                        tagValue['text'] = allValues[:-1]
+                        if checkVarLogTagValues.get() == 1:
+                            if not os.path.exists('tag_values_log.txt') or tagsChanged:
+                                headerAdded = False
 
-                            if not response.Value is None:
-                                allValues += response.TagName + ' : '
-
-                                if (checkVarBoolDisplay.get() == 1) and (str(response.Value[0]) == 'True' or str(response.Value[0]) == 'False'):
-                                    newBoolArray = []
-                                    for val in range(0, len(response.Value)):
-                                        newBoolArray.append(1 if str(response.Value[val]) == 'True' else 0)
-
-                                    if checkVarLogTagValues.get() == 1:
-                                        logValues += str(newBoolArray).replace(',', ';') + ', '
-
-                                    allValues += str(newBoolArray) + ', '
-                                else:
-                                    if checkVarLogTagValues.get() == 1:
-                                        logValues += str(response.Value).replace(',', ';') + ', '
-
-                                    allValues += str(response.Value) + ', '
-
-                                allValues += '\n'
-                except Exception as e:
-                    tagValue['text'] = str(e)
-                    connected = False
-                    response = None
-                    setWidgetState()
-                    start_connection()
-                    return
-
-                if allValues != '':
-                    tagValue['text'] = allValues[:-3]
-                    if checkVarLogTagValues.get() == 1:
-                        if not os.path.exists('tag_values_log.txt'):
-                            headerAdded = False
-
-                        with open('tag_values_log.txt', 'a') as log_file:
                             if headerAdded:
-                                strValue = str(datetime.datetime.now()).replace(' ', '/') + ', ' + logValues[:-2] + '\n'
-                                log_file.write(strValue)
+                                with open('tag_values_log.txt', 'a') as log_file:
+                                    strValue = str(datetime.datetime.now()).replace(' ', '/') + ', ' + logValues[:-2] + '\n'
+                                    log_file.write(strValue)
                             else:
-                                # add header with 'Date / Time' and all the tags being read
-                                header = 'Date / Time, ' + logHeader[:-2] + '\n'
-                                log_file.write(header)
-                                headerAdded = True
-                else:
-                    plcTime = comm.GetPLCTime()
-                    if plcTime.Value is None:
-                        tagValue['text'] = 'Connection Lost'
-                        if not connectionInProgress:
-                            connected = False
-                            start_connection()
+                                with open('tag_values_log.txt', 'w') as log_file:
+                                    previousLogHeader = logHeader
+                                    # add header with 'Date / Time' and all the tags being read
+                                    header = 'Date / Time, ' + logHeader[:-2] + '\n'
+                                    log_file.write(header)
+                                    headerAdded = True
                     else:
-                        tagValue['text'] = 'Check Tag(s)'
+                        plcTime = comm.GetPLCTime()
+                        if plcTime.Value is None:
+                            tagValue['text'] = 'Connection Lost'
+                            if not connectionInProgress:
+                                connected = False
+                                start_connection()
+                        else:
+                            tagValue['text'] = 'Check Tag(s)'
 
-            setWidgetState()
+                setWidgetState()
 
-            root.after(500, startUpdateValue)
+                root.after(500, startUpdateValue)
+    except Exception as e:
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def setWidgetState():
-    if btnStart['state'] == 'normal':
-        btnStart['state'] = 'disabled'
-        btnStart['bg'] = 'lightgrey'
-        btnStop['state'] = 'normal'
-        btnStop['bg'] = 'lightgreen'
-        tbIPAddress['state'] = 'disabled'
-        if checkVarMicro800.get() == 0:
-            sbProcessorSlot['state'] = 'disabled'
-        chbMicro800['state'] = 'disabled'
-        tbTag['state'] = 'disabled'
+    try:
+        if btnStart['state'] == 'normal':
+            btnStart['state'] = 'disabled'
+            btnStart['bg'] = 'lightgrey'
+            btnStop['state'] = 'normal'
+            btnStop['bg'] = 'lightgreen'
+            tbIPAddress['state'] = 'disabled'
+            if checkVarMicro800.get() == 0:
+                sbProcessorSlot['state'] = 'disabled'
+            chbMicro800['state'] = 'disabled'
+            tbTag['state'] = 'disabled'
+    except Exception as e:
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def stopUpdateValue():
     global updateRunning
     global tagsSet
 
-    if updateRunning:
-        updateRunning = False
-        tagValue['text'] = '~'
-        if not connectionInProgress:
-            btnStart['state'] = 'normal'
-            btnStart['bg'] = 'lightgreen'
-        btnStop['state'] = 'disabled'
-        btnStop['bg'] = 'lightgrey'
-        tbIPAddress['state'] = 'normal'
-        chbMicro800['state'] = 'normal'
-        if checkVarMicro800.get() == 0:
-            sbProcessorSlot['state'] = 'normal'
-        tbTag['state'] = 'normal'
-        tagsSet = False
+    try:
+        if updateRunning:
+            updateRunning = False
+            tagValue['text'] = '~'
+            chbLogTagValues['state'] = 'normal'
+            if not connectionInProgress:
+                btnStart['state'] = 'normal'
+                btnStart['bg'] = 'lightgreen'
+            btnStop['state'] = 'disabled'
+            btnStop['bg'] = 'lightgrey'
+            tbIPAddress['state'] = 'normal'
+            chbMicro800['state'] = 'normal'
+            if checkVarMicro800.get() == 0:
+                sbProcessorSlot['state'] = 'normal'
+            tbTag['state'] = 'normal'
+            tagsSet = False
+    except Exception as e:
+        if app_closing:
+            pass
+        else:
+            print(str(e))
 
 def save_tags_list(event, chbSaveTags):
     if checkVarSaveTags.get() == 0:
