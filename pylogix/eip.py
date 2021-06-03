@@ -511,10 +511,16 @@ class PLC(object):
                 typ = type(wd[1])
                 value = typ(wd[1])
 
-            if BitofWord(tag_name) or data_type == 0xd3:
-                write_service = self._add_mod_write_service(tag_name, ioi, [value], data_type)
+            # ensure that write values are always a list
+            if isinstance(value, (list, tuple)):
+                value = value
             else:
-                write_service = self._add_write_service(ioi, [value], data_type)
+                value = [value]
+
+            if BitofWord(tag_name) or data_type == 0xd3:
+                write_service = self._add_mod_write_service(tag_name, ioi, value, data_type)
+            else:
+                write_service = self._add_write_service(ioi, value, data_type)
 
             serviceSegments.append(write_service)
 
