@@ -242,7 +242,7 @@ tags, it can speed things up.
 ```python
 from pylogix import PLC
 with PLC("192.168.1.9") as comm:
-    ret = comm.Read("MyDint", data_type=0xc4)
+    ret = comm.Read("MyDint", datatype=0xc4)
     print(ret.TagName, ret.Value, ret.Status)
 ```
 result:
