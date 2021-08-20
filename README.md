@@ -88,11 +88,14 @@ comm.ConnectionSize = 508
 Pylogix has features other than simply reading/writing.  See the [documentation](docs/Documentation.md) for more info, see the examples directory
 simple use cases for the various methods.
 
+## FAQ
+
+Here's a list of frequent asked questions. [faq](docs/FAQ.md)
 
 ## Authors
 * **Burt Peterson** - *Initial work*
 * **Dustin Roeder** - *Maintainer* - [dmroeder](https://github.com/dmroeder)
-* **Fernando B. (Kodaman2)** - *Contributor* - [TheFern2](https://github.com/TheFern2)
+* **Fernando B. (TheFern2)** - *Contributor* - [TheFern2](https://github.com/TheFern2)
 * **Ottowayi** - *Contributor* - [ottowayi](https://github.com/ottowayi)
 * **Perry Kundert** - *Contributor* - [pjkundert](https://github.com/pjkundert)
 
