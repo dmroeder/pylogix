@@ -55,8 +55,11 @@ class Connection(object):
         if connected:
             eip_header = self._buildEIPHeader(request)
         else:
-            path = self._unconnectedPath(slot)
-            frame = self._buildCIPUnconnectedSend(len(request)) + request + path
+            if self.parent.Route:
+                path = self._unconnectedPath(slot)
+                frame = self._buildCIPUnconnectedSend(len(request)) + request + path
+            else:
+                frame = request
             eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
         
         return self._getBytes(eip_header, connected)
@@ -111,7 +114,7 @@ class Connection(object):
 
                 # if large forward open fails, try a normal forward open
                 if not ret[0]:
-                    self.ConnectionSize = 504
+                    self.ConnectionSize = 50
                     ret = self._forward_open()
 
             return ret
