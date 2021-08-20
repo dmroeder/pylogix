@@ -111,7 +111,7 @@ class Connection(object):
 
                 # if large forward open fails, try a normal forward open
                 if not ret[0]:
-                    self.ConnectionSize = 508
+                    self.ConnectionSize = 504
                     ret = self._forward_open()
 
             return ret
