@@ -1,7 +1,7 @@
 # Frequent Asked Questions
 
 1. Does pylogix work with PLC5, SLC, MicroLogix?
-No
+   No
 
 2. Does pylogix work with emulate? Yes, locally only. Ensure ProcessorSlot is set to 2
 
@@ -21,4 +21,4 @@ No
 
 10. How can I install pylogix? Installation can be done primarily with pip, or local install. Instructions on README
 
-11. Does pylogix support UDT's structure read? No, only way is to read each individual tag
+11. Does pylogix support UDT's structure read? Yes, and no. You can get a read in raw bytes which you'll then need to know how to unpack yourself example of that [here](https://github.com/dmroeder/pylogix/blob/master/examples/40_read_timer.py). There is no way to read the structure of the UDT at the moment discussion [here](https://github.com/dmroeder/pylogix/issues/67). There's also no current way to write raw to UDT's.
