@@ -394,6 +394,7 @@ class PLC(object):
                 result.append(self._readTag(tag, 1, None))
             else:
                 result.extend(self._multi_read(tags[len(result):], False))
+
         return result
 
     def _multi_read(self, tags, first):
@@ -408,9 +409,8 @@ class PLC(object):
 
         header = self._buildMultiServiceHeader()
 
-        # eip_header + size of header + offset
-        service_segment_size = 46 + len(header) + 2
-        rsp_tag_size = 52
+        min_tag_size = 12
+        service_segment_size = 8
 
         for tag in tags:
             if isinstance(tag, (list, tuple)):
@@ -420,8 +420,16 @@ class PLC(object):
             # get the data type if we have accessed the tag before
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
+                dt_size = self.CIPTypes[data_type][0]
+                if data_type == 0xa0:
+                    dt_size -= 8
             else:
+                #go with the worst case size
+                dt_size = self.CIPTypes[160][0]
                 data_type = None
+
+            # estimate the size that the response will occupy
+            rsp_tag_size = min_tag_size + len(base_tag) + dt_size
 
             ioi = self._buildTagIOI(tag_name, data_type)
             if first:
@@ -429,10 +437,11 @@ class PLC(object):
             else:
                 read_service = self._add_read_service(ioi, 1)
 
+            next_request_size = service_segment_size + rsp_tag_size + 2
+
             # check if request size does not exceed (ConnectionSize bytes limit)
-            next_request_size = service_segment_size + len(read_service) + (tag_count + 1) * 2
             if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
-                service_segment_size = service_segment_size + len(read_service)
+                service_segment_size = service_segment_size + rsp_tag_size
                 serviceSegments.append(read_service)
                 tag_count = tag_count + 1
             else:
@@ -443,7 +452,7 @@ class PLC(object):
 
         temp = len(header)
         if tag_count > 2:
-            temp += (tag_count-2)*2
+            temp += (tag_count - 2) * 2
         offsets = pack('<H', temp)
 
         # assemble all the segments
