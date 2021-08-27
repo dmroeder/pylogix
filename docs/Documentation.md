@@ -11,6 +11,7 @@ __Properties:__
 - Micro800 (optional, default=False)
 - Route (optional, default=None)
 - ConnectionSize (optional, default=4002)
+- SocketTimeout (optional, default=5.0)
 
 __Methods:__
 - [Read](#read)()
@@ -138,6 +139,11 @@ larger packet size.
 The early controllers and Ethernet modules supported connection sizes of 508 bytes.  At around
 v18, Rockwell implemented connection sizes of 4002 bytes.
 
+__SocketTimeout__
+If pylogix cannot connect to a PLC or loses its connection to the PLC, the default timeout is
+5 seconds (5.0). If this time is too long, it can be lowered.  Just be sure to not set it lower
+than the time it takes the PLC to reply to prevent false timeouts.  PLC's typically respond
+in a few milliseconds, but that is not guaranteed.
 
 # Read
 Read allows you to pull values from the PLC using tag names.  You can perform simple reads using
