@@ -102,7 +102,10 @@ class PLC(object):
                 return [self._readTag(tag[0], count, datatype)]
             if datatype:
                 raise TypeError('Datatype should be set to None when reading lists')
-            return self._batchRead(tag)
+            if self.Micro800 == True:
+                return [self._readTag(t, count, datatype) for t in tag]
+            else:
+                return self._batchRead(tag)
         else:
             return self._readTag(tag, count, datatype)
 
@@ -376,7 +379,7 @@ class PLC(object):
         """
         Processes the multiple read request. Split into multiple requests and reassemble responses when needed
         """
-        if self.Micro800:
+        if self.Micro800 == True:
             return Response(tags, None, 8)
 
         conn = self.conn.connect()
@@ -1552,7 +1555,7 @@ class PLC(object):
 
     def _makeString(self, string):
         work = []
-        if self.Micro800:
+        if self.Micro800 == True:
             temp = pack('<B', len(string)).decode(self.StringEncoding)
         else:
             temp = pack('<I', len(string)).decode(self.StringEncoding)
@@ -1560,7 +1563,7 @@ class PLC(object):
             work.append(ord(char))
         for char in string:
             work.append(ord(char))
-        if not self.Micro800:
+        if self.Micro800 == False:
             for x in range(len(string), 84):
                 work.append(0x00)
         return work
