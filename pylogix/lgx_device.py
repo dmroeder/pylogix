@@ -91,7 +91,7 @@ class Device(object):
             return "Unknown"
 
     @staticmethod
-    def parse(data):
+    def parse(data, ip_address=None):
         # we're going to take the packet and parse all
         #  the data that is in it.
 
@@ -100,7 +100,10 @@ class Device(object):
         resp.EncapsulationVersion = unpack_from('<H', data, 30)[0]
 
         longIP = unpack_from('<I', data, 36)[0]
-        resp.IPAddress = socket.inet_ntoa(pack('<L', longIP))
+        if ip_address:
+            resp.IPAddress = ip_address
+        else:
+            resp.IPAddress = socket.inet_ntoa(pack('<L', longIP))
 
         resp.VendorID = unpack_from('<H', data, 48)[0]
         resp.Vendor = Device.get_vendor(resp.VendorID)

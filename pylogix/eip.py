@@ -978,7 +978,7 @@ class PLC(object):
         ret_data = pad + ret_data
 
         if status == 0:
-            return Response(None, Device.parse(ret_data), status)
+            return Response(None, Device.parse(ret_data, self.IPAddress), status)
         else:
             return Response(None, Device(), status)
 
@@ -1011,7 +1011,7 @@ class PLC(object):
         ret_data = pad + ret_data
 
         if status == 0:
-            return Response(None, Device.parse(ret_data), status)
+            return Response(None, Device.parse(ret_data, self.IPAddress), status)
         else:
             return Response(None, Device(), status)
 
