@@ -55,7 +55,7 @@ class Connection(object):
         if connected:
             eip_header = self._buildEIPHeader(request)
         else:
-            if self.parent.Route or slot >= 0:
+            if self.parent.Route or slot is not None:
                 path = self._unconnectedPath(slot)
                 frame = self._buildCIPUnconnectedSend(len(request)) + request + path
             else:
