@@ -47,7 +47,7 @@ class Connection(object):
         """
         return self._connect(connected, conn_class)
 
-    def send(self, request, connected=True, slot=0):
+    def send(self, request, connected=True, slot=None):
         """
         Send the request to the PLC
         Return the status and data
@@ -55,7 +55,7 @@ class Connection(object):
         if connected:
             eip_header = self._buildEIPHeader(request)
         else:
-            if self.parent.Route:
+            if self.parent.Route or slot >= 0:
                 path = self._unconnectedPath(slot)
                 frame = self._buildCIPUnconnectedSend(len(request)) + request + path
             else:
