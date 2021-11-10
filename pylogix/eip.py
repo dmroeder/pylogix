@@ -67,7 +67,7 @@ class PLC(object):
                          0xca: (4, "REAL", '<f'),
                          0xcb: (8, "LREAL", '<d'),
                          0xd3: (4, "DWORD", '<i'),
-                         0xda: (1, "STRING", '<B')}
+                         0xda: (1, "STRING", '<B'),}
 
     @property
     def ConnectionSize(self):
