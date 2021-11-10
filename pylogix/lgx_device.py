@@ -162,7 +162,7 @@ devices = {0x00: 'Generic Device (deprecated)',
            0x2A: 'Safety Analog I/O Device',
            0x2B: 'Generic Device (keyable)',
            0x2C: 'Managed Switch',
-           0x32: 'ControlNet Physical Layer Component'}
+           0x32: 'ControlNet Physical Layer Component',}
 
 # List originally came from Wireshark /epan/dissectors/packet-cip.c
 vendors = {0: 'Reserved',
@@ -1380,4 +1380,4 @@ vendors = {0: 'Reserved',
            1237: 'ACOREL SAS',
            1238: 'Global Engineering Solutions Co., Ltd.',
            1239: 'ALTE Transportation, S.L.',
-           1240: 'Penko Engineering B.V.'}
+           1240: 'Penko Engineering B.V.',}
