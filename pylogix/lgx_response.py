@@ -97,4 +97,4 @@ cip_error_codes = {0x00: 'Success',
                    0x29: 'Member not settable',
                    0x2A: 'Group 2 only server general failure',
                    0x2B: 'Unknown Modbus error',
-                   0x2C: 'Attribute not gettable'}
+                   0x2C: 'Attribute not gettable',}
