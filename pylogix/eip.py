@@ -2,7 +2,7 @@
    Originally created by Burt Peterson
    Updated and maintained by Dustin Roeder (dmroeder@gmail.com)
 
-   Copyright 2021 Dustin Roeder
+   Copyright 2022 Dustin Roeder
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
