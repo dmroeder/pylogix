@@ -21,8 +21,7 @@ def audit_plcs(devices):
     for d in devices.Value:
         if d.DeviceID == 14:
             audit_rack(d)
-        else:
-            f.write(d.ProductName, d.Revision, '\n')
+        else:          
             f.write('%s %s\n' %(d.ProductName,  d.Revision))
             
 def audit_rack(plc):
