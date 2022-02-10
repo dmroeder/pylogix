@@ -23,6 +23,7 @@ def audit_plcs(devices):
             audit_rack(d)
         else:
             f.write(d.ProductName, d.Revision, '\n')
+            f.write('%s %s\n' %(d.ProductName,  d.Revision))
             
 def audit_rack(plc):
     '''
