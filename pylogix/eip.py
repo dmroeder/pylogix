@@ -518,7 +518,7 @@ class PLC(object):
             if data_type == 0xca or data_type == 0xcb:
                 value = float(wd[1])
             elif data_type == 0xa0 or data_type == 0xda:
-                value = self._makeString(wd[1])
+                value = [self._makeString(wd[1])]
             else:
                 typ = type(wd[1])
                 value = typ(wd[1])
