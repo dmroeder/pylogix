@@ -1,0 +1,26 @@
+plc_ip = 'a.b.c.d'
+plc_slot = 0
+isMicro800 = False
+
+########################################################################
+"""
+### Copy any of these outside the triple-quotes to skip that test
+### E.g. to skip the test_basic test, put a line containg
+### [skip_test_basic = True] before the line with 72 hashes (#s) above
+
+skip_test_basic = True
+skip_test_udt = True
+skip_test_combined = True
+skip_test_array = True
+skip_test_multi_read = True
+skip_test_bool_list = True
+skip_test_discover = True
+skip_test_time = True
+skip_test_get_tags = True
+skip_test_unexistent_tags = True
+skip_test_lgx_tag_class = True
+skip_test_response_class = True
+skip_test_program_list = True
+skip_test_program_tag_list = True
+skip_test_micro_800 = True
+"""

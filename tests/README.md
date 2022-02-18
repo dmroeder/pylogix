@@ -74,7 +74,7 @@ These are default functions from unittest, they will run before each test.
 
 ## Setup test configuration
 
-I've added a `.gitignore` entry for plc configurations in order to avoid having to keep discarding ip, slot changes inside pylogixTests.py.
+I've added a `.gitignore` entry for plc configurations in order to avoid having to keep discarding ip, slot changes inside pylogixTests.py.  See the sample file plcConfig.py.template instead.
 
 Inside the tests folder create a file `plcConfig.py`, then copy and paste below variables:
 
@@ -83,6 +83,14 @@ plc_ip = '192.168.0.26'
 plc_slot = 1
 isMicro800 = False
 ```
+
+### Setup to skip particular tests
+
+See comments in file plcConfig.py.template.  Summary: add a line like this
+
+    skip_test_to_skip = True
+
+to skip the "test_to_skip" test;
 
 ## Setting up an RSLogix 5000 Project
 
