@@ -33,14 +33,14 @@ from struct import pack, unpack_from
 
 class PLC(object):
 
-    def __init__(self, ip_address="", slot=0, timeout=5.0,**kwargs):
+    def __init__(self, ip_address="", slot=0, timeout=5.0,Micro800=False):
         """
         Initialize our parameters
         """
         self.IPAddress = ip_address
         self.ProcessorSlot = slot
         self.SocketTimeout = timeout
-        self.Micro800 = kwargs.get('Micro800',False)
+        self.Micro800 = Micro800
         self.Route = None
 
         self.conn = Connection(self)
