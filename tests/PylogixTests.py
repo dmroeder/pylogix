@@ -299,12 +299,16 @@ class PylogixTests(unittest.TestCase):
         comm.Micro800 = plcConfig.isMicro800
 
     def test_basic(self):
+        try: assert plcConfig.skip_test_basic ; return
+        except: pass
         self.basic_fixture()
         self.basic_array_fixture()
         self.basic_fixture('PROGRAM:MainProgram.p')
         self.basic_array_fixture('PROGRAM:MainProgram.p')
 
     def test_udt(self):
+        try: assert plcConfig.skip_test_udt ; return
+        except: pass
         self.udt_basic_fixture()
         self.udt_array_fixture_01()
         self.udt_array_fixture_02()
@@ -313,37 +317,53 @@ class PylogixTests(unittest.TestCase):
         self.udt_array_fixture_02('PROGRAM:MainProgram.p')
 
     def test_combined(self):
+        try: assert plcConfig.skip_test_combined ; return
+        except: pass
         self.udt_combined_fixture()
         self.udt_combined_array_fixture()
         self.udt_combined_fixture('PROGRAM:MainProgram.p')
         self.udt_combined_array_fixture('PROGRAM:MainProgram.p')
 
     def test_array(self):
+        try: assert plcConfig.skip_test_array ; return
+        except: pass
         self.read_array_fixture()
         self.read_array_fixture('PROGRAM:MainProgram.p')
 
     def test_multi_read(self):
+        try: assert plcConfig.skip_test_multi_read ; return
+        except: pass
         tags = ['BaseDINT', 'BaseINT', 'BaseSTRING']
         self.multi_read_fixture(tags)
 
     def test_bool_list(self):
+        try: assert plcConfig.skip_test_bool_list ; return
+        except: pass
         tags = self.bool_list_fixture(128)
         self.multi_read_fixture(tags)
 
     def test_discover(self):
+        try: assert plcConfig.skip_test_discover ; return
+        except: pass
         devices = comm.Discover()
         self.assertEqual(devices.Status, 'Success', devices.Status)
 
     def test_time(self):
+        try: assert plcConfig.skip_test_time ; return
+        except: pass
         comm.SetPLCTime()
         time = comm.GetPLCTime()
         self.assertEqual(time.Status, 'Success', time.Status)
 
     def test_get_tags(self):
+        try: assert plcConfig.skip_test_get_tags ; return
+        except: pass
         tags = comm.GetTagList()
         self.assertGreater(len(tags.Value), 1, tags.Status)
 
     def test_unexistent_tags(self):
+        try: assert plcConfig.skip_test_unexistent_tags ; return
+        except: pass
         response = comm.Read('DumbTag')
         self.assertEqual(
             response.Status, 'Path segment error', response.Status)
@@ -352,12 +372,16 @@ class PylogixTests(unittest.TestCase):
             write_reponse.Status, 'Path segment error', write_reponse.Status)
 
     def test_lgx_tag_class(self):
+        try: assert plcConfig.skip_test_lgx_tag_class ; return
+        except: pass
         tags = comm.GetTagList()
         self.assertEqual(
             isinstance(
                 tags.Value[0], Tag), True, "LgxTag not found in GetTagList")
 
     def test_response_class(self):
+        try: assert plcConfig.skip_test_response_class ; return
+        except: pass
         one_bool = comm.Read('BaseBool')
         self.assertEqual(
             isinstance(one_bool, Response),
@@ -373,6 +397,8 @@ class PylogixTests(unittest.TestCase):
             True, "Reponse class not found in Write")
 
     def test_program_list(self):
+        try: assert plcConfig.skip_test_program_list ; return
+        except: pass
         programs = comm.GetProgramsList()
         self.assertEqual(programs.Status, 'Success', programs.Status)
         self.assertEqual(
@@ -380,6 +406,8 @@ class PylogixTests(unittest.TestCase):
             True, "Reponse class not found in GetProgramsList")
 
     def test_program_tag_list(self):
+        try: assert plcConfig.skip_test_program_tag_list ; return
+        except: pass
         program_tags = comm.GetProgramTagList('Program:MainProgram')
         self.assertEqual(program_tags.Status, 'Success', program_tags.Status)
         self.assertEqual(
@@ -388,6 +416,13 @@ class PylogixTests(unittest.TestCase):
         self.assertEqual(
             isinstance(program_tags.Value[0], Tag),
             True, "LgxTag class not found in GetProgramTagList Value")
+
+    def test_micro_800(self):
+        try: assert plcConfig.skip_test_micro_899 ; return
+        except: pass
+        self.assertFalse(PLC().Micro800)
+        self.assertFalse(PLC(Micro800=False).Micro800)
+        self.assertTrue(PLC(Micro800=True).Micro800)
 
     def tearDown(self):
         comm.Close()
