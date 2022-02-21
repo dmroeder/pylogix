@@ -33,7 +33,7 @@ from struct import pack, unpack_from
 
 class PLC(object):
 
-    def __init__(self, ip_address="", slot=0, timeout=5.0,Micro800=False):
+    def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False):
         """
         Initialize our parameters
         """
@@ -927,6 +927,8 @@ class PLC(object):
                                 devices.append(device)
                 except Exception:
                     pass
+                try: s.close()   ### Ensure socket is closed
+                except: pass
 
         # added this because looping through addresses above doesn't work on
         # linux so this is a "just in case".  If we don't get results with the
@@ -946,6 +948,8 @@ class PLC(object):
                             devices.append(device)
             except Exception:
                 pass
+            try: s.close()   ### Ensure socket is closed
+            except: pass
 
         return Response(None, devices, 0)
 
