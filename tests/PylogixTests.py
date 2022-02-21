@@ -358,9 +358,9 @@ class PylogixTests(unittest.TestCase):
         response = comm.Read('DumbTag')
         self.assertEqual(
             response.Status, expected_msg, response.Status)
-        write_reponse = comm.Write('DumbTag', 10)
+        write_response = comm.Write('DumbTag', 10)
         self.assertEqual(
-            write_reponse.Status, expected_msg, write_reponse.Status)
+            write_response.Status, expected_msg, write_response.Status)
 
     def test_lgx_tag_class(self):
         tags = comm.GetTagList()

@@ -88,7 +88,7 @@ See the sample file plcConfig.py.template.
 
 ## Setting up an RSLogix 5000 Project
 
-Due to the versioning system of Rockwell it is difficult to provide one project for all CLX, and Compactlogix controllers. (Will need someone with an micro800 to do a repeatable test setup as I don't have one of those laying around)
+Due to the versioning system of Rockwell it is difficult to provide one project for all CLX, and Compactlogix controllers. (Will need someone with a Micro800 to do a repeatable test setup as I don't have one of those laying around)
 
 (Files are in the clx_setup folder)
 
