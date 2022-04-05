@@ -1,0 +1,3 @@
+plc_ip = '192.168.1.10'
+plc_slot = 0
+isMicro800 = False

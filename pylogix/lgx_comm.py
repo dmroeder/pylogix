@@ -85,6 +85,8 @@ class Connection(object):
                 return (True, 'Success')
 
         try:
+            try: self.Socket.close()    ### Ensure socket is closed
+            except: pass
             self.Socket = socket.socket()
             self.Socket.settimeout(self.parent.SocketTimeout)
             self.Socket.connect((self.parent.IPAddress, self.Port))

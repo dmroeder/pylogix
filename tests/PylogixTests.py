@@ -298,12 +298,14 @@ class PylogixTests(unittest.TestCase):
         comm.ProcessorSlot = plcConfig.plc_slot
         comm.Micro800 = plcConfig.isMicro800
 
+    @unittest.skipIf(plcConfig.isMicro800,'for Micro800')
     def test_basic(self):
         self.basic_fixture()
         self.basic_array_fixture()
         self.basic_fixture('PROGRAM:MainProgram.p')
         self.basic_array_fixture('PROGRAM:MainProgram.p')
 
+    @unittest.skipIf(plcConfig.isMicro800,'for Micro800')
     def test_udt(self):
         self.udt_basic_fixture()
         self.udt_array_fixture_01()
@@ -312,20 +314,24 @@ class PylogixTests(unittest.TestCase):
         self.udt_array_fixture_01('PROGRAM:MainProgram.p')
         self.udt_array_fixture_02('PROGRAM:MainProgram.p')
 
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_combined(self):
         self.udt_combined_fixture()
         self.udt_combined_array_fixture()
         self.udt_combined_fixture('PROGRAM:MainProgram.p')
         self.udt_combined_array_fixture('PROGRAM:MainProgram.p')
 
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_array(self):
         self.read_array_fixture()
         self.read_array_fixture('PROGRAM:MainProgram.p')
 
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_multi_read(self):
         tags = ['BaseDINT', 'BaseINT', 'BaseSTRING']
         self.multi_read_fixture(tags)
 
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_bool_list(self):
         tags = self.bool_list_fixture(128)
         self.multi_read_fixture(tags)
@@ -334,6 +340,7 @@ class PylogixTests(unittest.TestCase):
         devices = comm.Discover()
         self.assertEqual(devices.Status, 'Success', devices.Status)
 
+    @unittest.skipIf(plcConfig.isMicro800,'for Micro800')
     def test_time(self):
         comm.SetPLCTime()
         time = comm.GetPLCTime()
@@ -344,12 +351,16 @@ class PylogixTests(unittest.TestCase):
         self.assertGreater(len(tags.Value), 1, tags.Status)
 
     def test_unexistent_tags(self):
+        expected_msg = (plcConfig.isMicro800
+            and 'Path destination unknown'
+            or 'Path segment error'
+            )
         response = comm.Read('DumbTag')
         self.assertEqual(
-            response.Status, 'Path segment error', response.Status)
-        write_reponse = comm.Write('DumbTag', 10)
+            response.Status, expected_msg, response.Status)
+        write_response = comm.Write('DumbTag', 10)
         self.assertEqual(
-            write_reponse.Status, 'Path segment error', write_reponse.Status)
+            write_response.Status, expected_msg, write_response.Status)
 
     def test_lgx_tag_class(self):
         tags = comm.GetTagList()
@@ -372,6 +383,7 @@ class PylogixTests(unittest.TestCase):
             isinstance(bool_write, Response),
             True, "Reponse class not found in Write")
 
+    @unittest.skipIf(plcConfig.isMicro800,'for Micro800')
     def test_program_list(self):
         programs = comm.GetProgramsList()
         self.assertEqual(programs.Status, 'Success', programs.Status)
@@ -379,6 +391,7 @@ class PylogixTests(unittest.TestCase):
             isinstance(programs, Response),
             True, "Reponse class not found in GetProgramsList")
 
+    @unittest.skipIf(plcConfig.isMicro800,'for Micro800')
     def test_program_tag_list(self):
         program_tags = comm.GetProgramTagList('Program:MainProgram')
         self.assertEqual(program_tags.Status, 'Success', program_tags.Status)
@@ -388,6 +401,11 @@ class PylogixTests(unittest.TestCase):
         self.assertEqual(
             isinstance(program_tags.Value[0], Tag),
             True, "LgxTag class not found in GetProgramTagList Value")
+
+    def test_micro_800_init(self):
+        self.assertFalse(PLC().Micro800)
+        self.assertFalse(PLC(Micro800=False).Micro800)
+        self.assertTrue(PLC(Micro800=True).Micro800)
 
     def tearDown(self):
         comm.Close()
