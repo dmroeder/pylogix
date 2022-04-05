@@ -617,10 +617,11 @@ class PLC(object):
         AttributeClass = 0x8B
         AttributeInstanceType = 0x24
         AttributeInstance = 0x01
-        AttributeCount = 0x01
-        Attribute = 0x06
+        AttributeCount = 0x02
+        TimeAttribute = 0x06
         Time = int(time.time() * 1000000)
-        request = pack('<BBBBBBHHQ',
+        DSTAttribute = 0x0a
+        request = pack('<BBBBBBHHQHB',
                         AttributeService,
                         AttributeSize,
                         AttributeClassType,
@@ -628,8 +629,10 @@ class PLC(object):
                         AttributeInstanceType,
                         AttributeInstance,
                         AttributeCount,
-                        Attribute,
-                        Time)
+                        TimeAttribute,
+                        Time,
+                        DSTAttribute,
+                        time.daylight)
 
         status, ret_data = self.conn.send(request)
 
