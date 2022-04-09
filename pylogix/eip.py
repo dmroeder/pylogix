@@ -410,7 +410,7 @@ class PLC(object):
         Processes the multiple read request, but only the possible number of tags in a single request. The size
         difference between tags and result must be check for a complete read
         """
-        serviceSegments = []
+        service_segs = []
         segments = b""
         tag_count = 0
         self.Offset = 0
@@ -450,13 +450,13 @@ class PLC(object):
             # check if request size does not exceed (ConnectionSize bytes limit)
             if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
                 service_segment_size = service_segment_size + rsp_tag_size
-                serviceSegments.append(read_service)
+                service_segs.append(read_service)
                 tag_count = tag_count + 1
             else:
                 break
 
         tags_effective = tags[0:tag_count]
-        segmentCount = pack('<H', tag_count)
+        segment_count = pack('<H', tag_count)
 
         temp = len(header)
         if tag_count > 2:
@@ -465,13 +465,13 @@ class PLC(object):
 
         # assemble all the segments
         for i in range(tag_count):
-            segments += serviceSegments[i]
+            segments += service_segs[i]
 
         for i in range(tag_count-1):
-            temp += len(serviceSegments[i])
+            temp += len(service_segs[i])
             offsets += pack('<H', temp)
 
-        request = header + segmentCount + offsets + segments
+        request = header + segment_count + offsets + segments
         status, ret_data = self.conn.send(request)
 
         # return error if no data is returned
@@ -484,7 +484,7 @@ class PLC(object):
         """
         Processes the multiple write request
         """
-        serviceSegments = []
+        service_segs = []
         segments = b""
         tag_count = len(write_data)
         self.Offset = 0
@@ -538,14 +538,14 @@ class PLC(object):
                 for i in range(len(high)):
                     ioi = self._buildTagIOI(tags[i], data_type)
                     write_service = self._add_mod_write_service(ioi, data_type, high[i], data_type)
-                    serviceSegments.append(write_service)
+                    service_segs.append(write_service)
             else:
                 ioi = self._buildTagIOI(tag_name, data_type)
                 write_service = self._add_write_service(ioi, value, data_type)
-                serviceSegments.append(write_service)
+                service_segs.append(write_service)
 
         header = self._buildMultiServiceHeader()
-        segmentCount = pack('<H', tag_count)
+        segment_count = pack('<H', tag_count)
 
         temp = len(header)
         if tag_count > 2:
@@ -554,13 +554,13 @@ class PLC(object):
 
         # assemble all the segments
         for i in range(tag_count):
-            segments += serviceSegments[i]
+            segments += service_segs[i]
 
         for i in range(tag_count-1):
-            temp += len(serviceSegments[i])
+            temp += len(service_segs[i])
             offsets += pack('<H', temp)
 
-        request = header + segmentCount + offsets + segments
+        request = header + segment_count + offsets + segments
         status, ret_data = self.conn.send(request)
 
         # return error if no data is returned
