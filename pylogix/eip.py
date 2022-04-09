@@ -364,11 +364,16 @@ class PLC(object):
         else:
             # write fits in one packet
             if BitofWord(tag_name) or data_type == 0xd3:
-                request = self._add_mod_write_service(tag_name, ioi, write_data[0], data_type)
+                byte_count = self.CIPTypes[data_type][0] * 8
+                high, low, tags = mod_write_masks(tag_name, write_data[0], byte_count)
+                for i in range(len(high)):
+                    ioi = self._buildTagIOI(tags[i], data_type)
+                    request = self._add_mod_write_service(ioi, data_type, high[i], low[i])
+                    status, ret_data = self.conn.send(request)
             else:
                 request = self._add_write_service(ioi, write_data[0], data_type)
 
-            status, ret_data = self.conn.send(request)
+                status, ret_data = self.conn.send(request)
 
         if len(value) == 1:
             value = value[0]
@@ -512,8 +517,6 @@ class PLC(object):
             else:
                 data_type = 0
 
-            ioi = self._buildTagIOI(tag_name, data_type)
-
             # format the values
             if data_type == 0xca or data_type == 0xcb:
                 value = float(wd[1])
@@ -530,11 +533,16 @@ class PLC(object):
                 value = [value]
 
             if BitofWord(tag_name) or data_type == 0xd3:
-                write_service = self._add_mod_write_service(tag_name, ioi, value, data_type)
+                byte_count = self.CIPTypes[data_type][0] * 8
+                high, low, tags = mod_write_masks(tag_name, value, byte_count)
+                for i in range(len(high)):
+                    ioi = self._buildTagIOI(tags[i], data_type)
+                    write_service = self._add_mod_write_service(ioi, data_type, high[i], data_type)
+                    serviceSegments.append(write_service)
             else:
+                ioi = self._buildTagIOI(tag_name, data_type)
                 write_service = self._add_write_service(ioi, value, data_type)
-
-            serviceSegments.append(write_service)
+                serviceSegments.append(write_service)
 
         header = self._buildMultiServiceHeader()
         segmentCount = pack('<H', tag_count)
@@ -1146,7 +1154,7 @@ class PLC(object):
 
         return write_service
 
-    def _add_mod_write_service(self, tag_name, ioi, write_data, data_type):
+    def _add_mod_write_service(self, ioi, data_type, mask_high, mask_low):
         """
         This will add the bit level request to the tagIOI
         Writing to a bit is handled in a different way than
@@ -1158,20 +1166,12 @@ class PLC(object):
         write_request = pack('<BB', request_service, request_size)
         write_request += ioi
 
-        try:
-            pattern = r'\.\d+$'
-            index = int(re.search(pattern, tag_name).group(0)[1:])
-        except:
-            index = parse_tag_name(tag_name)[2]
-
         # number of bytes
         byte_count = self.CIPTypes[data_type][0]
         fmt = self.CIPTypes[data_type][2]
         write_request += pack('<H', byte_count)
-        val, mask = generate_request(write_data, index, byte_count*8)
-
-        write_request += pack(fmt, val)
-        write_request += pack(fmt, mask)
+        write_request += pack(fmt, mask_high)
+        write_request += pack(fmt, mask_low)
 
         return write_request
 
@@ -1652,19 +1652,57 @@ def bin_to_int(bits, bpw):
 
     return value
 
-def generate_request(bits, start, bpw):
+def mod_write_masks(tag, values, bpw):
     """
-    Generate a value and mask from a bit array for modified write request
+    The whole goal here is to generate lists of values for modified writes
+    (BOOL array or bits of DINT)
+
+    We can only write 32 bits at a time, so we'll take the request from the user
+    make the mask lists, then break them up into 4 byte chunks.  Lastly, we'll
+    convert them to values.
     """
-    start = start % bpw
-    b_value = [0 for i in range(start)] + bits
-    value = bin_to_int(b_value, bpw)
+    bit_pattern = r'\.\d+$'
+    array_pattern = r'\[([\d]|[,]|[\s])*\]$'
 
-    b_mask =[1 for i in range(bpw)]
-    b_mask[start:start+len(bits)] = bits
-    mask = bin_to_int(b_mask, bpw)
+    try:
+        # bit of a word
+        index = int(re.search(bit_pattern, tag).group(0)[1:])
+    except:
+        # boolean arrays
+        index = re.search(array_pattern, tag).group(0)
+        index = int(index[1:-1])
 
-    return value, mask
+    # figure out how many words our bits will occupy
+    start_bit = index % bpw
+    bit_count = len(values)
+    end_bit = start_bit + bit_count - 1
+    word_count = ((start_bit % bpw) + bit_count) / bpw
+    word_count = int(math.ceil(word_count))
+
+    # create template high/low mask lists.
+    mask_high = [0 for i in range(word_count*bpw)]
+    mask_low = [1 for i in range(word_count*bpw)]
+
+    # map our values onto our masks
+    mask_high[start_bit:start_bit+len(values)] = values
+    mask_low[start_bit:start_bit+len(values)] = values
+
+    # split up our lists into chunks of n bytes
+    segs_high = [mask_high[x:x+bpw] for x in range(0, len(mask_high), bpw)]
+    segs_low = [mask_low[x:x+bpw] for x in range(0, len(mask_low), bpw)]
+
+    # convert our finalized lists of masks to values to be written
+    vals_high = [bin_to_int(seg, bpw) for seg in segs_high]
+    vals_low = [bin_to_int(seg, bpw) for seg in segs_low]
+
+    tags = [tag]
+    for i in range(word_count-1):
+        index += bpw
+        new_index = "[{}]".format(index)
+        new_tag = re.sub(array_pattern, new_index, tag)
+        tags.append(new_tag)
+
+    return vals_high, vals_low, tags
 
 def BitofWord(tag):
     """
