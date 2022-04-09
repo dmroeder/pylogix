@@ -33,6 +33,7 @@ r = Randomizer()
 
 
 class PylogixTests(unittest.TestCase):
+
     def compare_bool(self, tag):
         # write false
         comm.Write(tag, 0)
@@ -293,6 +294,21 @@ class PylogixTests(unittest.TestCase):
             bool_list.append('BaseBOOLArray[{}]'.format(i))
         return bool_list
 
+    def nemesis_fixture(self, tag, length):
+        # test write BOOL array
+        true_val = [1 for i in range(length)]
+        false_val = [0 for i  in range(length)]
+
+        # write array to 0
+        comm.Write(tag, false_val)
+        ret = comm.Read(tag, length).Value
+        self.assertListEqual(ret, false_val, "Failed to write nemesis to 0")
+
+        # write array to 1
+        comm.Write(tag, true_val)
+        ret = comm.Read(tag, length).Value
+        self.assertListEqual(ret, true_val, "Failed to write nemesis to 1")
+
     def setUp(self):
         comm.IPAddress = plcConfig.plc_ip
         comm.ProcessorSlot = plcConfig.plc_slot
@@ -335,6 +351,10 @@ class PylogixTests(unittest.TestCase):
     def test_bool_list(self):
         tags = self.bool_list_fixture(128)
         self.multi_read_fixture(tags)
+
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
+    def test_nemesis_write(self):
+        self.nemesis_fixture("Nemesis[0]", 64)
 
     def test_discover(self):
         devices = comm.Discover()
