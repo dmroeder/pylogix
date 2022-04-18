@@ -1403,7 +1403,13 @@ class PLC(object):
         # calculate the limit for values in each request
         limit = int(space_for_payload / bytes_per_value)
         # split the list up into multiple smaller lists
-        chunks = [write_values[x:x+limit] for x in range(0, len(write_values), limit)]
+        if bit_of_word(tag) or data_type == 0xd3:
+            # bools are packed into 4 byte chunks and will write
+            # each chunk individually
+            chunks = [write_values]
+        else:
+            chunks = [write_values[x:x+limit] for x in range(0, len(write_values), limit)]
+
         return chunks
 
     def _words_to_bits(self, tag_name, value, count=0):
