@@ -33,6 +33,14 @@ def callback(return_data):
     print(return_data)
 
 def random_value(length):
+    """
+    Generate a random number to send back to the PLC.  I'm using
+    this just to watch for changes in the PLC.
+
+    Input data is being exchanged with the PLC.  This will return
+    a random number and a random index based on the input word size.
+    The new value is updated in the input word
+    """
     v = random.randrange(128)
     index = random.randrange(length)
     return index, v
@@ -40,7 +48,7 @@ def random_value(length):
 with Adapter() as comm:
     comm.PLCIPAddress = "192.168.1.10"
     # your computers address, the adapter should be confirugred for this address
-    comm.LocalIPAddress = "192.168.1.236"
+    comm.LocalIPAddress = "192.168.1.23"
     comm.DataType = 0xc4
     comm.InputSize = 4
     comm.OutputSize = 4
