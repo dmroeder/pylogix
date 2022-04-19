@@ -187,7 +187,7 @@ class Listener(threading.Thread):
                     # un-pause it, otherwise, start the thread
                     for item in self.adapter._responders.values():
                         item.pause = False
-                        print("starting thread", item)
+                        #print("starting thread", item)
                         if not item.is_alive():
                             item.start()
 
@@ -195,7 +195,7 @@ class Listener(threading.Thread):
                     # forward close
                     self.adapter._runnable = False
                     for item in self.adapter._responders.values():
-                        print("closing connections", item)
+                        #print("closing connections", item)
                         item.pause = True
                         item.EIPSequenceCount = 0
                         item.CIPSequenceCount = 0
