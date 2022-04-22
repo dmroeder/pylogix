@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 """
-
+import pylogix
 import socket
 
 from random import randrange
@@ -195,13 +195,13 @@ class Connection(object):
         EIPLength = 0x0004
         EIPSessionHandle = self.SessionHandle
         EIPStatus = 0x0000
-        EIPContext = self.Context
+        EIPContext = pylogix.__version__.ljust(8, " ").encode("utf-8")
         EIPOptions = 0x0000
 
         EIPProtocolVersion = 0x01
         EIPOptionFlag = 0x00
 
-        return pack('<HHIIQIHH',
+        return pack('<HHII8sIHH',
                     EIPCommand,
                     EIPLength,
                     EIPSessionHandle,
