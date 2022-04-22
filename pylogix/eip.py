@@ -86,15 +86,15 @@ class PLC(object):
         """
         if isinstance(tag, (list, tuple)):
             if len(tag) == 1:
-                return [self._readTag(tag[0], count, datatype)]
+                return [self._read_tag(tag[0], count, datatype)]
             if datatype:
                 raise TypeError('Datatype should be set to None when reading lists')
             if self.Micro800 == True:
-                return [self._readTag(t, count, datatype) for t in tag]
+                return [self._read_tag(t, count, datatype) for t in tag]
             else:
-                return self._batchRead(tag)
+                return self._batch_read(tag)
         else:
-            return self._readTag(tag, count, datatype)
+            return self._read_tag(tag, count, datatype)
 
     def Write(self, tag, value=None, datatype=None):
         """
@@ -105,14 +105,14 @@ class PLC(object):
         """
         if isinstance(tag, (list, tuple)):
             if len(tag) == 1:
-                return [self._writeTag(*tag[0])]
+                return [self._write_tag(*tag[0])]
             else:
-                return self._multiWrite(tag)
+                return self._batch_write(tag)
         else:
             if value == None:
                 raise TypeError('You must provide a value to write')
             else:
-                return self._writeTag(tag, value, datatype)
+                return self._write_tag(tag, value, datatype)
 
     def GetPLCTime(self, raw=False):
         """
@@ -228,7 +228,33 @@ class PLC(object):
         """
         return self.conn.close()
 
-    def _readTag(self, tag_name, elements, data_type):
+    def _batch_read(self, tags):
+        """
+        Processes the multiple read request. Split into multiple requests and
+        reassemble responses when needed
+        """
+        if self.Micro800 == True:
+            return Response(tags, None, 8)
+
+        conn = self.conn.connect()
+        if not conn[0]:
+            return [Response(t, None, conn[1]) for t in tags]
+
+        # get data types of unknown tags
+        self._get_unknown_types(tags)
+
+        result = []
+        while len(result) < len(tags):
+            if len(result) == len(tags) - 1:
+                # single tag left over, can't use multi msg service
+                tag = tags[len(result):][0]
+                result.append(self._read_tag(tag, 1, None))
+            else:
+                result.extend(self._multi_read(tags[len(result):], False))
+
+        return result
+
+    def _read_tag(self, tag_name, elements, data_type):
         """
         Processes the read request
         """
@@ -298,99 +324,6 @@ class PLC(object):
             value = None
 
         return Response(tag_name, value, status)
-
-    def _writeTag(self, tag_name, value, data_type=None):
-        """
-        Processes the write request
-        """
-        self.Offset = 0
-        write_data = []
-
-        conn = self.conn.connect()
-        if not conn[0]:
-            return Response(tag_name, value, conn[1])
-
-        tag, base_tag, index = parse_tag_name(tag_name)
-        resp = self._initial_read(tag, base_tag, data_type)
-        if resp[2] != 0 and resp[2] != 6:
-            return Response(tag_name, None, resp[2])
-
-        data_type = self.KnownTags[base_tag][0]
-
-        # check if values passed were a list
-        if isinstance(value, (list, tuple)):
-            elements = len(value)
-        else:
-            elements = 1
-            value = [value]
-
-        # format the values
-        for v in value:
-            if data_type == 0xca or data_type == 0xcb:
-                write_data.append(float(v))
-            elif data_type == 0xa0 or data_type == 0xda:
-                write_data.append(self._make_string(v))
-            else:
-                write_data.append(int(v))
-
-        # save the number of values we are writing
-        element_count = len(write_data)
-
-        # convert writeData to packet sized lists
-        write_data = self._convert_write_data(base_tag, data_type, write_data)
-
-        ioi = self._build_ioi(tag_name, data_type)
-
-        # handle sending the write data
-        if len(write_data) > 1:
-            # write requires multiple packets
-            for w in write_data:
-                request = self._add_frag_write_service(element_count, ioi, w, data_type)
-                status, ret_data = self.conn.send(request)
-                self.Offset += len(w)*self.CIPTypes[data_type][0]
-        else:
-            # write fits in one packet
-            if bit_of_word(tag_name) or data_type == 0xd3:
-                byte_count = self.CIPTypes[data_type][0] * 8
-                high, low, tags = mod_write_masks(tag_name, write_data[0], byte_count)
-                for i in range(len(high)):
-                    ioi = self._build_ioi(tags[i], data_type)
-                    request = self._add_mod_write_service(ioi, data_type, high[i], low[i])
-                    status, ret_data = self.conn.send(request)
-            else:
-                request = self._add_write_service(ioi, write_data[0], data_type)
-
-                status, ret_data = self.conn.send(request)
-
-        if len(value) == 1:
-            value = value[0]
-
-        return Response(tag_name, value, status)
-
-    def _batchRead(self, tags):
-        """
-        Processes the multiple read request. Split into multiple requests and reassemble responses when needed
-        """
-        if self.Micro800 == True:
-            return Response(tags, None, 8)
-
-        conn = self.conn.connect()
-        if not conn[0]:
-            return [Response(t, None, conn[1]) for t in tags]
-
-        # get data types of unknown tags
-        self._get_unknown_types(tags)
-
-        result = []
-        while len(result) < len(tags):
-            if len(result) == len(tags)-1:
-                # single tag left over, can't use multi msg service
-                tag = tags[len(result):][0]
-                result.append(self._readTag(tag, 1, None))
-            else:
-                result.extend(self._multi_read(tags[len(result):], False))
-
-        return result
 
     def _multi_read(self, tags, first):
         """
@@ -467,41 +400,134 @@ class PLC(object):
 
         return self._parse_multi_read(tags_effective, ret_data)
 
-    def _multiWrite(self, write_data):
+    def _batch_write(self, tags):
+        """
+        Processes the multiple write request. Split into multiple requests and
+        reassemble responses when needed
+        """
+        if self.Micro800 == True:
+            return Response(tags, None, 8)
+
+        conn = self.conn.connect()
+        if not conn[0]:
+            return [Response(t, None, conn[1]) for t in tags[1]]
+
+        # format the tags so that we have just the tag name or
+        # the tag name and data type
+        new_tags = []
+        for t in tags:
+            if len(t) == 3:
+                new_tags.append((t[0], t[2]))
+            else:
+                new_tags.append(t[0])
+
+        self._get_unknown_types(new_tags)
+
+        result = []
+        while len(result) < len(tags):
+            if len(result) == len(tags) - 1:
+                # single tag left over, can't use multi msg service
+                tag = tags[len(result):][0]
+                result.append(self._write_tag(*tag))
+            else:
+                result.extend(self._multi_write(tags[len(result):]))
+
+        return result
+
+    def _write_tag(self, tag_name, value, data_type=None):
+        """
+        Processes the write request
+        """
+        self.Offset = 0
+        write_data = []
+
+        conn = self.conn.connect()
+        if not conn[0]:
+            return Response(tag_name, value, conn[1])
+
+        tag, base_tag, index = parse_tag_name(tag_name)
+        resp = self._initial_read(tag, base_tag, data_type)
+        if resp[2] != 0 and resp[2] != 6:
+            return Response(tag_name, None, resp[2])
+
+        data_type = self.KnownTags[base_tag][0]
+
+        # check if values passed were a list
+        if isinstance(value, (list, tuple)):
+            elements = len(value)
+        else:
+            elements = 1
+            value = [value]
+
+        # format the values
+        for v in value:
+            if data_type == 0xca or data_type == 0xcb:
+                write_data.append(float(v))
+            elif data_type == 0xa0 or data_type == 0xda:
+                write_data.append(self._make_string(v))
+            else:
+                write_data.append(int(v))
+
+        # save the number of values we are writing
+        element_count = len(write_data)
+
+        # convert writeData to packet sized lists
+        write_data = self._convert_write_data(base_tag, data_type, write_data)
+
+        ioi = self._build_ioi(tag_name, data_type)
+
+        # handle sending the write data
+        if len(write_data) > 1:
+            # write requires multiple packets
+            for w in write_data:
+                request = self._add_frag_write_service(element_count, ioi, w, data_type)
+                status, ret_data = self.conn.send(request)
+                self.Offset += len(w)*self.CIPTypes[data_type][0]
+        else:
+            # write fits in one packet
+            if bit_of_word(tag_name) or data_type == 0xd3:
+                byte_count = self.CIPTypes[data_type][0] * 8
+                high, low, tags = mod_write_masks(tag_name, write_data[0], byte_count)
+                for i in range(len(high)):
+                    ioi = self._build_ioi(tags[i], data_type)
+                    request = self._add_mod_write_service(ioi, data_type, high[i], low[i])
+                    status, ret_data = self.conn.send(request)
+            else:
+                request = self._add_write_service(ioi, write_data[0], data_type)
+
+                status, ret_data = self.conn.send(request)
+
+        if len(value) == 1:
+            value = value[0]
+
+        return Response(tag_name, value, status)
+
+    def _multi_write(self, write_data):
         """
         Processes the multiple write request
         """
         service_segs = []
         segments = b""
-        tag_count = len(write_data)
+        tag_count = 0
         self.Offset = 0
 
-        conn = self.conn.connect()
-        if not conn[0]:
-            return [Response(w[0], w[1], conn[1]) for w in write_data]
+        min_tag_size = 24
+        service_segment_size = 8
 
-        # reduce our write data to just the tag name or a tuple
-        # of tag name and data type
-        tags = []
-        for w in write_data:
-            if isinstance(w,(list, tuple)):
-                if len(w) == 3:
-                    tags.append((w[0], w[2]))
-                else:
-                    tags.append(w[0])
-            else:
-                tags.append(w)
+        header = self._buildMultiServiceHeader()
 
-        # get the data types of unknown tags
-        self._get_unknown_types(tags)
-
+        write_values = []
         for wd in write_data:
 
             tag_name, base_tag, index = parse_tag_name(wd[0])
 
             if base_tag in self.KnownTags.keys():
                 data_type = self.KnownTags[base_tag][0]
+                dt_size = self.CIPTypes[data_type][0]
+                if data_type == 0xa0:
+                    dt_size -= 8
             else:
+                dt_size = self.CIPTypes[160][0]
                 data_type = 0
 
             # format the values
@@ -519,19 +545,50 @@ class PLC(object):
             else:
                 value = [value]
 
+            rsp_tag_size = min_tag_size + len(base_tag) + dt_size
+
             if bit_of_word(tag_name) or data_type == 0xd3:
+                # bool arrays are unique
                 byte_count = self.CIPTypes[data_type][0] * 8
                 high, low, tags = mod_write_masks(tag_name, value, byte_count)
+                temp_segments = []
+                tmp_count = tag_count
+                tmp_write_values = []
+                bools_fit = True
                 for i in range(len(high)):
                     ioi = self._build_ioi(tags[i], data_type)
-                    write_service = self._add_mod_write_service(ioi, data_type, high[i], data_type)
-                    service_segs.append(write_service)
+                    write_service = self._add_mod_write_service(ioi, data_type, high[i], low[i])
+
+                    next_request_size = service_segment_size + rsp_tag_size + 2
+                    # check if request size does not exceed (ConnectionSize bytes limit)
+                    if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
+                        service_segment_size = service_segment_size + rsp_tag_size
+                        temp_segments.append(write_service)
+                        tmp_write_values.append((tags[i], (high[i], low[i])))
+                        tag_count = tag_count + 1
+                    else:
+                        # BOOLs didn't fit in the current packet, abort
+                        bools_fit = True
+                        tag_count = tmp_count
+                        break
+                if bools_fit:
+                    # if the bools fit in this request, append them.
+                    write_values.extend(tmp_write_values)
+                    service_segs.extend(temp_segments)
             else:
                 ioi = self._build_ioi(tag_name, data_type)
                 write_service = self._add_write_service(ioi, value, data_type)
-                service_segs.append(write_service)
+                write_values.append((wd[0], value))
+                next_request_size = service_segment_size + rsp_tag_size + 2
 
-        header = self._buildMultiServiceHeader()
+                # check if request size does not exceed (ConnectionSize bytes limit)
+                if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
+                    service_segment_size = service_segment_size + rsp_tag_size
+                    service_segs.append(write_service)
+                    tag_count = tag_count + 1
+                else:
+                    break
+
         segment_count = pack('<H', tag_count)
 
         temp = len(header)
@@ -554,7 +611,7 @@ class PLC(object):
         if not ret_data:
             return [Response(w[0], w[1], status) for w in write_data]
 
-        return self._parse_multi_write(write_data, ret_data)
+        return self._parse_multi_write(write_values, ret_data)
 
     def _getPLCTime(self, raw=False):
         """
