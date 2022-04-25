@@ -1,9 +1,9 @@
-# pylogix API
+# pylogix PLC API
 
-Everything with pylogix is done via the PLC module, all the properties and modules will be
-discussed beow.  Whether you are reading, writing, pulling the tag list, etc.  To make things
-easy for the user, pylogix will automatically make the necessary connection to the PLC when
-you call any of the methods.
+The PLC module is for general read/writes using a class 3 connection, all the properties and
+modules will be discussed beow.  Whether you are reading, writing, pulling the tag list, etc.
+To make things easy for the user, pylogix will automatically make the necessary connection to
+the PLC when you call any of the methods.
 
 __Properties:__
 - IPAddress (required)

@@ -85,8 +85,9 @@ comm.ConnectionSize = 508
 
 ### Other Features
 
-Pylogix has features other than simply reading/writing.  See the [documentation](docs/Documentation.md) for more info, see the examples directory
-simple use cases for the various methods.
+Pylogix has features other than simply reading/writing.  See the [PLC module documentation](docs/plc_api.md) for more info on how to use the PLC module.  See the examples
+folder for all the basic pylogix usages.  For I/O connections using the Generic Module, see the
+[Adapter module documentation](docs/adapter_api.md)
 
 ## FAQ
 

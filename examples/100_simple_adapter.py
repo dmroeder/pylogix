@@ -47,7 +47,7 @@ def random_value(length):
 
 with Adapter() as comm:
     comm.PLCIPAddress = "192.168.1.10"
-    # your computers address, the adapter should be confirugred for this address
+    # your computers address, the adapter should be configured for this address
     comm.LocalIPAddress = "192.168.1.23"
     comm.DataType = 0xc4
     comm.InputSize = 4
