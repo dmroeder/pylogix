@@ -309,6 +309,20 @@ class PylogixTests(unittest.TestCase):
         ret = comm.Read(tag, length).Value
         self.assertListEqual(ret, true_val, "Failed to write nemesis to 1")
 
+    def large_list_fixture(self):
+            length = 50
+            r = Randomizer()
+            tags = ["Str{}".format(i) for i in range(length)]
+            vals = [r.String() for i in range(length)]
+
+            req = [[tags[i], vals[i]] for i in range(length)]
+            comm.Write(req)
+
+            ret = comm.Read(tags)
+            read_vals = [r.Value for r in ret]
+
+            self.assertListEqual(vals, read_vals, "Failed to write large list")
+
     def setUp(self):
         comm.IPAddress = plcConfig.plc_ip
         comm.ProcessorSlot = plcConfig.plc_slot
@@ -355,6 +369,10 @@ class PylogixTests(unittest.TestCase):
     @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_nemesis_write(self):
         self.nemesis_fixture("Nemesis[0]", 64)
+
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
+    def test_large_list(self):
+        self.large_list_fixture()
 
     def test_discover(self):
         devices = comm.Discover()
