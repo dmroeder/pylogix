@@ -350,7 +350,7 @@ class PLC(object):
 
         header = self._buildMultiServiceHeader()
 
-        min_tag_size = 12
+        min_tag_size = 24
         service_segment_size = 8
 
         for tag in tags:

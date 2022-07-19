@@ -148,8 +148,6 @@ class Connection(object):
         """
         Sends data and gets the return data, optionally asserting data size limit
         """
-        if self.ConnectionSize is not None and len(data) > self.ConnectionSize:
-            raise BufferError("ethernet/ip _getBytes output size exceeded: %d bytes" % len(data))
         try:
             self.Socket.send(data)
             ret_data = self.recv_data()
