@@ -103,7 +103,7 @@ class PLC(object):
             if datatype:
                 raise TypeError('Datatype should be set to None when reading lists')
             if self.Micro800 == True:
-                return [self._read_tag(t, count, datatype) for t in tag]
+                return [self._read_tag(*t) for t in tag]
             else:
                 return self._batch_read(tag)
         else:
@@ -1407,7 +1407,10 @@ class PLC(object):
         for t in tags:
             if isinstance(t, (list, tuple)):
                 tag_name, base_tag, index = parse_tag_name(t[0])
-                self.KnownTags[base_tag] = (t[1], 0)
+                if len(t) == 3:
+                    self.KnownTags[base_tag] = (t[2], 0)
+                else:
+                    unk_tags.append(t[0])
             else:
                 tag_name, base_tag, index = parse_tag_name(t)
             if base_tag not in self.KnownTags:
