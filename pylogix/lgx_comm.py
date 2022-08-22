@@ -550,6 +550,93 @@ class Connection(object):
 
         return connection_path
 
+    def discover(self, parse_procedural_parameter):
+        """
+        Discover devices on the network, similar to the RSLinx
+        Ethernet I/P driver
+        """
+        devices = []
+        request = self._buildListIdentity()
+
+        # get available ip addresses
+        addresses = socket.getaddrinfo(socket.gethostname(), None)
+
+        # we're going to send a request for all available ipv4
+        # addresses and build a list of all the devices that reply
+        for ip in addresses:
+            if ip[0] == 2:  # IP v4
+                # create a socket
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.settimeout(0.5)
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                s.bind((ip[4][0], 0))
+                s.sendto(request, ('255.255.255.255', 44818))
+                try:
+                    while(1):
+                        ret = s.recv(4096)
+                        context = unpack_from('<Q', ret, 14)[0]
+                        if context == 0x006d6f4d6948:
+                            device = parse_procedural_parameter(ret)
+                            if device.IPAddress:
+                                devices.append(device)
+                except Exception:
+                    pass
+                try:
+                    s.close()   ### Ensure socket is closed
+                except:
+                    pass
+
+        # added this because looping through addresses above doesn't work on
+        # linux so this is a "just in case".  If we don't get results with the
+        # above code, try one more time without binding to an address
+        if len(devices) == 0:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0.5)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.sendto(request, ('255.255.255.255', 44818))
+            try:
+                while(1):
+                    ret = s.recv(4096)
+                    context = unpack_from('<Q', ret, 14)[0]
+                    if context == 0x006d6f4d6948:
+                        device = parse_procedural_parameter(ret)
+                        if device.IPAddress:
+                            devices.append(device)
+            except Exception:
+                pass
+            try:
+                s.close()   ### Ensure socket is closed
+            except:
+                pass
+
+        return devices
+
+    def _buildListIdentity(self):
+        """
+        Build the list identity request for discovering Ethernet I/P
+        devices on the network
+        """
+        ListService = 0x63
+        ListLength = 0x00
+        ListSessionHandle = 0x00
+        ListStatus = 0x00
+        ListResponse = 0xFA
+        ListContext1 = 0x6948
+        ListContext2 = 0x6f4d
+        ListContext3 = 0x006d
+        ListOptions = 0x00
+
+        return pack("<HHIIHHHHI",
+                    ListService,
+                    ListLength,
+                    ListSessionHandle,
+                    ListStatus,
+                    ListResponse,
+                    ListContext1,
+                    ListContext2,
+                    ListContext3,
+                    ListOptions)
+
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,
                 1: 0x6f6e,
