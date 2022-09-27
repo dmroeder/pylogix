@@ -315,7 +315,7 @@ length, pylogix will simply use the number of values in the list.
 from pylogix import PLC
 with PLC("192.168.1.9") as comm:
     values = [123, 456, 789]
-    ret = comm.Read("MyDintArray[0]", values)
+    ret = comm.Write("MyDintArray[0]", values)
     print(ret.TagName, ret.Value, ret.Status)
 ```
 result:
