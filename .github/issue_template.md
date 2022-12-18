@@ -5,6 +5,7 @@ Before you post an issue, ensure you have tried the minimal examples within the 
 - [ ] Have you tried the [examples](https://github.com/dmroeder/pylogix/tree/master/examples)?
 - [ ] Have you tried [pylogix-tester](https://github.com/TheFern2/pylogix-tester)?
 - [ ] Have you read previous issues?
+- [ ] Is this a supported Rockwell PLC?
 
 ## Type of issue
 
