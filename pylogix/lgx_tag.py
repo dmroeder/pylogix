@@ -73,7 +73,7 @@ class Tag(object):
                 self.Scope1,
                 self.Bytes)
 
-    @ staticmethod
+    @staticmethod
     def in_filter(tag):
         """
         Check if the provided tag is in our filter
@@ -125,7 +125,7 @@ class UDT(object):
         props += 'Type={} '.format(self.Type)
         props += 'Name={} '.format(self.Name)
         props += 'Fields={} '.format(self.Fields)
-        props += 'FieldsByNam={}'.format(self.FieldsByName)
+        props += 'FieldsByName={}'.format(self.FieldsByName)
 
         return 'UDT({})'.format(props)
 
