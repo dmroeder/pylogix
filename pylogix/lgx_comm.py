@@ -89,8 +89,10 @@ class Connection(object):
             except: pass
             self.Socket = socket.socket()
             self.Socket.settimeout(self.parent.SocketTimeout)
-            self.Socket.connect((self.parent.IPAddress, self.Port))
-        except socket.error as e:
+            # self.Socket.connect((self.parent.IPAddress, self.Port))
+            addr = socket.getaddrinfo(self.parent.IPAddress, self.Port)[0][-1]
+            self.Socket.connect(addr)
+        except Exception as e:
             self.SocketConnected = False
             self.SequenceCounter = 1
             self.Socket.close()
@@ -193,7 +195,7 @@ class Connection(object):
         EIPLength = 0x0004
         EIPSessionHandle = self.SessionHandle
         EIPStatus = 0x0000
-        EIPContext = pylogix.__version__.ljust(8, " ").encode("utf-8")
+        EIPContext = '{:<8}'.format(pylogix.__version__).encode("utf-8")
         EIPOptions = 0x0000
 
         EIPProtocolVersion = 0x01

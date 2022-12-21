@@ -26,9 +26,13 @@ from .lgx_comm import Connection
 from .lgx_device import Device
 from .lgx_response import Response
 from .lgx_tag import Tag, UDT
-from datetime import datetime, timedelta
+from .utils import is_micropython
 from random import randrange
 from struct import pack, unpack_from
+
+
+if not is_micropython():
+    from datetime import datetime, timedelta
 
 class PLC(object):
 
@@ -661,7 +665,7 @@ class PLC(object):
         if status == 0:
             # get the time from the packet
             plc_time = unpack_from('<Q', ret_data, 56)[0]
-            if raw:
+            if raw or is_micropython():
                 value = plc_time
             else:
                 human_time = datetime(1970, 1, 1) + timedelta(microseconds=plc_time)
