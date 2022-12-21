@@ -89,7 +89,6 @@ class Connection(object):
             except: pass
             self.Socket = socket.socket()
             self.Socket.settimeout(self.parent.SocketTimeout)
-            # self.Socket.connect((self.parent.IPAddress, self.Port))
             addr = socket.getaddrinfo(self.parent.IPAddress, self.Port)[0][-1]
             self.Socket.connect(addr)
         except Exception as e:
