@@ -111,6 +111,19 @@ pip install tox
 tox
 ```
 
+## Micropython testing
+
+Install dependencies, this is tested on the unix/port of micropython:
+```python
+micropython -m mip install unittest
+micropython -m mip install unittest-discover
+```
+
+Run tests:
+```python
+micropython -m unittest tests/PylogixTests.py
+```
+
 ## TODO
 
 - Create a micro800 project, and export tags

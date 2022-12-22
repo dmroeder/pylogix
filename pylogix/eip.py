@@ -1605,16 +1605,12 @@ def parse_tag_name(tag):
     ex: MyTag.Name[42] returns:
     MyTag.Name[42], MyTag.Name, 42
     """
-    # bit_end_pattern = r'\.\d+$'
-    # array_pattern = r'\[([\d]|[,]|[\s])*\]$'
-
-    bit_end_pattern = re.compile(r'\.\d+$')
-    array_pattern = re.compile(r'\[([\d]|[,]|[\s])*\]$')
+    bit_end_pattern = r'\.\d+$'
+    array_pattern = r'\[([0-9^\]]|[,]|[\s])*\]$'
 
     # get the array index
     try:
-        # index = re.search(array_pattern, tag).group(0)
-        index = array_pattern.search(tag).group(0)
+        index = re.search(array_pattern, tag).group(0)
         index = index[1:-1]
         if ',' in index:
             index = index.split(',')
@@ -1625,10 +1621,8 @@ def parse_tag_name(tag):
         index = 0
 
     # get the base tag name
-    # base_tag = re.sub(bit_end_pattern, '', tag)
-    # base_tag = re.sub(array_pattern, '', base_tag)
-    base_tag = tag.split(".")[0]
-    base_tag = base_tag.split("[")[0]
+    base_tag = re.sub(bit_end_pattern, '', tag)
+    base_tag = re.sub(array_pattern, '', base_tag)
 
     return tag, base_tag, index
 
