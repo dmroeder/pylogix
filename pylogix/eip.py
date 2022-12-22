@@ -1606,7 +1606,7 @@ def parse_tag_name(tag):
     MyTag.Name[42], MyTag.Name, 42
     """
     bit_end_pattern = r'\.\d+$'
-    array_pattern = r'\[([0-9]|[,]|[\s])+\]$'
+    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
 
     # get the array index
     try:
