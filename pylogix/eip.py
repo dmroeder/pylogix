@@ -844,7 +844,8 @@ class PLC(object):
                         field.Scope1 = scope[1]
                         field.Internal = field.AccessRight == 0
 
-                    fieldDef = p[slice((i-1) * 8, i * 8)]
+                    # fieldDef = p[slice((i-1) * 8, i * 8)]
+                    fieldDef = p[(i - 1) * 8: i * 8]
                     field.Bytes = fieldDef
                     field.InstanceID = unpack_from('<H', fieldDef, 6)[0]
                     field.Meta = unpack_from("<H", fieldDef, 4)[0]
@@ -1511,8 +1512,20 @@ class PLC(object):
                     response = Response(tag, value, status)
                 else:
                     type_fmt = self.CIPTypes[data_type][2]
-                    value = unpack_from(type_fmt, stripped, offset+6)[0]
-                    response = Response(tag, value, status)
+                    # handling special format for micropython for bools
+                    # boolean format ? doesn't exist for upy struct module
+                    if type_fmt == '?' and is_micropython():
+                        value = unpack_from('B', stripped, offset + 6)[0]
+                        if value == 255:
+                            bool_val = True
+                        elif value == 0:
+                            bool_val = False
+                        else:
+                            bool_val = None
+                        response = Response(tag, bool_val, status)
+                    else:
+                        value = unpack_from(type_fmt, stripped, offset+6)[0]
+                        response = Response(tag, value, status)
             else:
                 response = Response(tag, None, status)
             reply.append(response)
@@ -1591,7 +1604,7 @@ def bit_of_word_state(tag, value):
     ex: (bit 4 of the number 30313 is False)
     """
     bit_pattern = r'\d+$'
-    array_pattern = r'\[([\d]|[,]|[\s])*\]$'
+    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
     try:
         index = re.search(array_pattern, tag).group(0)
         index = index[1:-1]
@@ -1670,7 +1683,7 @@ def mod_write_masks(tag, values, bpw):
     convert them to values.
     """
     bit_pattern = r'\.\d+$'
-    array_pattern = r'\[([\d]|[,]|[\s])*\]$'
+    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
 
     try:
         # bit of a word
