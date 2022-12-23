@@ -844,7 +844,6 @@ class PLC(object):
                         field.Scope1 = scope[1]
                         field.Internal = field.AccessRight == 0
 
-                    # fieldDef = p[slice((i-1) * 8, i * 8)]
                     fieldDef = p[(i - 1) * 8: i * 8]
                     field.Bytes = fieldDef
                     field.InstanceID = unpack_from('<H', fieldDef, 6)[0]
