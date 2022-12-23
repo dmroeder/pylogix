@@ -1337,8 +1337,22 @@ class PLC(object):
                     data = data[length:]
                 break
             else:
-                returnvalue = unpack_from(fmt, data, index)[0]
-                vals.append(returnvalue)
+                # boolean format doesn't exist for upy struct module
+                if fmt == '?' and is_micropython():
+                    # need at least 4 bytes to unpack an integer minus the 2 not used total of 6
+                    pad_zeroes = bytearray(3)
+                    bool_int_val = unpack_from('i', data + pad_zeroes, index)[0]
+
+                    if bool_int_val == 255:
+                        bool_val = True
+                    elif bool_int_val == 0:
+                        bool_val = False
+                    else:
+                        bool_val = None
+                    vals.append(bool_val)
+                else:
+                    returnvalue = unpack_from(fmt, data, index)[0]
+                    vals.append(returnvalue)
 
             self.Offset += data_size
             counter += 1
