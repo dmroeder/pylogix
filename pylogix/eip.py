@@ -222,6 +222,10 @@ class PLC(object):
 
         returns Response class (.TagName, .Value, .Status)
         """
+        if is_micropython():
+            status = "Discover not available on micropython, due to limited socket module"
+            return Response(None, None, status)
+
         devices = self.conn.discover(parse_procedural_parameter=Device.parse)
         return Response(None, devices, 0)
 

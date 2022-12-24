@@ -13,6 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 """
+import errno
 import pylogix
 import socket
 
@@ -91,11 +92,16 @@ class Connection(object):
             self.Socket.settimeout(self.parent.SocketTimeout)
             addr = socket.getaddrinfo(self.parent.IPAddress, self.Port)[0][-1]
             self.Socket.connect(addr)
-        except Exception as e:
+        except OSError as e:
             self.SocketConnected = False
             self.SequenceCounter = 1
             self.Socket.close()
-            return (False, e)
+            if e.errno == errno.ECOMM:
+                return False, 1
+            elif e.errno == errno.EIO:
+                return False, 7
+            # self.Socket.close()
+            #return (False, e)
 
         # register the session
         self.Socket.send(self._buildRegisterSession())
@@ -160,12 +166,16 @@ class Connection(object):
                 return status, ret_data
             else:
                 return 1, None
-        except (socket.gaierror):
+        except OSError as e:
+            # print("FAB OSSError", e.errno)
             self.SocketConnected = False
-            return 1, None
-        except (IOError):
-            self.SocketConnected = False
-            return 7, None
+            if e.errno == errno.ECOMM:
+                return 1, None
+            elif e.errno == errno.EIO:
+                return 7, None
+        # except OSError as e:
+        #     self.SocketConnected = False
+        #     return 7, None
 
     def recv_data(self):
         """
@@ -176,7 +186,7 @@ class Connection(object):
         when using LargeForwardOpen
         """
         data = b''
-        part = self.Socket.recv(4096)
+        part = self.Socket.recv(4096)  # TODO catch MemoryError here!
         payload_len = unpack_from('<H', part, 2)[0]
         data += part
 
