@@ -20,6 +20,9 @@ import socket
 from random import randrange
 from struct import pack, unpack_from
 
+from pylogix.utils import is_micropython, SO_BROADCAST
+
+
 class Connection(object):
 
     def __init__(self, parent):
@@ -570,7 +573,15 @@ class Connection(object):
         request = self._buildListIdentity()
 
         # get available ip addresses
-        addresses = socket.getaddrinfo(socket.gethostname(), None)
+        addresses = []
+        if is_micropython():
+            import network
+            station = network.WLAN(network.STA_IF)
+            if station.isconnected():
+                host = station.ifconfig()[0]
+                addresses = socket.getaddrinfo(host, 80)
+        else:
+            addresses = socket.getaddrinfo(socket.gethostname(), None)
 
         # we're going to send a request for all available ipv4
         # addresses and build a list of all the devices that reply
@@ -579,7 +590,7 @@ class Connection(object):
                 # create a socket
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 s.settimeout(0.5)
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                s.setsockopt(socket.SOL_SOCKET, SO_BROADCAST, 1)
                 s.bind((ip[4][0], 0))
                 s.sendto(request, ('255.255.255.255', 44818))
                 try:
@@ -603,7 +614,7 @@ class Connection(object):
         if len(devices) == 0:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(0.5)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.setsockopt(socket.SOL_SOCKET, SO_BROADCAST, 1)
             s.sendto(request, ('255.255.255.255', 44818))
             try:
                 while(1):
