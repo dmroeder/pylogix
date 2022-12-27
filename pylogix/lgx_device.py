@@ -17,12 +17,6 @@
 import socket
 from struct import pack, unpack_from
 
-from pylogix.utils import is_micropython
-
-if not is_micropython():
-    from pylogix import lgx_vendors
-
-
 class Device(object):
     
     def __init__(self):
@@ -91,22 +85,10 @@ class Device(object):
 
     @staticmethod
     def get_vendor(vendorID):
-        vendor_name = ''
-        if not is_micropython() and vendorID in vendors.keys():
-            vendor_name = vendors[vendorID]
-        elif is_micropython():
-            # look up on the fly without loading all vendors into memory
-            with open("vendors.txt") as vendor_data:
-                for line in vendor_data:
-                    k, v = line.split(':')
-                    if k == str(vendorID):
-                        vendor_name = v
-                        break
-
-        if not vendor_name:
-            return "Unknown"
+        if vendorID in vendors:
+            return vendors[vendorID]
         else:
-            return vendor_name
+            return "Unknown"
 
     @staticmethod
     def parse(data, ip_address=None):
@@ -182,5 +164,9 @@ devices = {0x00: 'Generic Device (deprecated)',
            0x2C: 'Managed Switch',
            0x32: 'ControlNet Physical Layer Component'}
 
-if not is_micropython():
-    vendors = lgx_vendors.vendors
+from pylogix.utils import is_micropython
+
+if is_micropython():
+    from pylogix.lgx_uvendors import uvendors as vendors
+else:
+    from pylogix.lgx_vendors import vendors
