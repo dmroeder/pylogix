@@ -16,7 +16,6 @@
 
 import sys
 
-SO_BROADCAST = 6
 
 def is_micropython():
     if hasattr(sys, 'implementation'):

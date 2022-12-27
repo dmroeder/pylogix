@@ -20,7 +20,7 @@ import socket
 from random import randrange
 from struct import pack, unpack_from
 
-from pylogix.utils import is_micropython, SO_BROADCAST
+from pylogix.utils import is_micropython
 
 
 class Connection(object):
@@ -576,7 +576,7 @@ class Connection(object):
                 # create a socket
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 s.settimeout(0.5)
-                s.setsockopt(socket.SOL_SOCKET, SO_BROADCAST, 1)
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
                 s.bind((ip[4][0], 0))
                 s.sendto(request, ('255.255.255.255', 44818))
                 try:
@@ -600,7 +600,7 @@ class Connection(object):
         if len(devices) == 0:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(0.5)
-            s.setsockopt(socket.SOL_SOCKET, SO_BROADCAST, 1)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             s.sendto(request, ('255.255.255.255', 44818))
             try:
                 while(1):
