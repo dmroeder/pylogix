@@ -103,8 +103,6 @@ class Connection(object):
                 return False, 1
             elif e.errno == errno.EIO:
                 return False, 7
-            # self.Socket.close()
-            #return (False, e)
 
         # register the session
         self.Socket.send(self._buildRegisterSession())
@@ -170,15 +168,11 @@ class Connection(object):
             else:
                 return 1, None
         except OSError as e:
-            # print("FAB OSSError", e.errno)
             self.SocketConnected = False
             if e.errno == errno.ECOMM:
                 return 1, None
             elif e.errno == errno.EIO:
                 return 7, None
-        # except OSError as e:
-        #     self.SocketConnected = False
-        #     return 7, None
 
     def recv_data(self):
         """
@@ -573,15 +567,7 @@ class Connection(object):
         request = self._buildListIdentity()
 
         # get available ip addresses
-        addresses = []
-        if is_micropython():
-            import network
-            station = network.WLAN(network.STA_IF)
-            if station.isconnected():
-                host = station.ifconfig()[0]
-                addresses = socket.getaddrinfo(host, 80)
-        else:
-            addresses = socket.getaddrinfo(socket.gethostname(), None)
+        addresses = socket.getaddrinfo(socket.gethostname(), None)
 
         # we're going to send a request for all available ipv4
         # addresses and build a list of all the devices that reply
