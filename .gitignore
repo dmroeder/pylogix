@@ -113,3 +113,4 @@ venv.bak/
 # pylogix configuration
 tests/plcConfig.py
 pylogix/testing/
+main.py
