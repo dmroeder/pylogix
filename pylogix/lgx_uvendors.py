@@ -6,7 +6,8 @@ class UVENDORS:
         sID = str(vendorID)
         with open(__file__ + ".txt") as vendor_data:
             for line in vendor_data:
-                k, v = line.split(':')
+                # Ensure list of exactly two elements is assigned to k,v
+                k, v = (line.split(':') + ['Unknown'])[:2]
                 if k == sID: return v.strip()
         return 'Unknown'
 
