@@ -10,44 +10,47 @@ class UVENDORS:
         bnl,bcln = b'\n',b':'
         fc = lambda bites: bites.index(bcln)
         vID = lambda bites: bites[:fc(bites)]
-        idval = lambda lyne: int(vID(lyne))
+
+        vc = str(vendorID).encode('UTF-8')  # vendorID as string
+        cp = len(vc)                        # colon position
+        vc += b':'                          # append colon
 
         with open(__file__ + ".bin",'rb') as vendor_file:
 
             # Read and validate header line (through first newline),
             # parse number of records, get fixed record length
-            hdr = vendor_file.readline()
-            assert bnl == hdr[-1:]
-            assert b':Count of vendors' == hdr[fc(hdr):].strip()
-            span = idval(hdr)
-            lo,hi,fixedlength = 1, 1+span, len(hdr)
+            lread = vendor_file.readline()
+            span = int(lread[:lread.index(bcln)])
+            lo,hi,fixedlength = 1, 1+span, len(lread)
 
-            # Read and validate first data line, i.e. next line
-            lin1 = vendor_file.readline()
-            assert len(lin1) == fixedlength
-            assert bnl == lin1[-1:]
+            # Read at least vendor ID digits plus colon from file
+            lread = vendor_file.read(12)
 
-            # Parse vendor ID from first data line, check for match
-            idval1 = idval(lin1)
-            if idval1 == vendorID:
-                return lin1[fc(lin1)+1:].strip().decode('UTF-8')
-            elif idval1 > vendorID:
+            # Check vendor ID for match
+            if lread.startswith(vc):
+                return (lread[cp+1:]
+                       +vendor_file.read(fixedlength-13)
+                       ).rstrip().decode('UTF-8')
+            elif lread[cp:cp+1] == b':' and lread > vc:
                 # Short-circuit the binary search if invariant fails
+                span = 0
+            elif fc(lread) > cp:
                 span = 0
 
             # Binary search; invariant is vID(line@lo) < vendorID
             while span > 1:
                 mid = lo + (span >> 1)
-                seek = (mid*fixedlength) - 1
-                assert vendor_file.seek(seek,0) == seek
-                lread = vendor_file.read(fixedlength+1)
-                assert bnl == lread[:1]
-                assert bnl == lread[-1:]
-                iID = idval(lread[1:])
-                if iID == vendorID:
-                    return lread[fc(lread)+1:].strip().decode('UTF-8')
-                elif iID < vendorID: lo = mid
-                else               : hi = mid
+                vendor_file.seek(mid*fixedlength,0)
+                lread = vendor_file.read(12)
+
+                if lread.startswith(vc):
+                    return (lread[cp+1:]
+                           +vendor_file.read(fixedlength-13)
+                           ).rstrip().decode('UTF-8')
+
+                if lread[cp:cp+1] == b':' and lread < vc: lo = mid
+                elif fc(lread) < cp                     : lo = mid
+                else                                    : hi = mid
                 span = hi - lo
             return 'Unknown'
 
