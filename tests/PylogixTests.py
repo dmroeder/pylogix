@@ -447,6 +447,21 @@ class PylogixTests(unittest.TestCase):
         self.assertFalse(pylogix.PLC(Micro800=False).Micro800)
         self.assertTrue(pylogix.PLC(Micro800=True).Micro800)
 
+    @unittest.skipIf(is_micropython(), 'Not loading vendors dict into micropython')
+    def test_all_uvendors(self):
+        from pylogix.lgx_uvendors import uvendors
+        vendors = pylogix.lgx_vendors.vendors
+        for k in vendors:
+            self.assertEqual(uvendors[k], vendors[k], "Mismatch vendors/uvendors")
+
+    def test_known_uvendors(self):
+        from pylogix.lgx_uvendors import uvendors
+        self.assertEqual(uvendors[0], 'Reserved', "Reserver uvendor not found")
+        self.assertEqual(uvendors[1], 'Rockwell Automation/Allen-Bradley', "Rockwell uvendor not found")
+        self.assertEqual(uvendors[-1], 'Unknown', "Unknown uvendor not returned")
+        self.assertEqual(uvendors[(1<<32)-1], 'Unknown', "Unknown uvendor not returned")
+
+
     def tearDown(self):
         self.comm.Close()
 
