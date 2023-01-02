@@ -1,11 +1,11 @@
 """
 Build script to write vendor names bin for micropython environments
-- File vendor.bin is read by app module [u]pylogix/lgx_uvendors.[m]py
+- File vendors.bin is read by app module [u]pylogix/lgx_uvendors.[m]py
 
 Usage
 =====
 
-    python build_vendor_bin.py
+    python build_vendors_bin.py
 
 This script is not part of the library.  It only needs to be run when
 the vendors dict change in script pylogix/lgx_uvendors.py,, but is
@@ -20,7 +20,7 @@ that the pylogix library takes too much memory on some hardware devices
 to be useful.
 
 This current solution writes the vendors data to a file* with sorted,
-fixed-length records, upylogix/vendor.bin, which data file can be read
+fixed-length records, upylogix/vendors.bin, which data file can be read
 by the code in pylogix/lgx_uvendors.[m]py to emulate the vendors dict.
 
 * The assumption is that the hardware device has separate file-based
