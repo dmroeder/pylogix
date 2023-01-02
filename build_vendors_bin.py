@@ -41,6 +41,7 @@ maxL = 0
 vlist = list()
 for k in ks:
     assert isinstance(k,int)
+    assert k > -1
     v = vdict[k]
     assert isinstance(v,str)
     vencoded = "{0}:{1}".format(k,v).encode('UTF-8')
