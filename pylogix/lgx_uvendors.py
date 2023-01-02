@@ -1,5 +1,6 @@
+# lgx_uvendors.py/.mpy
 # Micropython proxy class for large dict vendors in lgx_vendors.py
-class UVENDORS:
+class Uvendors:
     # Look up on the fly without loading all vendor data into memory
     # .__getitem__ method is called when evaluating `uvendors[id]`
     def __getitem__(self, vendorID):
@@ -7,51 +8,69 @@ class UVENDORS:
 
     def getitem_O_logN(self, vendorID):
 
-        bnl,bcln = b'\n',b':'
-        fc = lambda bites: bites.index(bcln)
-        vID = lambda bites: bites[:fc(bites)]
+        vc = str(vendorID).encode('UTF-8') + b':'  # vendorID: byte-str
+        colonpos = vc.index(b':')                  # colon position
 
-        vc = str(vendorID).encode('UTF-8')  # vendorID as string
-        cp = len(vc)                        # colon position
-        vc += b':'                          # append colon
-
+        # Vendor data file will be installed as [lgx_uvendors.mpy.bin],
+        # with fixed-length records of UTF-8-encoded byte0strings,
+        # terminated by newlines
         with open(__file__ + ".bin",'rb') as vendor_file:
 
-            # Read and validate header line (through first newline),
-            # parse number of records, get fixed record length
+            # Read entire header line (through first newline):
+            # - parse record count from decimal digits before colon;
+            # - get fixed record length;
+            # - calculate 0-based cardinalities of first record and of
+            #   record one past the last record.
             lread = vendor_file.readline()
-            span = int(lread[:lread.index(bcln)])
-            lo,hi,fixedlength = 1, 1+span, len(lread)
+            span = int(lread[:lread.index(b':')])
+            fixedlength = len(lread)
+            assert fixedlength > 12,'Invalid vendors.bin file'
+            lo,hi = 1, 1+span
 
-            # Read at least vendor ID digits plus colon from file
+            # Read vendor ID plus colon of next (first data) record
             lread = vendor_file.read(12)
 
-            # Check vendor ID for match
+            # Check that vendor ID, return if vendorID argument matches
             if lread.startswith(vc):
-                return (lread[cp+1:]
+                # Read balance of line, reconstruct vendor data
+                return (lread[colonpos+1:]
                        +vendor_file.read(fixedlength-13)
                        ).rstrip().decode('UTF-8')
-            elif lread[cp:cp+1] == b':' and lread > vc:
+
+            elif lread[colonpos:colonpos+1] == b':' and lread > vc:
                 # Short-circuit the binary search if invariant fails
                 span = 0
-            elif fc(lread) > cp:
+            elif lread.index(b':') > colonpos:
                 span = 0
 
-            # Binary search; invariant is vID(line@lo) < vendorID
+            # Binary search
+            # - Invariant is (vendor ID of record [lo]) < vendorID
             while span > 1:
+
+                # Read vendor ID of record ~halfway between lo and hi
                 mid = lo + (span >> 1)
                 vendor_file.seek(mid*fixedlength,0)
                 lread = vendor_file.read(12)
 
+                # Check that vendor ID, return if vendorID arg matches
                 if lread.startswith(vc):
-                    return (lread[cp+1:]
+                    # Read balance of line, reconstruct vendor data
+                    return (lread[colonpos+1:]
                            +vendor_file.read(fixedlength-13)
                            ).rstrip().decode('UTF-8')
 
-                if lread[cp:cp+1] == b':' and lread < vc: lo = mid
-                elif fc(lread) < cp                     : lo = mid
-                else                                    : hi = mid
+                # Maintain invariant by assigning mid to either lo or hi
+                if lread[colonpos:colonpos+1] == b':' and lread < vc:
+                    lo = mid
+                elif lread.index(b':') < colonpos:
+                    lo = mid
+                else:
+                    hi = mid
+
+                # Re-calculate magnitude of remaining hi:lo range
                 span = hi - lo
+
+            # No match found, return vendor data indicating same
             return 'Unknown'
 
 
@@ -70,14 +89,12 @@ class UVENDORS:
         return 'Unknown'
 
     # Do-nothing on class initialization
-    def __init__(self):
-        pass
+    def __init__(self): pass
 
     # Test if vendorID is in file of vendor IDs
     # .__contains__ method is called when executing `id in uvendors`
     # - use .__getitem__ method above
-    def __contains__(self, vendorID):
-        return self[vendorID] != 'Unknown'
+    def __contains__(self, vendorID): return self[vendorID] != 'Unknown'
 
 
-uvendors = UVENDORS()
+uvendors = Uvendors()
