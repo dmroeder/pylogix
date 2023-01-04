@@ -1,4 +1,30 @@
-"""
+########################################################################
+# scripts/build_mpy.py
+# - Cross-compile .py=>.mpy files for micropython
+# - Build upylogix/vendor.bin file from pylogix/lgx_vendors.py
+########################################################################
+
+# This should never be loaded as a module
+assert "__main__" == __name__,"Don't use [' + __file__ + '] as a module"
+
+import os
+from mpy_cross import run
+
+# CHDIR to root of repository
+script_dir = os.path.dirname(__file__)
+toproot_dir = os.path.join(script_dir,'..')
+os.chdir(toproot_dir)
+
+# Compile pylogix/*.py (except lgx_vendors.py) to upylogix/*.mpy
+for modyule in '__init__ eip lgx_comm lgx_device lgx_response lgx_tag utils lgx_uvendors'.split():
+  argv = list()
+  argv.append(os.path.join('pylogix','{0}.py'.format(modyule)))
+  argv.append('-o')
+  argv.append(os.path.join('upylogix','{0}.mpy'.format(modyule)))
+  run(*argv)
+
+########################################################################
+build_vendors_bin_doc = """
 Build script to write vendor names bin for micropython environments
 - File vendors.bin is read by app module [u]pylogix/lgx_uvendors.[m]py
 
@@ -28,10 +54,9 @@ by the code in pylogix/lgx_uvendors.[m]py to emulate the vendors dict.
 
 """
 
-# This should never be loaded as a module
-assert "__main__" == __name__,"Don't use [' + __file__ + '] as a module"
-
 # Load vendors dict, and create sorted list of keys; set max name length
+import sys
+sys.path.insert(0,'.')
 from pylogix.lgx_vendors import vendors as vdict
 ks = sorted(vdict.keys())
 maxL = 0
@@ -61,3 +86,5 @@ with open('upylogix/vendors.bin','wb') as fbin:
 
     # Write vendor data records
     for key_vendor in vlist: fbin.write(oneline(key_vendor))
+
+########################################################################
