@@ -1,5 +1,8 @@
 # lgx_uvendors.py/.mpy
 # Micropython proxy class for large dict vendors in lgx_vendors.py
+from pylogix.utils import is_python2
+
+
 class Uvendors:
     # Look up on the fly without loading all vendor data into memory
     # .__getitem__ method is called when evaluating `uvendors[id]`
@@ -14,7 +17,13 @@ class Uvendors:
         # Vendor data file will be installed as [lgx_uvendors.mpy.bin],
         # with fixed-length records of UTF-8-encoded byte0strings,
         # terminated by newlines
-        with open(__file__ + ".bin", 'rb') as vendor_file:
+        if is_python2():
+            file_name = __file__.replace("pyc", "py") + ".bin"
+        else:
+            file_name = __file__ + ".bin"
+
+        # with open(__file__ + ".bin", 'rb') as vendor_file:
+        with open(file_name, 'rb') as vendor_file:
 
             # Read entire header line (through first newline):
             # - parse record count from decimal digits before colon;

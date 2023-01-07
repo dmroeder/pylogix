@@ -448,7 +448,6 @@ class PylogixTests(unittest.TestCase):
         self.assertTrue(pylogix.PLC(Micro800=True).Micro800)
 
     @unittest.skipIf(is_micropython(), 'Not loading vendors dict into micropython')
-    @unittest.skipIf(is_python2(), 'Not loading vendors dict into micropython')
     def test_all_uvendors(self):
         from pylogix.lgx_uvendors import uvendors
         vendors = pylogix.lgx_vendors.vendors
