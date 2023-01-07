@@ -15,6 +15,8 @@ setuptools.setup(
     license="Apache License 2.0",
     url="https://github.com/dmroeder/pylogix",
     packages=setuptools.find_packages(),
+    package_data={'': ['lgx_uvendors.py.bin']},
+    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3.6",
