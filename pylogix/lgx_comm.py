@@ -26,21 +26,20 @@ class Connection(object):
         self.parent = parent
 
         self.Port = 44818
-        self.VendorID = 0x1337
-        self.Context = 0x00
-        self.ContextPointer = 0
-        self.SocketConnected = False
+        self.ConnectionSize = None  # Default to try Large, then Small Fwd Open.
         self.Socket = socket.socket()
+        self.SocketConnected = False
 
-        self._registered = False
         self._connected = False
-        self.OTNetworkConnectionID = None
-        self.SessionHandle = 0x0000
-        self.SessionRegistered = False
-        self.SerialNumber = 0
-        self.OriginatorSerialNumber = 42
-        self.SequenceCounter = 1
-        self.ConnectionSize = None # Default to try Large, then Small Fwd Open.
+        self._context = 0x00
+        self._context_index= 0
+        self._originator_serial = 42
+        self._ot_connection_id = None
+        self._registered = False
+        self._serial_number = 0
+        self._session_handle = 0x0000
+        self._sequence_counter = 1
+        self._vendor_id = 0x1337
 
     def connect(self, connected=True):
         """
@@ -95,7 +94,7 @@ class Connection(object):
             self.Socket.connect((self.parent.IPAddress, self.Port))
         except socket.error as e:
             self.SocketConnected = False
-            self.SequenceCounter = 1
+            self._sequence_counter  = 1
             self.Socket.close()
             return [False, e]
 
@@ -103,7 +102,7 @@ class Connection(object):
         self.Socket.send(self._build_register_session())
         ret_data = self.receive_data()
         if ret_data:
-            self.SessionHandle = unpack_from('<I', ret_data, 4)[0]
+            self._session_handle = unpack_from('<I', ret_data, 4)[0]
             self._registered = True
         else:
             self.SocketConnected = False
@@ -194,7 +193,7 @@ class Connection(object):
         """
         eip_command = 0x0065
         eip_length = 0x0004
-        eip_session_handle = self.SessionHandle
+        eip_session_handle = self._session_handle
         eip_status = 0x0000
         eip_context = pylogix.__version__.ljust(8, " ").encode("utf-8")
         eip_options = 0x0000
@@ -218,9 +217,9 @@ class Connection(object):
         """
         eip_command = 0x66
         eip_length = 0x0
-        eip_session_handle = self.SessionHandle
+        eip_session_handle = self._session_handle
         eip_status = 0x0000
-        eip_context = self.Context
+        eip_context = self._context
         eip_options = 0x0000
 
         return pack('<HHIIQI',
@@ -242,7 +241,7 @@ class Connection(object):
             return [False, e]
         sts = unpack_from('<b', ret_data, 42)[0]
         if not sts:
-            self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
+            self._ot_connection_id = unpack_from('<I', ret_data, 44)[0]
             self._connected = True
         else:
             self.SocketConnected = False
@@ -275,10 +274,10 @@ class Connection(object):
         cip_timeout_ticks = 0x0e
         cip_ot_connection_id = 0x20000002
         cip_to_connection_id = randrange(65000)
-        self.SerialNumber = randrange(65000)
-        cip_serial_number = self.SerialNumber
-        cip_vendor_id = self.VendorID
-        cip_originator_serial = self.OriginatorSerialNumber
+        self._serial_number = randrange(65000)
+        cip_serial_number = self._serial_number
+        cip_vendor_id = self._vendor_id
+        cip_originator_serial = self._originator_serial
         cip_multiplier = 0x03
         cip_ot_rpi = 0x00201234
         cip_connection_parameters = 0x4200
@@ -349,9 +348,9 @@ class Connection(object):
         cip_instance = 0x01
         cip_priority = 0x0A
         cip_timeout_ticks = 0x0e
-        cip_serial_number = self.SerialNumber
-        cip_vendor_id = self.VendorID
-        cip_originator_serial = self.OriginatorSerialNumber
+        cip_serial_number = self._serial_number
+        cip_vendor_id = self._vendor_id
+        cip_originator_serial = self._originator_serial
 
         packet = pack('<BBBBBBBBHHI',
                       cip_service,
@@ -378,9 +377,9 @@ class Connection(object):
         """
         eip_command = 0x6F
         eip_length = 16 + frame_len
-        eip_session_handle = self.SessionHandle
+        eip_session_handle = self._session_handle
         eip_status = 0x00
-        eip_context = self.Context
+        eip_context = self._context
         eip_options = 0x00
 
         eip_interface_handle = 0x00
@@ -439,17 +438,17 @@ class Connection(object):
         commands to perform the read or write.  This request
         will be followed by the reply containing the data
         """
-        if self.ContextPointer == 155:
-            self.ContextPointer = 0
+        if self._context_index == 155:
+            self._context_index = 0
 
         eip_connected_data_len = len(ioi) + 2
 
         eip_command = 0x70
         eip_length = 22 + len(ioi)
-        eip_session_handle = self.SessionHandle
+        eip_session_handle = self._session_handle
         eip_status = 0x00
-        eip_context = context_dict[self.ContextPointer]
-        self.ContextPointer += 1
+        eip_context = context_dict[self._context_index]
+        self._context_index += 1
 
         eip_options = 0x0000
         eip_interface_handle = 0x00
@@ -457,12 +456,12 @@ class Connection(object):
         eip_item_count = 0x02
         eip_item1_id = 0xA1
         eip_item1_length = 0x04
-        eip_item1 = self.OTNetworkConnectionID
+        eip_item1 = self._ot_connection_id
         eip_item2_id = 0xB1
         eip_item2_length = eip_connected_data_len
-        eip_sequence = self.SequenceCounter
-        self.SequenceCounter += 1
-        self.SequenceCounter = self.SequenceCounter % 0x10000
+        eip_sequence = self._sequence_counter 
+        self._sequence_counter  += 1
+        self._sequence_counter  = self._sequence_counter  % 0x10000
 
         packet = pack('<HHIIQIIHHHHIHHH',
                       eip_command,
@@ -622,7 +621,7 @@ class Connection(object):
         """
         cip_service = 0x63
         cip_length = 0x00
-        cip_session_handle = self.SessionHandle
+        cip_session_handle = self._session_handle
         cip_status = 0x00
         cip_response = 0xFA
         cip_context1 = 0x6948
