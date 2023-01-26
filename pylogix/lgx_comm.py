@@ -19,6 +19,7 @@ import socket
 from random import randrange
 from struct import pack, unpack_from
 
+# noinspection PyMethodMayBeStatic
 class Connection(object):
 
     def __init__(self, parent):
@@ -41,7 +42,7 @@ class Connection(object):
         self.SequenceCounter = 1
         self.ConnectionSize = None # Default to try Large, then Small Fwd Open.
 
-    def connect(self, connected=True, conn_class=3):
+    def connect(self, connected=True):
         """
         Connect to the PLC
         """
@@ -60,7 +61,7 @@ class Connection(object):
                 frame = self._build_unconnected_send(len(request)) + request + path
             else:
                 frame = request
-            eip_header = self._build_send_rrdata_header(len(frame)) + frame
+            eip_header = self._build_rr_data_header(len(frame)) + frame
         
         return self._get_bytes(eip_header, connected)
 
@@ -100,7 +101,7 @@ class Connection(object):
 
         # register the session
         self.Socket.send(self._build_register_session())
-        ret_data = self.recv_data()
+        ret_data = self.receive_data()
         if ret_data:
             self.SessionHandle = unpack_from('<I', ret_data, 4)[0]
             self._registered = True
@@ -135,7 +136,7 @@ class Connection(object):
             if self._connected:
                 close_packet = self._build_forward_close_packet()
                 self.Socket.send(close_packet)
-                self.recv_data()
+                self.receive_data()
                 self._connected = False
             if self._registered:
                 unregister_packet = self._build_unregister_session()
@@ -152,7 +153,7 @@ class Connection(object):
         """
         try:
             self.Socket.send(data)
-            ret_data = self.recv_data()
+            ret_data = self.receive_data()
             if ret_data:
                 if connected:
                     status = unpack_from('<B', ret_data, 48)[0]
@@ -168,12 +169,12 @@ class Connection(object):
             self.SocketConnected = False
             return 7, None
 
-    def recv_data(self):
+    def receive_data(self):
         """
         When receiving data from the socket, it is possible to receive
         incomplete data.  The initial packet that comes in contains
         the length of the payload.  We can use that to keep calling
-        recv() until the entire payload is received.  This only happens
+        socket receive until the entire payload is received.  This only happens
         when using LargeForwardOpen
         """
         data = b''
@@ -236,7 +237,7 @@ class Connection(object):
         """
         self.Socket.send(self._build_forward_open_packet())
         try:
-            ret_data = self.recv_data()
+            ret_data = self.receive_data()
         except socket.timeout as e:
             return [False, e]
         sts = unpack_from('<b', ret_data, 42)[0]
@@ -255,13 +256,13 @@ class Connection(object):
         Assemble the forward open packet
         """
         forward_open = self._build_cip_forward_open()
-        header = self._build_send_rrdata_header(len(forward_open))
+        header = self._build_rr_data_header(len(forward_open))
         return header + forward_open
 
     def _build_cip_forward_open(self):
         """
         Forward Open happens after a connection is made,
-        this will sequp the CIP connection parameters
+        this will define the CIP connection parameters
         """
         cip_path_size = 0x02
         cip_class_type = 0x20
@@ -332,7 +333,7 @@ class Connection(object):
         Assemble the forward close packet
         """
         forward_close = self._build_forward_close()
-        header = self._build_send_rrdata_header(len(forward_close))
+        header = self._build_rr_data_header(len(forward_close))
         return header + forward_close
 
     def _build_forward_close(self):
@@ -371,7 +372,7 @@ class Connection(object):
         connection_path += path
         return packet + connection_path
 
-    def _build_send_rrdata_header(self, frame_len):
+    def _build_rr_data_header(self, frame_len):
         """
         Build the EIP Send RR Data Header
         """

@@ -30,6 +30,7 @@ from datetime import datetime, timedelta
 from random import randrange
 from struct import pack, unpack_from
 
+# noinspection PyMethodMayBeStatic
 class PLC(object):
 
     def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False):
@@ -131,7 +132,7 @@ class PLC(object):
 
     def GetPLCTime(self, raw=False):
         """
-        Get the PLC's clock time, return as human-readable (default) or raw if raw=True
+        Get the controller clock time, return as human-readable (default) or raw if raw=True
 
         returns Response class (.TagName, .Value, .Status)
         """
@@ -139,7 +140,7 @@ class PLC(object):
 
     def SetPLCTime(self):
         """
-        Sets the PLC's clock time
+        Sets the controller clock time
 
         returns Response class (.TagName, .Value, .Status)
         """
@@ -177,7 +178,7 @@ class PLC(object):
         if not self.ProgramNames:
             self._get_tag_list(False)
 
-        # Get single program tags if progragName exists
+        # Get single program tags if programName exists
         if programName in self.ProgramNames:
             program_tags = self._get_program_tag_list(programName)
             # Getting status from program_tags Response object
@@ -275,6 +276,7 @@ class PLC(object):
         Processes the read request
         """
         self.Offset = 0
+        words = 1
 
         conn = self.conn.connect()
         if not conn[0]:
@@ -346,7 +348,7 @@ class PLC(object):
         Processes the multiple read request, but only the possible number of tags in a single request. The size
         difference between tags and result must check for a complete read
         """
-        service_segs = []
+        service_segments = []
         segments = b""
         tag_count = 0
         self.Offset = 0
@@ -386,7 +388,7 @@ class PLC(object):
             # check if request size does not exceed (ConnectionSize bytes limit)
             if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
                 service_segment_size = service_segment_size + rsp_tag_size
-                service_segs.append(read_service)
+                service_segments.append(read_service)
                 tag_count = tag_count + 1
             else:
                 break
@@ -401,10 +403,10 @@ class PLC(object):
 
         # assemble all the segments
         for i in range(tag_count):
-            segments += service_segs[i]
+            segments += service_segments[i]
 
         for i in range(tag_count-1):
-            temp += len(service_segs[i])
+            temp += len(service_segments[i])
             offsets += pack('<H', temp)
 
         request = header + segment_count + offsets + segments
@@ -489,7 +491,7 @@ class PLC(object):
 
         ioi = self._build_ioi(tag_name, data_type)
 
-        # handle sending the write data
+        # handle sending write data
         if len(write_data) > 1:
             # write requires multiple packets
             for w in write_data:
@@ -519,7 +521,7 @@ class PLC(object):
         """
         Processes the multiple write request
         """
-        service_segs = []
+        service_segments = []
         segments = b""
         tag_count = 0
         self.Offset = 0
@@ -567,7 +569,7 @@ class PLC(object):
                 temp_segments = []
                 tmp_count = tag_count
                 tmp_write_values = []
-                bools_fit = True
+                booleans_fit = True
                 for i in range(len(high)):
                     ioi = self._build_ioi(tags[i], data_type)
                     write_service = self._add_mod_write_service(ioi, data_type, high[i], low[i])
@@ -581,13 +583,13 @@ class PLC(object):
                         tag_count = tag_count + 1
                     else:
                         # BOOLs didn't fit in the current packet, abort
-                        bools_fit = True
+                        booleans_fit = True
                         tag_count = tmp_count
                         break
-                if bools_fit:
-                    # if the bools fit in this request, append them.
+                if booleans_fit:
+                    # if the booleans fit in this request, append them.
                     write_values.extend(tmp_write_values)
-                    service_segs.extend(temp_segments)
+                    service_segments.extend(temp_segments)
             else:
                 ioi = self._build_ioi(tag_name, data_type)
                 write_service = self._add_write_service(ioi, value, data_type)
@@ -597,7 +599,7 @@ class PLC(object):
                 # check if request size does not exceed (ConnectionSize bytes limit)
                 if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
                     service_segment_size = service_segment_size + rsp_tag_size
-                    service_segs.append(write_service)
+                    service_segments.append(write_service)
                     tag_count = tag_count + 1
                 else:
                     break
@@ -611,10 +613,10 @@ class PLC(object):
 
         # assemble all the segments
         for i in range(tag_count):
-            segments += service_segs[i]
+            segments += service_segments[i]
 
         for i in range(tag_count-1):
-            temp += len(service_segs[i])
+            temp += len(service_segments[i])
             offsets += pack('<H', temp)
 
         request = header + segment_count + offsets + segments
@@ -819,8 +821,8 @@ class PLC(object):
                 split_char = pack('<b', 0x00)
                 members = member_bytes.split(split_char)
                 split_char = pack('<b', 0x3b)
-                defs = members[0].split(split_char)
-                name = str(defs[0].decode('utf-8'))
+                definitions = members[0].split(split_char)
+                name = str(definitions[0].decode('utf-8'))
                 template[key][1] = name
 
                 udt = UDT()
@@ -830,8 +832,8 @@ class PLC(object):
                     field = Tag()
                     field.UDT = udt
                     field.TagName = str(members[i].decode('utf-8'))
-                    if len(defs) > 1:
-                        scope = unpack_from('<BB', defs[1], 1 + (i-1)*2)
+                    if len(definitions) > 1:
+                        scope = unpack_from('<BB', definitions[1], 1 + (i-1)*2)
                         field.AccessRight = scope[1] & 0x03
                         field.Scope0 = scope[0]
                         field.Scope1 = scope[1]
@@ -891,7 +893,7 @@ class PLC(object):
 
     def _get_template(self, instance, data_len):
         """
-        Get the members of a UDT so we can get it
+        Get the members of a UDT, so we can get it
         """
         data = b''
         status = 0
@@ -914,7 +916,7 @@ class PLC(object):
     def _build_template_attributes(self, instance):
         """
         Build the template attribute packet, part of
-        retreiving the UDT names
+        retrieving the UDT names
         """
         cip_service = 0x03
         cip_size = 0x03
@@ -944,7 +946,7 @@ class PLC(object):
     def _read_template_service(self, instance, data_len, offset=0):
         """
         Build the template attribute packet, part of
-        retreiving the UDT names
+        retrieving the UDT names
         """
         cip_service = 0x4c
         cip_size = 0x03
@@ -1109,6 +1111,7 @@ class PLC(object):
         """
         Add the read service to the tagIOI
         """
+        self._is_not_used()
         request_service = 0x4C
         request_size = int(len(ioi)/2)
         read_service = pack('<BB', request_service, request_size)
@@ -1120,6 +1123,7 @@ class PLC(object):
         """
         Add the partial read service to the tag IOI
         """
+        self._is_not_used()
         request_service = 0x52
         request_size = int(len(ioi)/2)
         read_service = pack('<BB', request_service, request_size)
@@ -1258,12 +1262,12 @@ class PLC(object):
         """
         Gets the replies from the PLC
         In the case of BOOL arrays and bits of
-            a word, we do some reformating
+            a word, we do some reformatting
         """
         tag, base_tag, index = parse_tag_name(tag_name)
         data_type = self.KnownTags[base_tag][0]
 
-        # if bit of word was requested
+        # if A bit of word was requested
         if bit_of_word(tag_name):
             words = self._get_values(tag_name, data)
             values = self._words_to_bits(tag_name, words, count=elements)
@@ -1277,7 +1281,7 @@ class PLC(object):
 
     def _get_values(self, tag_name, data):
         """
-        Gather all of the values in the reply/replies
+        Extract the values from the reply/replies
         """
         tag, base_tag, index = parse_tag_name(tag_name)
         data_type = self.KnownTags[base_tag][0]
@@ -1364,7 +1368,7 @@ class PLC(object):
 
     def _initial_read(self, tag, base_tag, data_type):
         """
-        Store each unique tag read in a dict so that we can retreive the
+        Store each unique tag read in a dict so that we can retrieve the
         data type or data length (for STRING) later
         """
         # if a tag already exists, return True
@@ -1400,7 +1404,7 @@ class PLC(object):
         packet_overhead = 110
         # calculate number of bytes tag name will occupy
         tag_length = len(tag) + len(tag) % 2
-        # calculate the available space (in bytes) for the write values
+        # calculate the available space (in bytes) for values to be written
         space_for_payload = self.ConnectionSize - packet_overhead - tag_length
 
         # calculate how many bytes per value are required
@@ -1409,7 +1413,7 @@ class PLC(object):
         limit = int(space_for_payload / bytes_per_value)
         # split the list up into multiple smaller lists
         if bit_of_word(tag) or data_type == 0xd3:
-            # bools are packed into 4 byte chunks and will write
+            # booleans are packed into 4 byte chunks and will write
             # each chunk individually
             chunks = [write_values]
         else:
@@ -1461,7 +1465,7 @@ class PLC(object):
                 data_type = unpack_from('<B', stripped, offset+4)[0]
                 tag_name, base_tag, index = parse_tag_name(tag)
                 self.KnownTags[base_tag] = (data_type, 0)
-                # if bit of word was requested
+                # if a bit of word was requested
                 if bit_of_word(tag):
                     type_fmt = self.CIPTypes[data_type][2]
                     val = unpack_from(type_fmt, stripped, offset+6)[0]
@@ -1489,6 +1493,7 @@ class PLC(object):
 
     def _parse_multi_write(self, write_data, data):
         # remove the beginning of the packet because we just don't care about it
+        self._is_not_used()
         stripped = data[50:]
         tag_count = unpack_from('<H', stripped, 0)[0]
 
@@ -1550,6 +1555,9 @@ class PLC(object):
                 work.append(0x00)
         return work
 
+    def _is_not_used(self):
+        pass
+
 def bit_of_word_state(tag, value):
     """
     Find the array/bit element at the end of a tag
@@ -1574,7 +1582,7 @@ def get_word_count(start, length, bits):
     Get the number of words that the requested
     bits would occupy.  We have to take into account
     how many bits are in a word and the fact that the
-    number of requested bits can span multipe words.
+    number of requested bits can span multiple words.
     """
     new_start = start % bits
     new_end = new_start + length
@@ -1640,7 +1648,7 @@ def mod_write_masks(tag, values, bpw):
     array_pattern = r'\[([\d]|[,]|[\s])*\]$'
 
     try:
-        # bit of a word
+        # A bit of a word
         index = int(re.search(bit_pattern, tag).group(0)[1:])
     except Exception:
         # boolean arrays
