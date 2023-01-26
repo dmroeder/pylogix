@@ -76,13 +76,13 @@ class Connection(object):
         """
         if self.SocketConnected:
             if connected and not self._connected:
-                # connection type changed, need to close so we can reconnect
+                # connection type changed, need to close, so we can reconnect
                 self._close_connection()
             elif not connected and self._connected:
-                # connection type changed, need to close so we can reconnect
+                # connection type changed, need to close, so we can reconnect
                 self._close_connection()
             else:
-                return (True, 'Success')
+                return [True, 'Success']
 
         try:
             try:
@@ -96,7 +96,7 @@ class Connection(object):
             self.SocketConnected = False
             self.SequenceCounter = 1
             self.Socket.close()
-            return (False, e)
+            return [False, e]
 
         # register the session
         self.Socket.send(self._build_register_session())
@@ -106,7 +106,7 @@ class Connection(object):
             self._registered = True
         else:
             self.SocketConnected = False
-            return (False, 'Register session failed')
+            return [False, 'Register session failed']
 
         if connected:
             if self.ConnectionSize is not None:
@@ -124,7 +124,7 @@ class Connection(object):
             return ret
 
         self.SocketConnected = True
-        return (self.SocketConnected, 'Success')
+        return [self.SocketConnected, 'Success']
 
     def _close_connection(self):
         """
@@ -161,10 +161,10 @@ class Connection(object):
                 return status, ret_data
             else:
                 return 1, None
-        except (socket.gaierror):
+        except socket.gaierror:
             self.SocketConnected = False
             return 1, None
-        except (IOError):
+        except IOError:
             self.SocketConnected = False
             return 7, None
 
@@ -238,17 +238,17 @@ class Connection(object):
         try:
             ret_data = self.recv_data()
         except socket.timeout as e:
-            return (False, e)
+            return [False, e]
         sts = unpack_from('<b', ret_data, 42)[0]
         if not sts:
             self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
             self._connected = True
         else:
             self.SocketConnected = False
-            return (False, 'Forward open failed')
+            return [False, 'Forward open failed']
 
         self.SocketConnected = True
-        return (self.SocketConnected, 'Success')
+        return [self.SocketConnected, 'Success']
 
     def _build_forward_open_packet(self):
         """
