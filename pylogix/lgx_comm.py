@@ -19,33 +19,34 @@ import socket
 from random import randrange
 from struct import pack, unpack_from
 
+
+# noinspection PyMethodMayBeStatic
 class Connection(object):
 
     def __init__(self, parent):
         self.parent = parent
 
         self.Port = 44818
-        self.VendorID = 0x1337
-        self.Context = 0x00
-        self.ContextPointer = 0
-        self.SocketConnected = False
+        self.ConnectionSize = None  # Default to try Large, then Small Fwd Open.
         self.Socket = socket.socket()
+        self.SocketConnected = False
 
-        self._registered = False
         self._connected = False
-        self.OTNetworkConnectionID = None
-        self.SessionHandle = 0x0000
-        self.SessionRegistered = False
-        self.SerialNumber = 0
-        self.OriginatorSerialNumber = 42
-        self.SequenceCounter = 1
-        self.ConnectionSize = None # Default to try Large, then Small Fwd Open.
+        self._context = 0x00
+        self._context_index = 0
+        self._originator_serial = 42
+        self._ot_connection_id = None
+        self._registered = False
+        self._serial_number = 0
+        self._session_handle = 0x0000
+        self._sequence_counter = 1
+        self._vendor_id = 0x1337
 
-    def connect(self, connected=True, conn_class=3):
+    def connect(self, connected=True):
         """
         Connect to the PLC
         """
-        return self._connect(connected, conn_class)
+        return self._connect(connected)
 
     def send(self, request, connected=True, slot=None):
         """
@@ -53,58 +54,60 @@ class Connection(object):
         Return the status and data
         """
         if connected:
-            eip_header = self._buildEIPHeader(request)
+            eip_header = self._build_eip_header(request)
         else:
             if self.parent.Route or slot is not None:
-                path = self._unconnectedPath(slot)
-                frame = self._buildCIPUnconnectedSend(len(request)) + request + path
+                path = self._unconnected_path(slot)
+                frame = self._build_unconnected_send(len(request)) + request + path
             else:
                 frame = request
-            eip_header = self._buildEIPSendRRDataHeader(len(frame)) + frame
+            eip_header = self._build_rr_data_header(len(frame)) + frame
         
-        return self._getBytes(eip_header, connected)
+        return self._get_bytes(eip_header, connected)
 
     def close(self):
         """
         Close the connection
         """
-        self._closeConnection()
+        self._close_connection()
 
-    def _connect(self, connected, conn_class):
+    def _connect(self, connected):
         """
         Open a connection to the PLC.
         """
         if self.SocketConnected:
             if connected and not self._connected:
-                # connection type changed, need to close so we can reconnect
-                self._closeConnection()
+                # connection type changed, need to close, so we can reconnect
+                self._close_connection()
             elif not connected and self._connected:
-                # connection type changed, need to close so we can reconnect
-                self._closeConnection()
+                # connection type changed, need to close, so we can reconnect
+                self._close_connection()
             else:
-                return (True, 'Success')
+                return [True, 'Success']
 
         try:
-            try: self.Socket.close()    ### Ensure socket is closed
-            except: pass
+            try:
+                self.Socket.close()
+            except (Exception,):
+                pass
             self.Socket = socket.socket()
             self.Socket.settimeout(self.parent.SocketTimeout)
             self.Socket.connect((self.parent.IPAddress, self.Port))
         except socket.error as e:
             self.SocketConnected = False
-            self.SequenceCounter = 1
+            self._sequence_counter = 1
             self.Socket.close()
-            return (False, e)
+            return [False, e]
 
         # register the session
-        self.Socket.send(self._buildRegisterSession())
-        ret_data = self.recv_data()
+        self.Socket.send(self._build_register_session())
+        ret_data = self.receive_data()
         if ret_data:
-            self.SessionHandle = unpack_from('<I', ret_data, 4)[0]
+            self._session_handle = unpack_from('<I', ret_data, 4)[0]
             self._registered = True
         else:
             self.SocketConnected = False
-            return (False, 'Register session failed')
+            return [False, 'Register session failed']
 
         if connected:
             if self.ConnectionSize is not None:
@@ -122,35 +125,35 @@ class Connection(object):
             return ret
 
         self.SocketConnected = True
-        return (self.SocketConnected, 'Success')
+        return [self.SocketConnected, 'Success']
 
-    def _closeConnection(self):
+    def _close_connection(self):
         """
         Close the connection to the PLC (forward close, unregister session)
         """
         self.SocketConnected = False
         try:
             if self._connected:
-                close_packet = self._buildForwardClosePacket()
+                close_packet = self._build_forward_close_packet()
                 self.Socket.send(close_packet)
-                ret_data = self.recv_data()
+                self.receive_data()
                 self._connected = False
             if self._registered:
-                unreg_packet = self._buildUnregisterSession()
-                self.Socket.send(unreg_packet)
+                unregister_packet = self._build_unregister_session()
+                self.Socket.send(unregister_packet)
             self.Socket.close()
-        except Exception:
+        except (Exception,):
             self.Socket.close()
         finally:
             pass
 
-    def _getBytes(self, data, connected):
+    def _get_bytes(self, data, connected):
         """
         Sends data and gets the return data, optionally asserting data size limit
         """
         try:
             self.Socket.send(data)
-            ret_data = self.recv_data()
+            ret_data = self.receive_data()
             if ret_data:
                 if connected:
                     status = unpack_from('<B', ret_data, 48)[0]
@@ -159,19 +162,19 @@ class Connection(object):
                 return status, ret_data
             else:
                 return 1, None
-        except (socket.gaierror):
+        except socket.gaierror:
             self.SocketConnected = False
             return 1, None
-        except (IOError):
+        except IOError:
             self.SocketConnected = False
             return 7, None
 
-    def recv_data(self):
+    def receive_data(self):
         """
         When receiving data from the socket, it is possible to receive
         incomplete data.  The initial packet that comes in contains
         the length of the payload.  We can use that to keep calling
-        recv() until the entire payload is received.  This only happnens
+        socket receive until the entire payload is received.  This only happens
         when using LargeForwardOpen
         """
         data = b''
@@ -185,303 +188,304 @@ class Connection(object):
 
         return data
 
-    def _buildRegisterSession(self):
+    def _build_register_session(self):
         """
         Register our CIP connection
         """
-        EIPCommand = 0x0065
-        EIPLength = 0x0004
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x0000
-        EIPContext = pylogix.__version__.ljust(8, " ").encode("utf-8")
-        EIPOptions = 0x0000
+        eip_command = 0x0065
+        eip_length = 0x0004
+        eip_session_handle = self._session_handle
+        eip_status = 0x0000
+        eip_context = pylogix.__version__.ljust(8, " ").encode("utf-8")
+        eip_options = 0x0000
 
-        EIPProtocolVersion = 0x01
-        EIPOptionFlag = 0x00
+        eip_proto_version = 0x01
+        eip_option_flag = 0x00
 
         return pack('<HHII8sIHH',
-                    EIPCommand,
-                    EIPLength,
-                    EIPSessionHandle,
-                    EIPStatus,
-                    EIPContext,
-                    EIPOptions,
-                    EIPProtocolVersion,
-                    EIPOptionFlag)
+                    eip_command,
+                    eip_length,
+                    eip_session_handle,
+                    eip_status,
+                    eip_context,
+                    eip_options,
+                    eip_proto_version,
+                    eip_option_flag)
 
-    def _buildUnregisterSession(self):
+    def _build_unregister_session(self):
         """
         Build Unregister session
         """
-        EIPCommand = 0x66
-        EIPLength = 0x0
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x0000
-        EIPContext = self.Context
-        EIPOptions = 0x0000
+        eip_command = 0x66
+        eip_length = 0x0
+        eip_session_handle = self._session_handle
+        eip_status = 0x0000
+        eip_context = self._context
+        eip_options = 0x0000
 
         return pack('<HHIIQI',
-                    EIPCommand,
-                    EIPLength,
-                    EIPSessionHandle,
-                    EIPStatus,
-                    EIPContext,
-                    EIPOptions)
+                    eip_command,
+                    eip_length,
+                    eip_session_handle,
+                    eip_status,
+                    eip_context,
+                    eip_options)
 
     def _forward_open(self):
         """
         ForwardOpen connection.
         """
-        self.Socket.send(self._buildForwardOpenPacket())
+        self.Socket.send(self._build_forward_open_packet())
         try:
-            ret_data = self.recv_data()
+            ret_data = self.receive_data()
         except socket.timeout as e:
-            return (False, e)
+            return [False, e]
         sts = unpack_from('<b', ret_data, 42)[0]
         if not sts:
-            self.OTNetworkConnectionID = unpack_from('<I', ret_data, 44)[0]
+            self._ot_connection_id = unpack_from('<I', ret_data, 44)[0]
             self._connected = True
         else:
             self.SocketConnected = False
-            return (False, 'Forward open failed')
+            return [False, 'Forward open failed']
 
         self.SocketConnected = True
-        return (self.SocketConnected, 'Success')
+        return [self.SocketConnected, 'Success']
 
-    def _buildForwardOpenPacket(self):
+    def _build_forward_open_packet(self):
         """
         Assemble the forward open packet
         """
-        forwardOpen = self._buildCIPForwardOpen()
-        rrDataHeader = self._buildEIPSendRRDataHeader(len(forwardOpen))
-        return rrDataHeader+forwardOpen
+        forward_open = self._build_cip_forward_open()
+        header = self._build_rr_data_header(len(forward_open))
+        return header + forward_open
 
-    def _buildCIPForwardOpen(self):
+    def _build_cip_forward_open(self):
         """
         Forward Open happens after a connection is made,
-        this will sequp the CIP connection parameters
+        this will define the CIP connection parameters
         """
-        CIPPathSize = 0x02
-        CIPClassType = 0x20
+        cip_path_size = 0x02
+        cip_class_type = 0x20
 
-        CIPClass = 0x06
-        CIPInstanceType = 0x24
+        cip_class = 0x06
+        cip_instance_type = 0x24
 
-        CIPInstance = 0x01
-        CIPPriority = 0x0A
-        CIPTimeoutTicks = 0x0e
-        CIPOTConnectionID = 0x20000002
-        CIPTOConnectionID = randrange(65000)
-        self.SerialNumber = randrange(65000)
-        CIPConnectionSerialNumber = self.SerialNumber
-        CIPVendorID = self.VendorID
-        CIPOriginatorSerialNumber = self.OriginatorSerialNumber
-        CIPMultiplier = 0x03
-        CIPOTRPI = 0x00201234
-        CIPConnectionParameters = 0x4200
-        CIPTORPI = 0x00204001
-        CIPTransportTrigger = 0xA3
+        cip_instance = 0x01
+        cip_priority = 0x0A
+        cip_timeout_ticks = 0x0e
+        cip_ot_connection_id = 0x20000002
+        cip_to_connection_id = randrange(65000)
+        self._serial_number = randrange(65000)
+        cip_serial_number = self._serial_number
+        cip_vendor_id = self._vendor_id
+        cip_originator_serial = self._originator_serial
+        cip_multiplier = 0x03
+        cip_ot_rpi = 0x00201234
+        cip_connection_parameters = 0x4200
+        cip_to_rpi = 0x00204001
+        cip_transport_trigger = 0xA3
 
         # decide whether to use the standard ForwardOpen
         # or the large format
         if self.ConnectionSize <= 511:
-            CIPService = 0x54
-            CIPConnectionParameters += self.ConnectionSize
+            cip_service = 0x54
+            cip_connection_parameters += self.ConnectionSize
             pack_format = '<BBBBBBBBIIHHIIIHIHB'
         else:
-            CIPService = 0x5B
-            CIPConnectionParameters = CIPConnectionParameters << 16
-            CIPConnectionParameters += self.ConnectionSize
+            cip_service = 0x5B
+            cip_connection_parameters = cip_connection_parameters << 16
+            cip_connection_parameters += self.ConnectionSize
             pack_format = '<BBBBBBBBIIHHIIIIIIB'
 
-        CIPOTNetworkConnectionParameters = CIPConnectionParameters
-        CIPTONetworkConnectionParameters = CIPConnectionParameters
+        cip_ot_connection_parameters = cip_connection_parameters
+        cip_to_connection_parameters = cip_connection_parameters
 
-        ForwardOpen = pack(pack_format,
-                           CIPService,
-                           CIPPathSize,
-                           CIPClassType,
-                           CIPClass,
-                           CIPInstanceType,
-                           CIPInstance,
-                           CIPPriority,
-                           CIPTimeoutTicks,
-                           CIPOTConnectionID,
-                           CIPTOConnectionID,
-                           CIPConnectionSerialNumber,
-                           CIPVendorID,
-                           CIPOriginatorSerialNumber,
-                           CIPMultiplier,
-                           CIPOTRPI,
-                           CIPOTNetworkConnectionParameters,
-                           CIPTORPI,
-                           CIPTONetworkConnectionParameters,
-                           CIPTransportTrigger)
+        packet = pack(pack_format,
+                      cip_service,
+                      cip_path_size,
+                      cip_class_type,
+                      cip_class,
+                      cip_instance_type,
+                      cip_instance,
+                      cip_priority,
+                      cip_timeout_ticks,
+                      cip_ot_connection_id,
+                      cip_to_connection_id,
+                      cip_serial_number,
+                      cip_vendor_id,
+                      cip_originator_serial,
+                      cip_multiplier,
+                      cip_ot_rpi,
+                      cip_ot_connection_parameters,
+                      cip_to_rpi,
+                      cip_to_connection_parameters,
+                      cip_transport_trigger)
 
         # add the connection path
 
-        path_size, path = self._connectedPath()
+        path_size, path = self._connected_path()
         connection_path = pack('<B', path_size)
         connection_path += path
-        return ForwardOpen + connection_path
+        return packet + connection_path
 
-    def _buildForwardClosePacket(self):
+    def _build_forward_close_packet(self):
         """
         Assemble the forward close packet
         """
-        forwardClose = self._buildForwardClose()
-        rrDataHeader = self._buildEIPSendRRDataHeader(len(forwardClose))
-        return rrDataHeader + forwardClose
+        forward_close = self._build_forward_close()
+        header = self._build_rr_data_header(len(forward_close))
+        return header + forward_close
 
-    def _buildForwardClose(self):
+    def _build_forward_close(self):
         """
         Forward Close packet for closing the connection
         """
-        CIPService = 0x4E
-        CIPPathSize = 0x02
-        CIPClassType = 0x20
-        CIPClass = 0x06
-        CIPInstanceType = 0x24
+        cip_service = 0x4E
+        cip_path_size = 0x02
+        cip_class_type = 0x20
+        cip_class = 0x06
+        cip_instance_type = 0x24
 
-        CIPInstance = 0x01
-        CIPPriority = 0x0A
-        CIPTimeoutTicks = 0x0e
-        CIPConnectionSerialNumber = self.SerialNumber
-        CIPVendorID = self.VendorID
-        CIPOriginatorSerialNumber = self.OriginatorSerialNumber
+        cip_instance = 0x01
+        cip_priority = 0x0A
+        cip_timeout_ticks = 0x0e
+        cip_serial_number = self._serial_number
+        cip_vendor_id = self._vendor_id
+        cip_originator_serial = self._originator_serial
 
-        ForwardClose = pack('<BBBBBBBBHHI',
-                            CIPService,
-                            CIPPathSize,
-                            CIPClassType,
-                            CIPClass,
-                            CIPInstanceType,
-                            CIPInstance,
-                            CIPPriority,
-                            CIPTimeoutTicks,
-                            CIPConnectionSerialNumber,
-                            CIPVendorID,
-                            CIPOriginatorSerialNumber)
+        packet = pack('<BBBBBBBBHHI',
+                      cip_service,
+                      cip_path_size,
+                      cip_class_type,
+                      cip_class,
+                      cip_instance_type,
+                      cip_instance,
+                      cip_priority,
+                      cip_timeout_ticks,
+                      cip_serial_number,
+                      cip_vendor_id,
+                      cip_originator_serial)
 
         # add the connection path
-        path_size, path = self._connectedPath()
+        path_size, path = self._connected_path()
         connection_path = pack('<BB', path_size, 0x00)
         connection_path += path
-        return ForwardClose + connection_path
+        return packet + connection_path
 
-    def _buildEIPSendRRDataHeader(self, frameLen):
+    def _build_rr_data_header(self, frame_len):
         """
         Build the EIP Send RR Data Header
         """
-        EIPCommand = 0x6F
-        EIPLength = 16+frameLen
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x00
-        EIPContext = self.Context
-        EIPOptions = 0x00
+        eip_command = 0x6F
+        eip_length = 16 + frame_len
+        eip_session_handle = self._session_handle
+        eip_status = 0x00
+        eip_context = self._context
+        eip_options = 0x00
 
-        EIPInterfaceHandle = 0x00
-        EIPTimeout = 0x00
-        EIPItemCount = 0x02
-        EIPItem1Type = 0x00
-        EIPItem1Length = 0x00
-        EIPItem2Type = 0xB2
-        EIPItem2Length = frameLen
+        eip_interface_handle = 0x00
+        eip_timeout = 0x00
+        eip_item_count = 0x02
+        eip_item1_type = 0x00
+        eip_item1_length = 0x00
+        eip_item2_type = 0xB2
+        eip_item2_length = frame_len
 
         return pack('<HHIIQIIHHHHHH',
-                    EIPCommand,
-                    EIPLength,
-                    EIPSessionHandle,
-                    EIPStatus,
-                    EIPContext,
-                    EIPOptions,
-                    EIPInterfaceHandle,
-                    EIPTimeout,
-                    EIPItemCount,
-                    EIPItem1Type,
-                    EIPItem1Length,
-                    EIPItem2Type,
-                    EIPItem2Length)
+                    eip_command,
+                    eip_length,
+                    eip_session_handle,
+                    eip_status,
+                    eip_context,
+                    eip_options,
+                    eip_interface_handle,
+                    eip_timeout,
+                    eip_item_count,
+                    eip_item1_type,
+                    eip_item1_length,
+                    eip_item2_type,
+                    eip_item2_length)
 
-    def _buildCIPUnconnectedSend(self, service_size):
+    def _build_unconnected_send(self, service_size):
         """
         build unconnected send to request tag database
         """
-        CIPService = 0x52
-        CIPPathSize = 0x02
-        CIPClassType = 0x20
+        cip_service = 0x52
+        cip_path_size = 0x02
+        cip_class_type = 0x20
 
-        CIPClass = 0x06
-        CIPInstanceType = 0x24
+        cip_class = 0x06
+        cip_instance_type = 0x24
 
-        CIPInstance = 0x01
-        CIPPriority = 0x0A
-        CIPTimeoutTicks = 0x0e
-        ServiceSize = service_size
+        cip_instance = 0x01
+        cip_priority = 0x0A
+        cip_timeout_ticks = 0x0e
+        cip_service_size = service_size
 
         return pack('<BBBBBBBBH',
-                    CIPService,
-                    CIPPathSize,
-                    CIPClassType,
-                    CIPClass,
-                    CIPInstanceType,
-                    CIPInstance,
-                    CIPPriority,
-                    CIPTimeoutTicks,
-                    ServiceSize)
+                    cip_service,
+                    cip_path_size,
+                    cip_class_type,
+                    cip_class,
+                    cip_instance_type,
+                    cip_instance,
+                    cip_priority,
+                    cip_timeout_ticks,
+                    cip_service_size)
 
-    def _buildEIPHeader(self, ioi):
+    def _build_eip_header(self, ioi):
         """
         The EIP Header contains the tagIOI and the
         commands to perform the read or write.  This request
         will be followed by the reply containing the data
         """
-        if self.ContextPointer == 155:
-            self.ContextPointer = 0
+        if self._context_index == 155:
+            self._context_index = 0
 
-        EIPPayloadLength = 22+len(ioi)
-        EIPConnectedDataLength = len(ioi)+2
+        eip_connected_data_len = len(ioi) + 2
 
-        EIPCommand = 0x70
-        EIPLength = 22 + len(ioi)
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x00
-        EIPContext = context_dict[self.ContextPointer]
-        self.ContextPointer += 1
+        eip_command = 0x70
+        eip_length = 22 + len(ioi)
+        eip_session_handle = self._session_handle
+        eip_status = 0x00
+        eip_context = context_dict[self._context_index]
+        self._context_index += 1
 
-        EIPOptions = 0x0000
-        EIPInterfaceHandle = 0x00
-        EIPTimeout = 0x00
-        EIPItemCount = 0x02
-        EIPItem1ID = 0xA1
-        EIPItem1Length = 0x04
-        EIPItem1 = self.OTNetworkConnectionID
-        EIPItem2ID = 0xB1
-        EIPItem2Length = EIPConnectedDataLength
-        EIPSequence = self.SequenceCounter
-        self.SequenceCounter += 1
-        self.SequenceCounter = self.SequenceCounter % 0x10000
+        eip_options = 0x0000
+        eip_interface_handle = 0x00
+        eip_timeout = 0x00
+        eip_item_count = 0x02
+        eip_item1_id = 0xA1
+        eip_item1_length = 0x04
+        eip_item1 = self._ot_connection_id
+        eip_item2_id = 0xB1
+        eip_item2_length = eip_connected_data_len
+        eip_sequence = self._sequence_counter 
+        self._sequence_counter += 1
+        self._sequence_counter = self._sequence_counter % 0x10000
 
-        EIPHeaderFrame = pack('<HHIIQIIHHHHIHHH',
-                              EIPCommand,
-                              EIPLength,
-                              EIPSessionHandle,
-                              EIPStatus,
-                              EIPContext,
-                              EIPOptions,
-                              EIPInterfaceHandle,
-                              EIPTimeout,
-                              EIPItemCount,
-                              EIPItem1ID,
-                              EIPItem1Length,
-                              EIPItem1,
-                              EIPItem2ID, EIPItem2Length, EIPSequence)
+        packet = pack('<HHIIQIIHHHHIHHH',
+                      eip_command,
+                      eip_length,
+                      eip_session_handle,
+                      eip_status,
+                      eip_context,
+                      eip_options,
+                      eip_interface_handle,
+                      eip_timeout,
+                      eip_item_count,
+                      eip_item1_id,
+                      eip_item1_length,
+                      eip_item1,
+                      eip_item2_id,
+                      eip_item2_length,
+                      eip_sequence)
 
-        return EIPHeaderFrame+ioi
+        return packet + ioi
 
-    def _connectedPath(self):
+    def _connected_path(self):
         """
-        Build the connected path porition of the packet
+        Build the connected path portion of the packet
         """
         # if a route was provided, use it, otherwise use
         # the default route
@@ -506,7 +510,7 @@ class Connection(object):
                     for c in segment[1]:
                         path.append(ord(c))
                     # byte align
-                    if len(path)%2:
+                    if len(path) % 2:
                         path.append(0x00)
 
         path += [0x20, 0x02, 0x24, 0x01]
@@ -517,9 +521,9 @@ class Connection(object):
 
         return path_size, connection_path
 
-    def _unconnectedPath(self, slot):
+    def _unconnected_path(self, slot):
         """
-        Build the unconnection path portion of the packet
+        Build the unconnected path portion of the packet
         """
         # if a route was provided, use it, otherwise use
         # the default route
@@ -541,7 +545,7 @@ class Connection(object):
                 for c in segment[1]:
                     path.append(ord(c))
                 # byte align
-                if len(path)%2:
+                if len(path) % 2:
                     path.append(0x00)
 
         path_size = int(len(path)/2)
@@ -556,7 +560,7 @@ class Connection(object):
         Ethernet I/P driver
         """
         devices = []
-        request = self._buildListIdentity()
+        request = self._build_list_identity()
 
         # get available ip addresses
         addresses = socket.getaddrinfo(socket.gethostname(), None)
@@ -572,7 +576,7 @@ class Connection(object):
                 s.bind((ip[4][0], 0))
                 s.sendto(request, ('255.255.255.255', 44818))
                 try:
-                    while(1):
+                    while True:
                         ret = s.recv(4096)
                         context = unpack_from('<Q', ret, 14)[0]
                         if context == 0x006d6f4d6948:
@@ -582,8 +586,8 @@ class Connection(object):
                 except Exception:
                     pass
                 try:
-                    s.close()   ### Ensure socket is closed
-                except:
+                    s.close()
+                except (Exception,):
                     pass
 
         # added this because looping through addresses above doesn't work on
@@ -595,7 +599,7 @@ class Connection(object):
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             s.sendto(request, ('255.255.255.255', 44818))
             try:
-                while(1):
+                while True:
                     ret = s.recv(4096)
                     context = unpack_from('<Q', ret, 14)[0]
                     if context == 0x006d6f4d6948:
@@ -605,37 +609,38 @@ class Connection(object):
             except Exception:
                 pass
             try:
-                s.close()   ### Ensure socket is closed
-            except:
+                s.close()
+            except (Exception,):
                 pass
 
         return devices
 
-    def _buildListIdentity(self):
+    def _build_list_identity(self):
         """
         Build the list identity request for discovering Ethernet I/P
         devices on the network
         """
-        ListService = 0x63
-        ListLength = 0x00
-        ListSessionHandle = 0x00
-        ListStatus = 0x00
-        ListResponse = 0xFA
-        ListContext1 = 0x6948
-        ListContext2 = 0x6f4d
-        ListContext3 = 0x006d
-        ListOptions = 0x00
+        cip_service = 0x63
+        cip_length = 0x00
+        cip_session_handle = self._session_handle
+        cip_status = 0x00
+        cip_response = 0xFA
+        cip_context1 = 0x6948
+        cip_context2 = 0x6f4d
+        cip_context3 = 0x006d
+        cip_options = 0x00
 
         return pack("<HHIIHHHHI",
-                    ListService,
-                    ListLength,
-                    ListSessionHandle,
-                    ListStatus,
-                    ListResponse,
-                    ListContext1,
-                    ListContext2,
-                    ListContext3,
-                    ListOptions)
+                    cip_service,
+                    cip_length,
+                    cip_session_handle,
+                    cip_status,
+                    cip_response,
+                    cip_context1,
+                    cip_context2,
+                    cip_context3,
+                    cip_options)
+
 
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,

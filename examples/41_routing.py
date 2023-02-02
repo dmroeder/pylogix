@@ -1,6 +1,3 @@
-
-from pylogix import PLC
-
 """
 This example will show how to read a tag from a
 CompactLogix by routing through a ControlLogix rack.
@@ -13,6 +10,8 @@ at the address of 10.10.10.9.
 Routes are defined in pairs, so we will specify them
 as a list of pairs of tuples.
 """
+from pylogix import PLC
+
 with PLC('192.168.1.1') as comm:
     comm.Route = [(1, 4), (2, '10.10.10.9')]
     x = comm.Read('BaseDINT')

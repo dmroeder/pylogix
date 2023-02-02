@@ -16,6 +16,7 @@
 
 import sys
 
+
 class Response(object):
 
     def __init__(self, tag_name, value, status):
@@ -53,6 +54,7 @@ class Response(object):
             err = 'Unknown error {}'.format(status)
         return err
 
+
 cip_error_codes = {0x00: 'Success',
                    0x01: 'Connection failure',
                    0x02: 'Resource unavailable',
@@ -71,7 +73,7 @@ cip_error_codes = {0x00: 'Success',
                    0x0F: 'Privilege violation',
                    0x10: 'Device state conflict',
                    0x11: 'Reply data too large',
-                   0x12: 'Fragmentation of a premitive value',
+                   0x12: 'Fragmentation of a primitive value',
                    0x13: 'Not enough data',
                    0x14: 'Attribute not supported',
                    0x15: 'Too much data',

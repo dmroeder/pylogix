@@ -1,11 +1,4 @@
-'''
-the following import is only necessary because eip.py is not in this directory
-'''
-import sys
-sys.path.append('..')
-
-
-'''
+"""
 Write to a custom size string
 
 WHen you create a custom size string, it is essentially
@@ -15,7 +8,7 @@ can write to a standard size string.
 In this case, we're going to write some text to the tag
 String20, which is a custom string STRING20.  We not only
 have to write the data, we have to also write the length.
-'''
+"""
 from pylogix import PLC
 
 with PLC() as comm:

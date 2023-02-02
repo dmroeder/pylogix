@@ -1,14 +1,8 @@
-'''
-the following import is only necessary because eip.py is not in this directory
-'''
-import sys
-sys.path.append('..')
-
-'''
+"""
 Get the PLC time
 
 returns datetime.datetime type
-'''
+"""
 from pylogix import PLC
 
 with PLC() as comm:
