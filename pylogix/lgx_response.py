@@ -16,6 +16,7 @@
 
 import sys
 
+
 class Response(object):
 
     def __init__(self, tag_name, value, status):
@@ -52,6 +53,7 @@ class Response(object):
         else:
             err = 'Unknown error {}'.format(status)
         return err
+
 
 cip_error_codes = {0x00: 'Success',
                    0x01: 'Connection failure',
