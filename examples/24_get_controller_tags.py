@@ -1,17 +1,11 @@
-'''
-the following import is only necessary because eip.py is not in this directory
-'''
-import sys
-sys.path.append('..')
-
-'''
+"""
 Get controller scoped tags from the PLC
 
 This will fetch all the controller scoped tags 
-from the PLC.  In the case of Structs (UDT's),
-it will not give you the makeupof each  tag,
+from the PLC.  In the case of Structs (UDTs),
+it will not give you the makeup of each tag,
 just main tag names.
-'''
+"""
 from pylogix import PLC
 
 with PLC() as comm:
@@ -20,4 +14,3 @@ with PLC() as comm:
     
     for t in tags.Value:
         print(t.TagName, t.DataType)
-

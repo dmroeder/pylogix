@@ -1,17 +1,10 @@
-'''
-the following import is only necessary because eip is not in this directory
-'''
-import sys
-sys.path.append('..')
-
-
-'''
+"""
 Monitor a tag, when we see a certain value,
 call another function once.
 
-I often finding myself needing to trigger some
+I often find myself needing to trigger some
 other code the first time a BOOL goes true, for
-example.  I only want the function to fire once
+example.  I only want the function to fire once,
 so we'll have to make sure it goes false before
 firing again.
 
@@ -22,13 +15,15 @@ FaultHappened(), then we enter another loop that
 will keep reading until the value goes False.
 This will make sure that we only call the function
 once per True result.
-'''
-from pylogix import PLC
+"""
 import time
+from pylogix import PLC
 
-def FaultHappend():
+
+def fault_happened():
     # this should get called once.
     print('we had a fault')
+
 
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
@@ -39,11 +34,10 @@ with PLC() as comm:
             ret = comm.Read('PE040')
             time.sleep(1)
             if ret.Value:
-                FaultHappend()
+                fault_happened()
                 while ret.Value:
                     ret = comm.Read('PE040')
                     time.sleep(1)
         except KeyboardInterrupt:
             print('exiting')
             read = False
-

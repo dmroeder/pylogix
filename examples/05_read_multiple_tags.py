@@ -1,11 +1,4 @@
-'''
-the following import is only necessary because eip.py is not in this directory
-'''
-import sys
-sys.path.append('..')
-
-
-'''
+"""
 Read a list of tags at once
 
 Reading lists and arrays is much more efficient than
@@ -16,13 +9,13 @@ you passed to Read()
 
 NOTE:  Packets have a ~500 byte limit, so you have to be cautions
 about not exceeding that or the read will fail.  It's a little
-difficult to predict how many bytes your reads will take up becuase
-the send packet will depend on the length of the tag name and the
-reply will depened on the data type.  Strings are a lot longer than
+difficult to predict how many bytes your reads will take up because
+the packet will depend on the length of the tag name and the
+reply will depend on the data type.  Strings are a lot longer than
 DINT's for example.
 
-I'll usually read no more than 5 strings at once, or 10 DINT's)
-'''
+I'll usually read no more than 5 strings at once, or 10 DINTs
+"""
 from pylogix import PLC
 
 tag_list = ['Zone1ASpeed', 'Zone1BSpeed', 'Zone2ASpeed', 'Zone2BSpeed', 'Zone3ASpeed', 'Zone3BSpeed',
