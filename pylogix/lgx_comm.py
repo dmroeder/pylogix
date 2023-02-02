@@ -19,6 +19,7 @@ import socket
 from random import randrange
 from struct import pack, unpack_from
 
+
 # noinspection PyMethodMayBeStatic
 class Connection(object):
 
@@ -32,7 +33,7 @@ class Connection(object):
 
         self._connected = False
         self._context = 0x00
-        self._context_index= 0
+        self._context_index = 0
         self._originator_serial = 42
         self._ot_connection_id = None
         self._registered = False
@@ -86,7 +87,7 @@ class Connection(object):
 
         try:
             try:
-                self.Socket.close()    ### Ensure socket is closed
+                self.Socket.close()
             except (Exception,):
                 pass
             self.Socket = socket.socket()
@@ -94,7 +95,7 @@ class Connection(object):
             self.Socket.connect((self.parent.IPAddress, self.Port))
         except socket.error as e:
             self.SocketConnected = False
-            self._sequence_counter  = 1
+            self._sequence_counter = 1
             self.Socket.close()
             return [False, e]
 
@@ -460,8 +461,8 @@ class Connection(object):
         eip_item2_id = 0xB1
         eip_item2_length = eip_connected_data_len
         eip_sequence = self._sequence_counter 
-        self._sequence_counter  += 1
-        self._sequence_counter  = self._sequence_counter  % 0x10000
+        self._sequence_counter += 1
+        self._sequence_counter = self._sequence_counter % 0x10000
 
         packet = pack('<HHIIQIIHHHHIHHH',
                       eip_command,
@@ -509,7 +510,7 @@ class Connection(object):
                     for c in segment[1]:
                         path.append(ord(c))
                     # byte align
-                    if len(path)%2:
+                    if len(path) % 2:
                         path.append(0x00)
 
         path += [0x20, 0x02, 0x24, 0x01]
@@ -544,7 +545,7 @@ class Connection(object):
                 for c in segment[1]:
                     path.append(ord(c))
                 # byte align
-                if len(path)%2:
+                if len(path) % 2:
                     path.append(0x00)
 
         path_size = int(len(path)/2)
@@ -585,7 +586,7 @@ class Connection(object):
                 except Exception:
                     pass
                 try:
-                    s.close()   ### Ensure socket is closed
+                    s.close()
                 except (Exception,):
                     pass
 
@@ -608,7 +609,7 @@ class Connection(object):
             except Exception:
                 pass
             try:
-                s.close()   ### Ensure socket is closed
+                s.close()
             except (Exception,):
                 pass
 
@@ -639,6 +640,7 @@ class Connection(object):
                     cip_context2,
                     cip_context3,
                     cip_options)
+
 
 # Context values passed to the PLC when reading/writing
 context_dict = {0: 0x6572276557,
