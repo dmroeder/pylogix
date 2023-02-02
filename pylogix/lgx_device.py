@@ -17,24 +17,25 @@
 import socket
 from struct import pack, unpack_from
 
+
 class Device(object):
 
     def __init__(self):
         # structure of a logix device
-        self.Length=None
-        self.EncapsulationVersion=None
-        self.IPAddress=None
-        self.VendorID=None
-        self.Vendor=None
-        self.DeviceID=None
-        self.DeviceType=None
-        self.ProductCode=None
-        self.Revision=None
-        self.Status=None
-        self.SerialNumber=None
-        self.ProductNameLength=None
-        self.ProductName=None
-        self.State=None
+        self.Length = None
+        self.EncapsulationVersion = None
+        self.IPAddress = None
+        self.VendorID = None
+        self.Vendor = None
+        self.DeviceID = None
+        self.DeviceType = None
+        self.ProductCode = None
+        self.Revision = None
+        self.Status = None
+        self.SerialNumber = None
+        self.ProductNameLength = None
+        self.ProductName = None
+        self.State = None
 
     def __repr__(self):
 
@@ -125,6 +126,7 @@ class Device(object):
         resp.State = unpack_from('<B', state, 0)[0]
 
         return resp
+
 
 # List originally came from Wireshark /epan/dissectors/packet-cip.c
 devices = {0x00: 'Generic Device (deprecated)',
