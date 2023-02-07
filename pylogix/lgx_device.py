@@ -110,7 +110,7 @@ class Device(object):
         resp.Vendor = Device.get_vendor(resp.VendorID)
 
         resp.DeviceID = unpack_from('<H', data, 50)[0]
-        resp.Device = Device.get_device(resp.DeviceID)
+        resp.DeviceType = Device.get_device(resp.DeviceID)
 
         resp.ProductCode = unpack_from('<H', data, 52)[0]
         major = unpack_from('<B', data, 54)[0]
