@@ -1060,7 +1060,7 @@ class PLC(object):
                 tag_size = len(base_tag)
                 if data_type == 0xd3 and i == len(tag_array) - 1:
                     index = int(index / 32)
-                elif data_type is not None:
+                elif data_type is None:
                     index = 0
 
                 # Assemble the packet
