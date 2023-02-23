@@ -86,6 +86,7 @@ class PylogixTests(unittest.TestCase):
         self.compare_tag(prefix + 'BaseSTRINGArray[31]', self.r.String())
         self.compare_tag(prefix + 'BaseTimerArray[0].PRE', abs(self.r.Int()))
         self.compare_tag(prefix + 'BaseTimerArray[31].PRE', abs(self.r.Int()))
+        self.compare_tag(prefix + 'MultiDim[1,1,1]', self.r.Dint())
 
     def udt_basic_fixture(self, prefix=''):
         self.compare_bool(prefix + 'UDTBasic.b_BOOL')
