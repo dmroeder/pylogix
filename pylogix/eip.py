@@ -66,6 +66,7 @@ class PLC(object):
                          0xc9: (8, "LWORD", '<Q'),
                          0xca: (4, "REAL", '<f'),
                          0xcb: (8, "LREAL", '<d'),
+                         0xd0: (1, "O_STRING", '<B'),
                          0xd3: (4, "DWORD", '<i'),
                          0xda: (1, "STRING", '<B')}
 
@@ -475,7 +476,7 @@ class PLC(object):
         for v in value:
             if data_type == 0xca or data_type == 0xcb:
                 write_data.append(float(v))
-            elif data_type == 0xa0 or data_type == 0xda:
+            elif data_type == 0xa0 or data_type == 0xda or data_type == 0xd0:
                 write_data.append(self._make_string(v))
             else:
                 write_data.append(int(v))
@@ -545,7 +546,7 @@ class PLC(object):
             # format the values
             if data_type == 0xca or data_type == 0xcb:
                 value = float(wd[1])
-            elif data_type == 0xa0 or data_type == 0xda:
+            elif data_type == 0xa0 or data_type == 0xda or data_type == 0xd0:
                 value = [self._make_string(wd[1])]
             else:
                 typ = type(wd[1])
@@ -1309,17 +1310,23 @@ class PLC(object):
                 s = data[index + 4:index + 4 + name_len]
                 values.append(str(s.decode(self.StringEncoding)))
 
-            elif data_type == 0xda:
+            elif data_type == 0xda or data_type == 0xd0:
                 # remove the data type
                 data = data[2:]
                 while len(data) > 0:
-                    # get the next string length
-                    length = unpack_from('<B', data, 0)[0]
-                    # remove the length from the packet
-                    data = data[1:]
+                    
+                    if data_type == 0xd0:
+                        # special string
+                        length = unpack_from("<H", data, 0)[0]
+                        data = data[2:]
+                    else:
+                        # Micro800 String
+                        length = unpack_from("<B", data, 0)[0]
+                        data[1:]
+
                     # grab the string
-                    s = data[:length]
-                    values.append(str(s.decode(self.StringEncoding)))
+                    string_value = data[:length]
+                    values.append(str(string_value.decode(self.StringEncoding)))
                     # remove the string from the packet
                     data = data[length:]
                 break
