@@ -378,10 +378,7 @@ class PLC(object):
             rsp_tag_size = min_tag_size + len(base_tag) + dt_size
 
             ioi = self._build_ioi(tag_name, data_type)
-            if first:
-                read_service = self._add_partial_read_service(ioi, 1)
-            else:
-                read_service = self._add_read_service(ioi, 1)
+            read_service = self._add_read_service(ioi, 1)
 
             next_request_size = service_segment_size + rsp_tag_size + 2
 
@@ -1379,7 +1376,7 @@ class PLC(object):
             return tag, None, 0
 
         ioi = self._build_ioi(base_tag, data_type)
-        request = self._add_partial_read_service(ioi, 1)
+        request = self._add_read_service(ioi, 1)
 
         # send our tag read request
         status, ret_data = self.conn.send(request)
