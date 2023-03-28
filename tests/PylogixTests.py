@@ -323,6 +323,39 @@ class PylogixTests(unittest.TestCase):
 
             self.assertListEqual(vals, read_vals, "Failed to write large list")
 
+    def test_with_datatype(self):
+        """
+        Try a few variations of reads when including data type
+        """
+        self.comm.KnownTags = {}
+        value = self.r.Dint()
+        self.comm.Write("BaseDINT", value, 0xc4)
+        self.comm.KnownTags = {}
+        ret = self.comm.Read("BaseDINT", 1, 0xc4).Value
+        self.assertEqual(value, ret, "Failed when including data type")
+
+        # try with a list/tuple, but only one instance
+        value = self.r.Int()
+        self.comm.KnownTags = {}
+        tag = [("BaseINT", value, 0xc3)]
+        self.comm.Write(tag)
+        self.comm.KnownTags = {}
+        ret = self.comm.Read(tag).Value[0]
+        self.assertEqual(value, ret, "Failed read list of one with data type")
+
+        # try a list with multiple values and data type
+        values = [self.r.Sint() for i in range(10)]
+        write_request = [("BaseSINTArray[{}]".format(i), values[i], 0xc2) for i in range(10)]
+        read_request = [("BaseSINTArray[{}]".format(i), 1, 0xc2) for i in range(10)]
+        self.KnownTags = {}
+        self.comm.Write(write_request)
+        
+        self.KnownTags = {}
+        ret = self.comm.Read(read_request)
+        return_values = [r.Value for r in ret]
+
+        self.assertListEqual(values, return_values, "Failed reading a list with data type")
+
     def setUp(self):
         self.comm.IPAddress = plcConfig.plc_ip
         self.comm.ProcessorSlot = plcConfig.plc_slot
@@ -373,6 +406,10 @@ class PylogixTests(unittest.TestCase):
     @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_large_list(self):
         self.large_list_fixture()
+
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
+    def test_large_list(self):
+        self.test_with_datatype()
 
     def test_discover(self):
         devices = self.comm.Discover()
