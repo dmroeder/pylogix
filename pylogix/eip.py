@@ -100,9 +100,10 @@ class PLC(object):
         """
         if isinstance(tag, (list, tuple)):
             if len(tag) == 1:
-                return [self._read_tag(tag[0], count, datatype)]
-            if datatype:
-                raise TypeError('Datatype should be set to None when reading lists')
+                if isinstance(tag[0], (list, tuple)):
+                    return [self._read_tag(*tag[0])]
+                else:
+                    return [self._read_tag(tag[0], count, datatype)]
             if self.Micro800:
                 if isinstance(tag[0], (list, tuple)):
                     return [self._read_tag(*t) for t in tag]

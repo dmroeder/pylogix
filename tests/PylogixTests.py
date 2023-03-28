@@ -337,11 +337,14 @@ class PylogixTests(unittest.TestCase):
         # try with a list/tuple, but only one instance
         value = self.r.Int()
         self.comm.KnownTags = {}
-        tag = [("BaseINT", value, 0xc3)]
-        self.comm.Write(tag)
+        write_request = [("BaseINT", value, 0xc3)]
+        self.comm.Write(write_request)
+        
+        read_request = [("BaseINT", 1, 0xc3)] 
         self.comm.KnownTags = {}
-        ret = self.comm.Read(tag).Value[0]
-        self.assertEqual(value, ret, "Failed read list of one with data type")
+        ret = self.comm.Read(read_request)
+
+        self.assertEqual(value, ret[0].Value, "Failed read list of one with data type")
 
         # try a list with multiple values and data type
         values = [self.r.Sint() for i in range(10)]
