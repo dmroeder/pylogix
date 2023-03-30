@@ -55,6 +55,7 @@ class PLC(object):
         self.StringID = 0x0fce
         self.StringEncoding = 'utf-8'
         self.CIPTypes = {0xa0: (88, "STRUCT", '<B'),
+                         0xc0: (8, "DT", '<Q'),
                          0xc1: (1, "BOOL", '?'),
                          0xc2: (1, "SINT", '<b'),
                          0xc3: (2, "INT", '<h'),
@@ -65,10 +66,14 @@ class PLC(object):
                          0xc8: (4, "UDINT", '<I'),
                          0xc9: (8, "LWORD", '<Q'),
                          0xca: (4, "REAL", '<f'),
+                         0xcc: (8, "LDT", '<Q'),
                          0xcb: (8, "LREAL", '<d'),
                          0xd0: (1, "O_STRING", '<B'),
                          0xd3: (4, "DWORD", '<i'),
-                         0xda: (1, "STRING", '<B')}
+                         0xd6: (4, "TIME32", '<I'),
+                         0xd7: (8, "TIME", '<Q'),
+                         0xda: (1, "STRING", '<B'),
+                         0xdf: (8, "LTIME", '<Q')}
 
     @property
     def ConnectionSize(self):
