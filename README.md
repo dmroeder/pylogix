@@ -101,7 +101,7 @@ Here's a list of frequent asked questions. [faq](docs/FAQ.md)
 * **Burt Peterson** - *Initial work*
 * **Dustin Roeder** - *Maintainer* - [dmroeder](https://github.com/dmroeder)
 * **Fernando B. (TheFern2)** - *Contributor* - [TheFern2](https://github.com/TheFern2)
-* **Ottowayi** - *Contributor* - [ottowayi](https://github.com/ottowayi)
+* **jryan** - *Contributor* - [jryan](https://bitbucket.org/jryan/aphytcomm/src/master/)
 * **Perry Kundert** - *Contributor* - [pjkundert](https://github.com/pjkundert)
 
 ## License
@@ -111,5 +111,6 @@ This project is licensed under Apache 2.0 License - see the [LICENSE](LICENSE.tx
 ## Acknowledgements
 
 * Archie of AdvancedHMI for all kinds pointers and suggestions.
-* Thanks to ottowayi for general python and good practice advice
+* Thanks to ottowayi for general python and good practice advice.
 * Thanks to all of the users that have tested and provided feedback.
+* Jryan for Omron testing and feedback

@@ -19,7 +19,6 @@
 
 import math
 import re
-import sys
 import time
 
 from .lgx_comm import Connection
@@ -69,6 +68,8 @@ class PLC(object):
                          0xcc: (8, "LDT", '<Q'),
                          0xcb: (8, "LREAL", '<d'),
                          0xd0: (1, "O_STRING", '<B'),
+                         0xd1: (1, "BYTE", "<B"),
+                         0xd2: (2, "WORD", "<I"),
                          0xd3: (4, "DWORD", '<i'),
                          0xd6: (4, "TIME32", '<I'),
                          0xd7: (8, "TIME", '<Q'),
@@ -483,7 +484,7 @@ class PLC(object):
             if data_type == 0xca or data_type == 0xcb:
                 write_data.append(float(v))
             elif data_type == 0xa0 or data_type == 0xda or data_type == 0xd0:
-                write_data.append(self._make_string(v))
+                write_data.append(self._make_string(v, data_type))
             else:
                 write_data.append(int(v))
 
@@ -553,7 +554,7 @@ class PLC(object):
             if data_type == 0xca or data_type == 0xcb:
                 value = float(wd[1])
             elif data_type == 0xa0 or data_type == 0xda or data_type == 0xd0:
-                value = [self._make_string(wd[1])]
+                value = [self._make_string(wd[1], data_type)]
             else:
                 typ = type(wd[1])
                 value = typ(wd[1])
@@ -1550,9 +1551,9 @@ class PLC(object):
 
         return tag_list
 
-    def _make_string(self, string):
+    def _make_string(self, string, data_type):
         work = []
-        if self.Micro800:
+        if data_type == 0xd0 or data_type == 0xda:
             temp = pack('<B', len(string)).decode(self.StringEncoding)
         else:
             temp = pack('<I', len(string)).decode(self.StringEncoding)
@@ -1560,7 +1561,7 @@ class PLC(object):
             work.append(ord(char))
         for char in string:
             work.append(ord(char))
-        if not self.Micro800:
+        if data_type == 0xa0:
             for _ in range(len(string), 84):
                 work.append(0x00)
         return work
