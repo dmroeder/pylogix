@@ -483,8 +483,10 @@ class PLC(object):
         for v in value:
             if data_type == 0xca or data_type == 0xcb:
                 write_data.append(float(v))
-            elif data_type == 0xa0 or data_type == 0xda or data_type == 0xd0:
-                write_data.append(self._make_string(v, data_type))
+            elif data_type == 0xa0:
+                write_data.append(self._make_standard_string(v))
+            elif data_type == 0xda or data_type == 0xd0:
+                write_data.append(self._make_special_string(v))
             else:
                 write_data.append(int(v))
 
@@ -553,8 +555,10 @@ class PLC(object):
             # format the values
             if data_type == 0xca or data_type == 0xcb:
                 value = float(wd[1])
-            elif data_type == 0xa0 or data_type == 0xda or data_type == 0xd0:
-                value = [self._make_string(wd[1], data_type)]
+            elif data_type == 0xa0:
+                value = [self._make_standard_string(wd[1])]
+            elif data_type == 0xda or data_type == 0xd0:
+                value = [self._make_special_string(wd[1])]
             else:
                 typ = type(wd[1])
                 value = typ(wd[1])
@@ -1551,19 +1555,30 @@ class PLC(object):
 
         return tag_list
 
-    def _make_string(self, string, data_type):
+    def _make_standard_string(self, string):
+        """
+        String for Compact/Control Logix
+        """
         work = []
-        if data_type == 0xd0 or data_type == 0xda:
-            temp = pack('<B', len(string)).decode(self.StringEncoding)
-        else:
-            temp = pack('<I', len(string)).decode(self.StringEncoding)
+        temp = pack('<I', len(string)).decode(self.StringEncoding)
         for char in temp:
             work.append(ord(char))
         for char in string:
             work.append(ord(char))
-        if data_type == 0xa0:
-            for _ in range(len(string), 84):
-                work.append(0x00)
+        for _ in range(len(string), 84):
+            work.append(0x00)
+        return work
+
+    def _make_special_string(self, string):
+        """
+        String for Micro800 and other platforms
+        """
+        work = []
+        temp = pack('<B', len(string)).decode(self.StringEncoding)
+        for char in temp:
+            work.append(ord(char))
+        for char in string:
+            work.append(ord(char))
         return work
 
     def _is_not_used(self):
