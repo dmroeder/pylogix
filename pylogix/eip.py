@@ -1333,7 +1333,7 @@ class PLC(object):
                     else:
                         # Micro800 String
                         length = unpack_from("<B", data, 0)[0]
-                        data[1:]
+                        data = data[1:]
 
                     # grab the string
                     string_value = data[:length]
