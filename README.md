@@ -5,6 +5,9 @@
 ![Versions](https://img.shields.io/pypi/pyversions/pylogix)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/pylogix)
 
+
+<font size="4">**WARNING**</font> There appears to be the possibility of a scam going on using the pylogix name.  Be careful with anything claming to by pylogix.  https://www.notpylogix.com
+
 pylogix is a communication driver that lets you easily read/write values from tags in Rockwell Automation ControlLogix, CompactLogix and Micro8xx PLC's over Ethernet I/P using Python.  Only PLC's that are programmed with RSLogix5000/Studio5000 or Connected Components Workbench (Micro8xx), models like PLC5, SLC, MicroLogix are *not* supported.  They use a different protocol, which I have no plans to support.
 
 There are many devices that support CIP objects that allow for automatic disocvery (like RSLinx does), which pylogix can discover, but will likely not be able to interact with in any other meaningful way.  Pylogix is really only intended to talk to the above mentioned PLC's and is only tested against them.  It likely will not communicate with any other brands.
@@ -101,7 +104,7 @@ Here's a list of frequent asked questions. [faq](docs/FAQ.md)
 * **Burt Peterson** - *Initial work*
 * **Dustin Roeder** - *Maintainer* - [dmroeder](https://github.com/dmroeder)
 * **Fernando B. (TheFern2)** - *Contributor* - [TheFern2](https://github.com/TheFern2)
-* **jryan** - *Contributor* - [jryan](https://bitbucket.org/jryan/aphytcomm/src/master/)
+* **Joe Ryan** - *Contributor* - [jryan](https://bitbucket.org/jryan/aphytcomm/src/master/)
 * **Perry Kundert** - *Contributor* - [pjkundert](https://github.com/pjkundert)
 
 ## License
@@ -113,4 +116,4 @@ This project is licensed under Apache 2.0 License - see the [LICENSE](LICENSE.tx
 * Archie of AdvancedHMI for all kinds pointers and suggestions.
 * Thanks to ottowayi for general python and good practice advice.
 * Thanks to all of the users that have tested and provided feedback.
-* Jryan for Omron testing and feedback
+* Joe Ryan for Omron testing and feedback
