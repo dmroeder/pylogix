@@ -5,6 +5,8 @@
 ![Versions](https://img.shields.io/pypi/pyversions/pylogix)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/pylogix)
 
+> <font size="6">**WARNING**</font> There appears to be the possibility of a scam going on using the pylogix name. Be careful with anything claming to be pylogix. https://www.notpylogix.com
+
 
 pylogix is a communication driver that lets you easily read/write values from tags in Rockwell Automation ControlLogix, CompactLogix and Micro8xx PLC's over Ethernet I/P using Python.  Only PLC's that are programmed with RSLogix5000/Studio5000 or Connected Components Workbench (Micro8xx), models like PLC5, SLC, MicroLogix are *not* supported.  They use a different protocol, which I have no plans to support.
 
