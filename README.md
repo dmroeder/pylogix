@@ -13,7 +13,7 @@
 
 
 pylogix is a communication driver that lets you easily read/write values from tags in Rockwell Automation ControlLogix, CompactLogix and Micro8xx PLC's over Ethernet I/P using Python.  Only PLC's that are programmed with RSLogix5000/Studio5000 or Connected Components Workbench (Micro8xx), models like PLC5, SLC, MicroLogix are *not* supported.  They use a different protocol, which I have no plans to support.  You can also connect to RSEmulate, but it may require additional
-configuration. See the Emuate [document](docs/Emulate.md) for more information.
+configuration. See the Emulate [document](docs/Emulate.md) for more information.
 
 There are many devices that support CIP objects that allow for automatic disocvery (like RSLinx does), which pylogix can discover, but will likely not be able to interact with in any other meaningful way.  Pylogix is really only intended to talk to the above mentioned PLC's and is only tested against them.  It likely will not communicate with any other brands.
 
