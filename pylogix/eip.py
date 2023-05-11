@@ -1516,7 +1516,16 @@ class PLC(object):
         reply = []
         for i, offset in enumerate(offsets):
             status = unpack_from('<B', stripped, offset + 2)[0]
-            response = Response(write_data[i][0], write_data[i][1], status)
+            
+            # only return value list if the original request was multiple
+            if len(write_data[i][1]) == 1:
+                tag = write_data[i][0]
+                value = write_data[i][1][0]
+            else:
+                tag = write_data[i][0]
+                value = write_data[i][1]
+
+            response = Response(tag, value, status)
             reply.append(response)
 
         return reply
