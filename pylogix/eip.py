@@ -53,7 +53,8 @@ class PLC(object):
         self.ProgramNames = []
         self.StringID = 0x0fce
         self.StringEncoding = 'utf-8'
-        self.CIPTypes = {0xa0: (88, "STRUCT", '<B'),
+        self.CIPTypes = {0x00: (0, "UNKNOWN", '?'),
+                         0xa0: (88, "STRUCT", '<B'),
                          0xc0: (8, "DT", '<Q'),
                          0xc1: (1, "BOOL", '?'),
                          0xc2: (1, "SINT", '<b'),
