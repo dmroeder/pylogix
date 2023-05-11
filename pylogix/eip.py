@@ -482,14 +482,7 @@ class PLC(object):
 
         # format the values
         for v in value:
-            if data_type == 0xca or data_type == 0xcb:
-                write_data.append(float(v))
-            elif data_type == 0xa0:
-                write_data.append(self._make_standard_string(v))
-            elif data_type == 0xda or data_type == 0xd0:
-                write_data.append(self._make_special_string(v))
-            else:
-                write_data.append(int(v))
+            write_data.append(v)
 
         # save the number of values we are writing
         element_count = len(write_data)
@@ -553,16 +546,8 @@ class PLC(object):
                 dt_size = self.CIPTypes[160][0]
                 data_type = 0
 
-            # format the values
-            if data_type == 0xca or data_type == 0xcb:
-                value = float(wd[1])
-            elif data_type == 0xa0:
-                value = [self._make_standard_string(wd[1])]
-            elif data_type == 0xda or data_type == 0xd0:
-                value = [self._make_special_string(wd[1])]
-            else:
-                typ = type(wd[1])
-                value = typ(wd[1])
+            typ = type(wd[1])
+            value = typ(wd[1])
 
             # ensure that write values are always a list
             if isinstance(value, (list, tuple)):
@@ -1151,14 +1136,23 @@ class PLC(object):
         write_service = pack('<BB', request_service, request_size)
         write_service += ioi
 
+        if data_type == 0xca or data_type == 0xcb:
+            value = [float(write_data[0])]
+        elif data_type == 0xa0:
+            value = [self._make_standard_string(write_data[0])]
+        elif data_type == 0xda or data_type == 0xd0:
+            value = [self._make_special_string(write_data[0])]
+        else:
+            value = write_data
+
         if data_type == 0xa0:
             type_len = 0x02
-            write_service += pack('<BBHH', data_type, type_len, self.StringID, len(write_data))
+            write_service += pack('<BBHH', data_type, type_len, self.StringID, len(value))
         else:
             type_len = 0x00
-            write_service += pack('<BBH', data_type, type_len, len(write_data))
+            write_service += pack('<BBH', data_type, type_len, len(value))
 
-        for v in write_data:
+        for v in value:
             try:
                 for i in range(len(v)):
                     el = v[i]
