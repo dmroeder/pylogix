@@ -574,7 +574,6 @@ class PLC(object):
                     if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
                         service_segment_size = service_segment_size + rsp_tag_size
                         temp_segments.append(write_service)
-                        # tmp_write_values.append((tags[i], (high[i], low[i])))
                         tmp_write_values.append((tags[i], value))
                         tag_count = tag_count + 1
                     else:
