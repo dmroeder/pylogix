@@ -434,7 +434,7 @@ class PLC(object):
 
         conn = self.conn.connect()
         if not conn[0]:
-            return [Response(t, None, conn[1]) for t in tags[1]]
+            return [Response(t[0], t[1], conn[1]) for t in tags]
 
         # format the tags so that we have just the tag name or
         # the tag name and data type
