@@ -434,7 +434,7 @@ class PLC(object):
 
         conn = self.conn.connect()
         if not conn[0]:
-            return [Response(t[0], t[1], conn[1]) for t in tags]
+            return [Response(t[0], None, conn[1]) for t in tags]
 
         # format the tags so that we have just the tag name or
         # the tag name and data type
@@ -467,7 +467,7 @@ class PLC(object):
 
         conn = self.conn.connect()
         if not conn[0]:
-            return Response(tag_name, value, conn[1])
+            return Response(tag_name, None, conn[1])
 
         tag, base_tag, index = parse_tag_name(tag_name)
         resp = self._initial_read(tag, base_tag, data_type)
