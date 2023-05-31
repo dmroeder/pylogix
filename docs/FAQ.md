@@ -9,7 +9,7 @@
 
 4. Does pylogix work with Micro8xx, and CCW Simulator? Yes
 
-5. Can pylogix read Micro8xx program tags? No
+5. Can pylogix read Micro8xx program tags? No, it can only read global tags.
 
 6. Does pylogix works with other brand PLCs, such as Omron, Siemens, etc? No
 
