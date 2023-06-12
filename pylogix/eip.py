@@ -1136,29 +1136,26 @@ class PLC(object):
         write_service = pack('<BB', request_service, request_size)
         write_service += ioi
 
-        if data_type == 0xca or data_type == 0xcb:
-            value = [float(write_data[0])]
-        elif data_type == 0xa0:
-            value = [self._make_standard_string(write_data[0])]
-        elif data_type == 0xda or data_type == 0xd0:
-            value = [self._make_special_string(write_data[0])]
-        else:
-            value = write_data
-
         if data_type == 0xa0:
             type_len = 0x02
-            write_service += pack('<BBHH', data_type, type_len, self.StringID, len(value))
+            write_service += pack('<BBHH', data_type, type_len, self.StringID, len(write_data))
         else:
             type_len = 0x00
-            write_service += pack('<BBH', data_type, type_len, len(value))
+            write_service += pack('<BBH', data_type, type_len, len(write_data))
 
-        for v in value:
+        for value in write_data:
+            if data_type == 0xca or data_type == 0xcb:
+                value = float(value)
+            elif data_type == 0xa0:
+                value = self._make_standard_string(value)
+            elif data_type == 0xda or data_type == 0xd0:
+                value = self._make_special_string(value)
             try:
-                for i in range(len(v)):
-                    el = v[i]
+                for i in range(len(value)):
+                    el = value[i]
                     write_service += pack(self.CIPTypes[data_type][2], el)
             except Exception:
-                write_service += pack(self.CIPTypes[data_type][2], v)
+                write_service += pack(self.CIPTypes[data_type][2], value)
 
         return write_service
 
