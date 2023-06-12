@@ -359,6 +359,48 @@ class PylogixTests(unittest.TestCase):
 
         self.assertListEqual(values, return_values, "Failed reading a list with data type")
 
+    def write_array_fixture(self):
+        
+        # clear the values before trying to write
+        for i in range(6):
+            self.comm.Write("BaseSINTArray[{}]".format(i), 0)
+            self.comm.Write("BaseINTArray[{}]".format(i), 0)
+            self.comm.Write("BaseDINTArray[{}]".format(i), 0)
+            self.comm.Write("BaseLINTArray[{}]".format(i), 0)
+            self.comm.Write("BaseREALArray[{}]".format(i), 0)
+            self.comm.Write("BaseSTRINGArray[{}]".format(i), "")
+
+        values = [1, 2, 3, 4, 5]
+        self.comm.Write("BaseSINTArray[0]", values)
+        return_values = self.comm.Read("BaseSINTArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of SINT values")
+
+        values = [1, 2, 3, 4, 5]
+        self.comm.Write("BaseINTArray[0]", values)
+        return_values = self.comm.Read("BaseINTArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of INT values")
+
+        values = [1, 2, 3, 4, 5]
+        self.comm.Write("BaseDINTArray[0]", values)
+        return_values = self.comm.Read("BaseDINTArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of DINT values")
+
+        values = [1, 2, 3, 4, 5]
+        self.comm.Write("BaseLINTArray[0]", values)
+        return_values = self.comm.Read("BaseLINTArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of LINT values")
+
+        values = [1.0, 2.0, 3.0, 4.0, 5.0]
+        self.comm.Write("BaseREALArray[0]", values)
+        return_values = self.comm.Read("BaseREALArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of REAL values")
+
+        values = ["String1", "String2", "String3", "String4", "String5"]
+        self.comm.Write("BaseSTRINGArray[0]", values)
+        return_values = self.comm.Read("BaseSTRINGArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of STRING values")
+
+
     def setUp(self):
         self.comm.IPAddress = plcConfig.plc_ip
         self.comm.ProcessorSlot = plcConfig.plc_slot
@@ -405,6 +447,9 @@ class PylogixTests(unittest.TestCase):
     @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_nemesis_write(self):
         self.nemesis_fixture("Nemesis[0]", 64)
+
+    def test_array_write(self):
+        self.write_array_fixture()
 
     @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_large_list(self):
