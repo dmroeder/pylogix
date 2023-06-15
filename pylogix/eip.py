@@ -1197,13 +1197,20 @@ class PLC(object):
         request += pack('<H', count)
         request += pack('<I', self.Offset)
 
-        for v in write_data:
+        for value in write_data:
+
+            if data_type == 0xca or data_type == 0xcb:
+                value = float(value)
+            elif data_type == 0xa0:
+                value = self._make_standard_string(value)
+            elif data_type == 0xda or data_type == 0xd0:
+                value = self._make_special_string(value)
             try:
-                for i in range(len(v)):
-                    el = v[i]
+                for i in range(len(value)):
+                    el = value[i]
                     request += pack(self.CIPTypes[data_type][2], el)
             except Exception:
-                request += pack(self.CIPTypes[data_type][2], v)
+                request += pack(self.CIPTypes[data_type][2], value)
 
         return request
 
