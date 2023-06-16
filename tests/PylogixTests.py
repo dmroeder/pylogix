@@ -370,32 +370,32 @@ class PylogixTests(unittest.TestCase):
             self.comm.Write("BaseREALArray[{}]".format(i), 0)
             self.comm.Write("BaseSTRINGArray[{}]".format(i), "")
 
-        values = [1, 2, 3, 4, 5]
+        values = [i for i in range(100)]
         self.comm.Write("BaseSINTArray[0]", values)
         return_values = self.comm.Read("BaseSINTArray[0]", len(values)).Value
         self.assertListEqual(values, return_values, "Failed to write array of SINT values")
 
-        values = [1, 2, 3, 4, 5]
+        values = [i for i in range(100)]
         self.comm.Write("BaseINTArray[0]", values)
         return_values = self.comm.Read("BaseINTArray[0]", len(values)).Value
         self.assertListEqual(values, return_values, "Failed to write array of INT values")
 
-        values = [1, 2, 3, 4, 5]
+        values = [i for i in range(100)]
         self.comm.Write("BaseDINTArray[0]", values)
         return_values = self.comm.Read("BaseDINTArray[0]", len(values)).Value
         self.assertListEqual(values, return_values, "Failed to write array of DINT values")
 
-        values = [1, 2, 3, 4, 5]
+        values = [i for i in range(100)]
         self.comm.Write("BaseLINTArray[0]", values)
         return_values = self.comm.Read("BaseLINTArray[0]", len(values)).Value
         self.assertListEqual(values, return_values, "Failed to write array of LINT values")
 
-        values = [1.0, 2.0, 3.0, 4.0, 5.0]
+        values = [i for i in range(100)]
         self.comm.Write("BaseREALArray[0]", values)
         return_values = self.comm.Read("BaseREALArray[0]", len(values)).Value
         self.assertListEqual(values, return_values, "Failed to write array of REAL values")
 
-        values = ["String1", "String2", "String3", "String4", "String5"]
+        values = ["String{}".format(i) for i in range(100)]
         self.comm.Write("BaseSTRINGArray[0]", values)
         return_values = self.comm.Read("BaseSTRINGArray[0]", len(values)).Value
         self.assertListEqual(values, return_values, "Failed to write array of STRING values")
