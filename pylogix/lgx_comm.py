@@ -26,7 +26,6 @@ class Connection(object):
     def __init__(self, parent):
         self.parent = parent
 
-        self.Port = 44818
         self.ConnectionSize = None  # Default to try Large, then Small Fwd Open.
         self.Socket = socket.socket()
         self.SocketConnected = False
@@ -92,7 +91,7 @@ class Connection(object):
                 pass
             self.Socket = socket.socket()
             self.Socket.settimeout(self.parent.SocketTimeout)
-            self.Socket.connect((self.parent.IPAddress, self.Port))
+            self.Socket.connect((self.parent.IPAddress, self.parent.Port))
         except socket.error as e:
             self.SocketConnected = False
             self._sequence_counter = 1
@@ -554,7 +553,7 @@ class Connection(object):
 
         return connection_path
 
-    def discover(self, parse_procedural_parameter):
+    def discover(self, parse_procedural_parameter, port=44818):
         """
         Discover devices on the network, similar to the RSLinx
         Ethernet I/P driver
@@ -574,7 +573,7 @@ class Connection(object):
                 s.settimeout(0.5)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
                 s.bind((ip[4][0], 0))
-                s.sendto(request, ('255.255.255.255', 44818))
+                s.sendto(request, ('255.255.255.255', port))
                 try:
                     while True:
                         ret = s.recv(4096)
@@ -597,7 +596,7 @@ class Connection(object):
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(0.5)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.sendto(request, ('255.255.255.255', 44818))
+            s.sendto(request, ('255.255.255.255', port))
             try:
                 while True:
                     ret = s.recv(4096)
