@@ -553,7 +553,7 @@ class Connection(object):
 
         return connection_path
 
-    def discover(self, parse_procedural_parameter, port=44818):
+    def discover(self, parse_procedural_parameter):
         """
         Discover devices on the network, similar to the RSLinx
         Ethernet I/P driver
@@ -573,7 +573,7 @@ class Connection(object):
                 s.settimeout(0.5)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
                 s.bind((ip[4][0], 0))
-                s.sendto(request, ('255.255.255.255', port))
+                s.sendto(request, ('255.255.255.255', self.parent.Port))
                 try:
                     while True:
                         ret = s.recv(4096)
@@ -596,7 +596,7 @@ class Connection(object):
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(0.5)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.sendto(request, ('255.255.255.255', port))
+            s.sendto(request, ('255.255.255.255', self.parent.Port))
             try:
                 while True:
                     ret = s.recv(4096)
