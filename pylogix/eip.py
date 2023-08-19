@@ -33,7 +33,7 @@ from struct import pack, unpack_from
 # noinspection PyMethodMayBeStatic
 class PLC(object):
 
-    def __init__(self, ip_address="", port=44818, slot=0, timeout=5.0, Micro800=False):
+    def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False, port=44818):
         """
         Initialize our parameters
         """
