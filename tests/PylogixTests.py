@@ -358,7 +358,7 @@ class PylogixTests(unittest.TestCase):
         ret = self.comm.Read(read_request)
         return_values = [r.Value for r in ret]
 
-        self.assertListEqual(values, return_values, "Failed reading a list with data type")
+        self.assertEqual(values, return_values, "Failed reading a list with data type")
 
     def write_array_fixture(self):
         
@@ -374,32 +374,32 @@ class PylogixTests(unittest.TestCase):
         values = [i for i in range(100)]
         self.comm.Write("BaseSINTArray[0]", values)
         return_values = self.comm.Read("BaseSINTArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of SINT values")
+        self.assertEqual(values, return_values, "Failed to write array of SINT values")
 
         values = [i for i in range(100)]
         self.comm.Write("BaseINTArray[0]", values)
         return_values = self.comm.Read("BaseINTArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of INT values")
+        self.assertEqual(values, return_values, "Failed to write array of INT values")
 
         values = [i for i in range(100)]
         self.comm.Write("BaseDINTArray[0]", values)
         return_values = self.comm.Read("BaseDINTArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of DINT values")
+        self.assertEqual(values, return_values, "Failed to write array of DINT values")
 
         values = [i for i in range(100)]
         self.comm.Write("BaseLINTArray[0]", values)
         return_values = self.comm.Read("BaseLINTArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of LINT values")
+        self.assertEqual(values, return_values, "Failed to write array of LINT values")
 
         values = [i for i in range(100)]
         self.comm.Write("BaseREALArray[0]", values)
         return_values = self.comm.Read("BaseREALArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of REAL values")
+        self.assertEqual(values, return_values, "Failed to write array of REAL values")
 
         values = ["String{}".format(i) for i in range(100)]
         self.comm.Write("BaseSTRINGArray[0]", values)
         return_values = self.comm.Read("BaseSTRINGArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of STRING values")
+        self.assertEqual(values, return_values, "Failed to write array of STRING values")
 
 
     def setUp(self):

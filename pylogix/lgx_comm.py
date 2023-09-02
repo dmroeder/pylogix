@@ -175,21 +175,18 @@ class Connection(object):
                 return status, ret_data
             else:
                 return 1, None
-<<<<<<< HEAD
         except OSError as e:
             self.SocketConnected = False
             if e.errno == errno.ECOMM:
                 return 1, None
             elif e.errno == errno.EIO:
                 return 7, None
-=======
         except socket.gaierror:
             self.SocketConnected = False
             return 1, None
         except IOError:
             self.SocketConnected = False
             return 7, None
->>>>>>> master
 
     def receive_data(self):
         """
@@ -214,21 +211,12 @@ class Connection(object):
         """
         Register our CIP connection
         """
-<<<<<<< HEAD
-        EIPCommand = 0x0065
-        EIPLength = 0x0004
-        EIPSessionHandle = self.SessionHandle
-        EIPStatus = 0x0000
-        EIPContext = '{:<8}'.format(pylogix.__version__).encode("utf-8")
-        EIPOptions = 0x0000
-=======
         eip_command = 0x0065
         eip_length = 0x0004
         eip_session_handle = self._session_handle
         eip_status = 0x0000
-        eip_context = pylogix.__version__.ljust(8, " ").encode("utf-8")
+        eip_context = '{:<8}'.format(pylogix.__version__).encode("utf-8")
         eip_options = 0x0000
->>>>>>> master
 
         eip_proto_version = 0x01
         eip_option_flag = 0x00
