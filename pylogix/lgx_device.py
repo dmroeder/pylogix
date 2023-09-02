@@ -17,24 +17,25 @@
 import socket
 from struct import pack, unpack_from
 
+
 class Device(object):
-    
+
     def __init__(self):
         # structure of a logix device
-        self.Length=None
-        self.EncapsulationVersion=None
-        self.IPAddress=None
-        self.VendorID=None
-        self.Vendor=None
-        self.DeviceID=None
-        self.DeviceType=None
-        self.ProductCode=None
-        self.Revision=None
-        self.Status=None
-        self.SerialNumber=None
-        self.ProductNameLength=None
-        self.ProductName=None
-        self.State=None
+        self.Length = None
+        self.EncapsulationVersion = None
+        self.IPAddress = None
+        self.VendorID = None
+        self.Vendor = None
+        self.DeviceID = None
+        self.DeviceType = None
+        self.ProductCode = None
+        self.Revision = None
+        self.Status = None
+        self.SerialNumber = None
+        self.ProductNameLength = None
+        self.ProductName = None
+        self.State = None
 
     def __repr__(self):
 
@@ -77,16 +78,16 @@ class Device(object):
         return ret
 
     @staticmethod
-    def get_device(deviceID):
-        if deviceID in devices.keys():
-            return devices[deviceID]
+    def get_device(device_id):
+        if device_id in devices.keys():
+            return devices[device_id]
         else:
             return "Unknown"
 
     @staticmethod
-    def get_vendor(vendorID):
-        if vendorID in vendors:
-            return vendors[vendorID]
+    def get_vendor(vendor_id):
+        if vendor_id in vendors.keys():
+            return vendors[vendor_id]
         else:
             return "Unknown"
 
@@ -99,17 +100,17 @@ class Device(object):
         resp.Length = unpack_from('<H', data, 28)[0]
         resp.EncapsulationVersion = unpack_from('<H', data, 30)[0]
 
-        longIP = unpack_from('<I', data, 36)[0]
+        long_ip = unpack_from('<I', data, 36)[0]
         if ip_address:
             resp.IPAddress = ip_address
         else:
-            resp.IPAddress = socket.inet_ntoa(pack('<L', longIP))
+            resp.IPAddress = socket.inet_ntoa(pack('<L', long_ip))
 
         resp.VendorID = unpack_from('<H', data, 48)[0]
         resp.Vendor = Device.get_vendor(resp.VendorID)
 
         resp.DeviceID = unpack_from('<H', data, 50)[0]
-        resp.Device = Device.get_device(resp.DeviceID)
+        resp.DeviceType = Device.get_device(resp.DeviceID)
 
         resp.ProductCode = unpack_from('<H', data, 52)[0]
         major = unpack_from('<B', data, 54)[0]
@@ -125,6 +126,7 @@ class Device(object):
         resp.State = unpack_from('<B', state, 0)[0]
 
         return resp
+
 
 # List originally came from Wireshark /epan/dissectors/packet-cip.c
 devices = {0x00: 'Generic Device (deprecated)',

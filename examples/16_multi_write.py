@@ -1,11 +1,4 @@
 """
-the following import is only necessary because eip.py is not in this directory
-"""
-import sys
-sys.path.append('..')
-
-
-"""
 This example shows how to utilize the multi write service
 
 If you pass Write a list of tuples (tag, value), it will
@@ -23,7 +16,7 @@ with PLC() as comm:
 
     # write the values
     ret = comm.Write(write_data)
-    
+
     # print the status of the writes
     for r in ret:
         print(r.TagName, r.Status)

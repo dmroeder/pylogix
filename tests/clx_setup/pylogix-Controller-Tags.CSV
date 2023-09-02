@@ -1,9 +1,9 @@
-remark,CSV-Import-Export,,,,,
-remark,Date = Tue Sep 24 01:52:35 2019,,,,,
-remark,Version = RSLogix 5000 v20.01,,,,,
-remark,Owner = CanrigAdmin,,,,,
-remark,Company = Nabors Corporate Services,,,,,
-0.3,,,,,,
+remark,"CSV-Import-Export"
+remark,"Date = Tue Sep 24 01:52:35 2019"
+remark,"Version = RSLogix 5000 v20.01"
+remark,"Owner = CanrigAdmin"
+remark,"Company = Nabors Corporate Services"
+0.3
 TYPE,SCOPE,NAME,DESCRIPTION,DATATYPE,SPECIFIER,ATTRIBUTES
 TAG,,BaseBITS,,DINT,,"(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
 TAG,,BaseBITSArray,,DINT[128],,"(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
@@ -33,6 +33,7 @@ TAG,,UDTCombined,,combined,,"(Constant := false, ExternalAccess := Read/Write)"
 TAG,,UDTCombinedArray,,combined[32],,"(Constant := false, ExternalAccess := Read/Write)"
 TAG,,YugeArray,,DINT[60000],,"(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
 TAG,,Nemesis,,DINT[64],,"(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
+TAG,MainProgram,pMultiDim,"","DINT[5,5,5]","","(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
 TAG,,Str0,,STRING,,"(Constant := false, ExternalAccess := Read/Write)"
 TAG,,Str1,,STRING,,"(Constant := false, ExternalAccess := Read/Write)"
 TAG,,Str10,,STRING,,"(Constant := false, ExternalAccess := Read/Write)"

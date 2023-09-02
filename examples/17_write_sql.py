@@ -14,20 +14,22 @@ db_connection = mysql.connector.connect(
                 host="localhost",
                 user="root",
                 passwd="password",
-                database = "pylogix_db")
+                database="pylogix_db")
 
-mycursor = db_connection.cursor()
+my_cursor = db_connection.cursor()
 tags = ["recipe_name", "recipe_value"]
 comm = pylogix.PLC("192.168.1.10")
 
-def write_to_db(vals):
+
+def write_to_db(values):
     """
     Write our values to the database
     """
     cmd = "INSERT INTO recipes (name, number) VALUES (%s, %s)"
-    val = (vals[0], vals[1])
-    mycursor.execute(cmd, val)
+    val = (values[0], values[1])
+    my_cursor.execute(cmd, val)
     db_connection.commit()
+
 
 def read_from_plc():
     """
@@ -38,6 +40,7 @@ def read_from_plc():
 
     return [r.Value for r in ret]
 
+
 run = True
 while run:
     try:
@@ -47,4 +50,3 @@ while run:
 
     except KeyboardInterrupt:
         run = False
-

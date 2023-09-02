@@ -16,6 +16,7 @@
 
 from struct import unpack_from
 
+
 class Tag(object):
 
     def __init__(self):
@@ -86,13 +87,13 @@ class Tag(object):
         return False
 
     @staticmethod
-    def parse(packet, programName):
+    def parse(packet, program_name):
 
         t = Tag()
         length = unpack_from('<H', packet, 4)[0]
         name = packet[6:length+6].decode('utf-8')
-        if programName:
-            t.TagName = str(programName + '.' + name)
+        if program_name:
+            t.TagName = str(program_name + '.' + name)
         else:
             t.TagName = str(name)
         t.InstanceID = unpack_from('<H', packet, 0)[0]
@@ -109,6 +110,7 @@ class Tag(object):
         else:
             t.Size = 0
         return t
+
 
 class UDT(object):
 

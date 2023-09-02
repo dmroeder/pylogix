@@ -87,6 +87,7 @@ class PylogixTests(unittest.TestCase):
         self.compare_tag(prefix + 'BaseSTRINGArray[31]', self.r.String())
         self.compare_tag(prefix + 'BaseTimerArray[0].PRE', abs(self.r.Int()))
         self.compare_tag(prefix + 'BaseTimerArray[31].PRE', abs(self.r.Int()))
+        self.compare_tag(prefix + 'MultiDim[1,1,1]', self.r.Dint())
 
     def udt_basic_fixture(self, prefix=''):
         self.compare_bool(prefix + 'UDTBasic.b_BOOL')
@@ -323,6 +324,84 @@ class PylogixTests(unittest.TestCase):
 
             self.assertEqual(vals, read_vals, "Failed to write large list")
 
+    def test_with_datatype(self):
+        """
+        Try a few variations of reads when including data type
+        """
+        self.comm.KnownTags = {}
+        value = self.r.Dint()
+        self.comm.Write("BaseDINT", value, 0xc4)
+        self.comm.KnownTags = {}
+        ret = self.comm.Read("BaseDINT", 1, 0xc4).Value
+        self.assertEqual(value, ret, "Failed when including data type")
+
+        # try with a list/tuple, but only one instance
+        value = self.r.Int()
+        self.comm.KnownTags = {}
+        write_request = [("BaseINT", value, 0xc3)]
+        self.comm.Write(write_request)
+        
+        read_request = [("BaseINT", 1, 0xc3)] 
+        self.comm.KnownTags = {}
+        ret = self.comm.Read(read_request)
+
+        self.assertEqual(value, ret[0].Value, "Failed read list of one with data type")
+
+        # try a list with multiple values and data type
+        values = [self.r.Sint() for i in range(10)]
+        write_request = [("BaseSINTArray[{}]".format(i), values[i], 0xc2) for i in range(10)]
+        read_request = [("BaseSINTArray[{}]".format(i), 1, 0xc2) for i in range(10)]
+        self.KnownTags = {}
+        self.comm.Write(write_request)
+        
+        self.KnownTags = {}
+        ret = self.comm.Read(read_request)
+        return_values = [r.Value for r in ret]
+
+        self.assertListEqual(values, return_values, "Failed reading a list with data type")
+
+    def write_array_fixture(self):
+        
+        # clear the values before trying to write
+        for i in range(6):
+            self.comm.Write("BaseSINTArray[{}]".format(i), 0)
+            self.comm.Write("BaseINTArray[{}]".format(i), 0)
+            self.comm.Write("BaseDINTArray[{}]".format(i), 0)
+            self.comm.Write("BaseLINTArray[{}]".format(i), 0)
+            self.comm.Write("BaseREALArray[{}]".format(i), 0)
+            self.comm.Write("BaseSTRINGArray[{}]".format(i), "")
+
+        values = [i for i in range(100)]
+        self.comm.Write("BaseSINTArray[0]", values)
+        return_values = self.comm.Read("BaseSINTArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of SINT values")
+
+        values = [i for i in range(100)]
+        self.comm.Write("BaseINTArray[0]", values)
+        return_values = self.comm.Read("BaseINTArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of INT values")
+
+        values = [i for i in range(100)]
+        self.comm.Write("BaseDINTArray[0]", values)
+        return_values = self.comm.Read("BaseDINTArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of DINT values")
+
+        values = [i for i in range(100)]
+        self.comm.Write("BaseLINTArray[0]", values)
+        return_values = self.comm.Read("BaseLINTArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of LINT values")
+
+        values = [i for i in range(100)]
+        self.comm.Write("BaseREALArray[0]", values)
+        return_values = self.comm.Read("BaseREALArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of REAL values")
+
+        values = ["String{}".format(i) for i in range(100)]
+        self.comm.Write("BaseSTRINGArray[0]", values)
+        return_values = self.comm.Read("BaseSTRINGArray[0]", len(values)).Value
+        self.assertListEqual(values, return_values, "Failed to write array of STRING values")
+
+
     def setUp(self):
         self.comm.IPAddress = plcConfig.plc_ip
         self.comm.ProcessorSlot = plcConfig.plc_slot
@@ -370,9 +449,16 @@ class PylogixTests(unittest.TestCase):
     def test_nemesis_write(self):
         self.nemesis_fixture("Nemesis[0]", 64)
 
+    def test_array_write(self):
+        self.write_array_fixture()
+
     @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_large_list(self):
         self.large_list_fixture()
+
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
+    def test_large_list(self):
+        self.test_with_datatype()
 
     @unittest.skipIf(is_micropython(), 'No gethostname in micropython socket module')
     def test_discover(self):
@@ -457,7 +543,7 @@ class PylogixTests(unittest.TestCase):
     @unittest.skipIf(not is_micropython(), 'Not testing uvendors for python')
     def test_known_uvendors(self):
         from pylogix.lgx_uvendors import uvendors
-        self.assertEqual(uvendors[0], 'Reserved', "Reserver uvendor not found")
+        self.assertEqual(uvendors[26], 'Festo', "Festo uvendor not found")
         self.assertEqual(uvendors[1], 'Rockwell Automation/Allen-Bradley', "Rockwell uvendor not found")
         self.assertEqual(uvendors[-1], 'Unknown', "Unknown uvendor not returned")
         self.assertEqual(uvendors[(1<<32)-1], 'Unknown', "Unknown uvendor not returned")
