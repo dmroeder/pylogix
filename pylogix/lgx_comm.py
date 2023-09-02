@@ -99,6 +99,10 @@ class Connection(object):
             self.SocketConnected = False
             self.SequenceCounter = 1
             self.Socket.close()
+            # TODO FAB unsure if this works on both python and mpy
+            print(e)
+            print(e.args[0])
+            print(e.errno)
             if e.errno == errno.ECOMM:
                 return False, 1
             elif e.errno == errno.EIO:
