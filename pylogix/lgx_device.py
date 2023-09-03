@@ -79,14 +79,14 @@ class Device(object):
 
     @staticmethod
     def get_device(device_id):
-        if device_id in devices.keys():
+        if device_id in devices:
             return devices[device_id]
         else:
             return "Unknown"
 
     @staticmethod
     def get_vendor(vendor_id):
-        if vendor_id in vendors.keys():
+        if vendor_id in vendors:
             return vendors[vendor_id]
         else:
             return "Unknown"
