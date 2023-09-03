@@ -6,6 +6,7 @@
 ![PyPI](https://img.shields.io/pypi/v/pylogix?label=pypi%20pylogix)
 ![PyPI](https://img.shields.io/pypi/l/pylogix)
 ![Versions](https://img.shields.io/pypi/pyversions/pylogix)
+![MicroPython](https://img.shields.io/badge/micropython-1.20.0+-red?logo=micropython)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/pylogix)
 
 
@@ -15,13 +16,13 @@
 pylogix is a communication driver that lets you easily read/write values from tags in Rockwell Automation ControlLogix, CompactLogix and Micro8xx PLC's over Ethernet I/P using Python.  Only PLC's that are programmed with RSLogix5000/Studio5000 or Connected Components Workbench (Micro8xx), models like PLC5, SLC, MicroLogix are *not* supported.  They use a different protocol, which I have no plans to support.  You can also connect to RSEmulate, but it may require additional
 configuration. See the Emulate [document](docs/Emulate.md) for more information.
 
-There are many devices that support CIP objects that allow for automatic disocvery (like RSLinx does), which pylogix can discover, but will likely not be able to interact with in any other meaningful way.  Pylogix is really only intended to talk to the above mentioned PLC's and is only tested against them.  It likely will not communicate with any other brands.
+There are many devices that support CIP objects that allow for automatic discovery (like RSLinx does), which pylogix can discover, but will likely not be able to interact with in any other meaningful way.  Pylogix is really only intended to talk to the above mentioned PLC's and is only tested against them.  It likely will not communicate with any other brands.
 
 For general support or questions, I created a [discord](https://discord.gg/tw8E9EAAnf), feel free to join and ask questions, I'll do my best to help in a timely manner.
 
 ## Getting Started
 
-There are currently no dependencies so you can get going quickly without having to install any other prerequiste packages.  Both python2 and python3 are supported.
+There are currently no dependencies, so you can get going quickly without having to install any other prerequiste packages.  Both python2 and python3 are supported.
 
 ### Installing
 
@@ -95,6 +96,9 @@ Optionally set a specific maximum size for requests/replies.  If not specified, 
 comm.ConnectionSize = 508
 ```
 
+## Installing MicroPython
+
+Checkout [Documentation](docs/mpy/README.md)
 
 ### Other Features
 

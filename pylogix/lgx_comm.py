@@ -97,20 +97,25 @@ class Connection(object):
             self.Socket.settimeout(self.parent.SocketTimeout)
             addr = socket.getaddrinfo(self.parent.IPAddress, self.parent.Port)[0][-1]
             self.Socket.connect(addr)
+        # Changed to a more generic exception class as mpy does not have socket.error
+        # Explanation in the docs: https://docs.micropython.org/en/latest/library/socket.html#functions
         except OSError as e:
             self.SocketConnected = False
             self._sequence_counter = 1
             self.Socket.close()
-            # TODO FAB unsure if this works on both python and mpy
-            print(e)
-            print(e.args[0])
-            print(e.errno)
-            if e.errno == errno.ECOMM:
-                return False, 1
-            elif e.errno == errno.EIO:
-                return False, 7
-            # new way of returning the error for current pylogix python
-            # return [False, e]
+            # Handle errors just as before for python
+            if not is_micropython():
+                return [False, e]
+            else:
+                # mpy: For now all exceptions go to 1 Connection failure
+                # there might be a better way to handle this in the future
+                # If the plc IP is wrong, the socket conn error goes to err 115 EINPROGRESS
+                # this only happens when the socket is non block which is the default
+                # If the socket is blocking socket conn error goes to err 103 ECONNABORTED
+                # https://docs.python.org/3/library/exceptions.html
+                # https://docs.python.org/3/library/errno.html this list is far greater than
+                # available mpy errors
+                return [False, 1]
 
         # register the session
         self.Socket.send(self._build_register_session())
@@ -175,13 +180,8 @@ class Connection(object):
                 return status, ret_data
             else:
                 return 1, None
-        except OSError as e:
-            self.SocketConnected = False
-            if e.errno == errno.ECOMM:
-                return 1, None
-            elif e.errno == errno.EIO:
-                return 7, None
-        except socket.gaierror:
+        # Generalized exception error to catch both python and mpy
+        except OSError:
             self.SocketConnected = False
             return 1, None
         except IOError:
