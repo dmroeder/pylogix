@@ -8,7 +8,7 @@
     ["pylogix/lgx_tag.mpy", "github:dmroeder/pylogix/upylogix/lgx_tag.mpy"],
     ["pylogix/utils.mpy", "github:dmroeder/pylogix/upylogix/utils.mpy"],
     ["pylogix/lgx_uvendors.mpy", "github:dmroeder/pylogix/upylogix/lgx_uvendors.mpy"],
-    ["pylogix/lgx_uvendors.mpy.bin", "github:dmroeder/pylogix/upylogix/vendors.bin"]
+    ["pylogix/lgx_uvendors.mpy.bin", "github:dmroeder/pylogix/upylogix/lgx_uvendors.mpy.bin"]
   ],
-  "version": "0.8.7"
+  "version": "0.9.0"
 }

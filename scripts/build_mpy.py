@@ -78,7 +78,7 @@ for k in ks:
 oneline = lambda v: (v + (b' '*maxL))[:maxL] + b'\n'
 
 # Write fixed-length records to vendors.bin file for fast lookups
-with open('upylogix/vendors.bin','wb') as fbin:
+with open('upylogix/lgx_uvendors.mpy.bin','wb') as fbin:
 
     # Write an initial header record containing the vendor count
     headerstring = "{0}:{1}".format(len(ks),"Count of vendors")
