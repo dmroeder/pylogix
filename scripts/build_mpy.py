@@ -110,6 +110,7 @@ package_json_dict = {}
 list_of_package_urls = []
 for py_file in py_files:
     repo_url = "github:dmroeder/pylogix/upylogix"
+    py_file = py_file.replace(".py", ".mpy")
     list_to_add = [f"pylogix/{py_file}", f"{repo_url}/{py_file}"]
     list_of_package_urls.append(list_to_add)
 

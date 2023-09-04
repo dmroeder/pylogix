@@ -31,6 +31,13 @@ Once you have a repl, and know how to upload files to your board checkout the di
 import mip
 mip.install("github:dmroeder/pylogix")
 ```
+
+# If there is a dev branch
+
+```python
+mip.install("github:dmroeder/pylogix", version="micropython/patch1")
+```
+
 In the repl, you can run ls() which is a function I've loaded in the boot.py
 
 ```
