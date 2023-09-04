@@ -1,14 +1,41 @@
 {
-  "urls": [
-    ["pylogix/__init__.mpy", "github:dmroeder/pylogix/upylogix/__init__.mpy"],
-    ["pylogix/eip.mpy", "github:dmroeder/pylogix/upylogix/eip.mpy"],
-    ["pylogix/lgx_comm.mpy", "github:dmroeder/pylogix/upylogix/lgx_comm.mpy"],
-    ["pylogix/lgx_device.mpy", "github:dmroeder/pylogix/upylogix/lgx_device.mpy"],
-    ["pylogix/lgx_response.mpy", "github:dmroeder/pylogix/upylogix/lgx_response.mpy"],
-    ["pylogix/lgx_tag.mpy", "github:dmroeder/pylogix/upylogix/lgx_tag.mpy"],
-    ["pylogix/utils.mpy", "github:dmroeder/pylogix/upylogix/utils.mpy"],
-    ["pylogix/lgx_uvendors.mpy", "github:dmroeder/pylogix/upylogix/lgx_uvendors.mpy"],
-    ["pylogix/lgx_uvendors.mpy.bin", "github:dmroeder/pylogix/upylogix/lgx_uvendors.mpy.bin"]
-  ],
-  "version": "0.9.0"
+    "urls": [
+        [
+            "pylogix/eip.py",
+            "github:dmroeder/pylogix/upylogix/eip.py"
+        ],
+        [
+            "pylogix/lgx_uvendors.py",
+            "github:dmroeder/pylogix/upylogix/lgx_uvendors.py"
+        ],
+        [
+            "pylogix/utils.py",
+            "github:dmroeder/pylogix/upylogix/utils.py"
+        ],
+        [
+            "pylogix/__init__.py",
+            "github:dmroeder/pylogix/upylogix/__init__.py"
+        ],
+        [
+            "pylogix/lgx_device.py",
+            "github:dmroeder/pylogix/upylogix/lgx_device.py"
+        ],
+        [
+            "pylogix/lgx_response.py",
+            "github:dmroeder/pylogix/upylogix/lgx_response.py"
+        ],
+        [
+            "pylogix/lgx_tag.py",
+            "github:dmroeder/pylogix/upylogix/lgx_tag.py"
+        ],
+        [
+            "pylogix/lgx_comm.py",
+            "github:dmroeder/pylogix/upylogix/lgx_comm.py"
+        ],
+        [
+            "pylogix/lgx_uvendors.mpy.bin",
+            "github:dmroeder/pylogix/upylogix/lgx_uvendors.mpy.bin"
+        ]
+    ],
+    "version": "0.9.0"
 }

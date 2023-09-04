@@ -1,7 +1,8 @@
 ########################################################################
 # scripts/build_mpy.py
 # - Cross-compile .py=>.mpy files for micropython
-# - Build upylogix/vendor.bin file from pylogix/lgx_vendors.py
+# - Build upylogix/lgx_uvendors.mpy.bin file from pylogix/lgx_vendors.py
+# - Generate package.json
 ########################################################################
 
 # This should never be loaded as a module
@@ -88,3 +89,31 @@ with open('upylogix/lgx_uvendors.mpy.bin','wb') as fbin:
     for key_vendor in vlist: fbin.write(oneline(key_vendor))
 
 ########################################################################
+# Generate package.json
+import os
+import glob
+import json
+
+from pylogix import __version__
+
+directory_path = f'{toproot_dir}/pylogix/'
+py_files_fullpath = glob.glob(os.path.join(directory_path, '*.py'))
+py_files = []
+# exclude lgx_vendors.py
+for py_file in py_files_fullpath:
+    if "lgx_vendors.py" not in py_file:
+        py_files.append(os.path.basename(py_file))
+
+# manually add lgx_uvendors.mpy.bin
+py_files.append("lgx_uvendors.mpy.bin")
+package_json_dict = {}
+list_of_package_urls = []
+for py_file in py_files:
+    repo_url = "github:dmroeder/pylogix/upylogix"
+    list_to_add = [f"pylogix/{py_file}", f"{repo_url}/{py_file}"]
+    list_of_package_urls.append(list_to_add)
+
+package_json_dict["urls"] = list_of_package_urls
+package_json_dict["version"] = __version__
+with open("package.json", "w") as fp:
+    json.dump(package_json_dict, fp, indent=4)
