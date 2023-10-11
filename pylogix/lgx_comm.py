@@ -197,7 +197,7 @@ class Connection(object):
         when using LargeForwardOpen
         """
         data = b''
-        part = self.Socket.recv(4096)  # TODO catch MemoryError here!
+        part = self.Socket.recv(4096)
         payload_len = unpack_from('<H', part, 2)[0]
         data += part
 
