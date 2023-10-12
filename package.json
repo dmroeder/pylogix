@@ -1,20 +1,16 @@
 {
     "urls": [
         [
+            "pylogix/__init__.mpy",
+            "github:dmroeder/pylogix/upylogix/__init__.mpy"
+        ],
+        [
             "pylogix/eip.mpy",
             "github:dmroeder/pylogix/upylogix/eip.mpy"
         ],
         [
-            "pylogix/lgx_uvendors.mpy",
-            "github:dmroeder/pylogix/upylogix/lgx_uvendors.mpy"
-        ],
-        [
-            "pylogix/utils.mpy",
-            "github:dmroeder/pylogix/upylogix/utils.mpy"
-        ],
-        [
-            "pylogix/__init__.mpy",
-            "github:dmroeder/pylogix/upylogix/__init__.mpy"
+            "pylogix/lgx_comm.mpy",
+            "github:dmroeder/pylogix/upylogix/lgx_comm.mpy"
         ],
         [
             "pylogix/lgx_device.mpy",
@@ -29,12 +25,16 @@
             "github:dmroeder/pylogix/upylogix/lgx_tag.mpy"
         ],
         [
-            "pylogix/lgx_comm.mpy",
-            "github:dmroeder/pylogix/upylogix/lgx_comm.mpy"
-        ],
-        [
             "pylogix/lgx_uvendors.mpy.bin",
             "github:dmroeder/pylogix/upylogix/lgx_uvendors.mpy.bin"
+        ],
+        [
+            "pylogix/lgx_uvendors.mpy",
+            "github:dmroeder/pylogix/upylogix/lgx_uvendors.mpy"
+        ],
+        [
+            "pylogix/utils.mpy",
+            "github:dmroeder/pylogix/upylogix/utils.mpy"
         ]
     ],
     "version": "0.9.0"

@@ -106,6 +106,7 @@ for py_file in py_files_fullpath:
 
 # manually add lgx_uvendors.mpy.bin
 py_files.append("lgx_uvendors.mpy.bin")
+py_files = sorted(py_files)
 package_json_dict = {}
 list_of_package_urls = []
 for py_file in py_files:
