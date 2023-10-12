@@ -1361,12 +1361,13 @@ class PLC(object):
                 if fmt == '?' and is_micropython():
                     bool_int_val = unpack_from('B', data, index)[0]
 
-                    if bool_int_val == 255:
+                    if bool_int_val == 255 or bool_int_val == 1:
                         bool_val = True
                     elif bool_int_val == 0:
                         bool_val = False
                     else:
                         bool_val = None
+
                     values.append(bool_val)
                 else:
                     return_value = unpack_from(fmt, data, index)[0]
@@ -1529,12 +1530,14 @@ class PLC(object):
                     # boolean format ? doesn't exist for upy struct module
                     if type_fmt == '?' and is_micropython():
                         value = unpack_from('B', stripped, offset + 6)[0]
-                        if value == 255:
+
+                        if value == 255 or value == 1:
                             bool_val = True
                         elif value == 0:
                             bool_val = False
                         else:
                             bool_val = None
+
                         response = Response(tag, bool_val, status)
                     else:
                         value = unpack_from(type_fmt, stripped, offset + 6)[0]
