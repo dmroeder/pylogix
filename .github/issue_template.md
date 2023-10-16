@@ -24,7 +24,9 @@ Before you post an issue, ensure you have tried the minimal examples within the 
 
 ## Code
 
-Please provide a minimal, reproducible example
+Please provide a minimal, reproducible example.
+
+https://stackoverflow.com/help/minimal-reproducible-example
 
 ## Screenshots
 
@@ -35,5 +37,6 @@ Please provide a minimal, reproducible example
 Include versions to
 
 - pylogix:
+- plc model:
 - python:
 - OS:
