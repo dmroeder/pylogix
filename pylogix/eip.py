@@ -77,9 +77,6 @@ class PLC(object):
                          0xd7: (8, "TIME", '<Q'),
                          0xda: (1, "STRING", '<B'),
                          0xdf: (8, "LTIME", '<Q')}
-        self.StringTypes = [0xa0,
-                            0xd0,
-                            0xda]
 
     @property
     def ConnectionSize(self):
@@ -484,10 +481,6 @@ class PLC(object):
         if not isinstance(value, (list, tuple)):
             value = [value]
 
-        # limit string size to 82 characters
-        if data_type in self.StringTypes:
-            value[0] = value[0][:82]
-
         # format the values
         for v in value:
             write_data.append(v)
@@ -541,7 +534,7 @@ class PLC(object):
         header = self._build_multi_service_header()
 
         write_values = []
-        for i, wd in enumerate(write_data):
+        for wd in write_data:
 
             tag_name, base_tag, index = parse_tag_name(wd[0])
 
@@ -595,10 +588,6 @@ class PLC(object):
                     service_segments.extend(temp_segments)
             else:
                 ioi = self._build_ioi(tag_name, data_type)
-                # limit string size to 82 characters
-                if data_type in self.StringTypes:
-                    value[0] = value[0][:82]
-                    write_data[i] = (wd[0], value)
                 write_service = self._add_write_service(ioi, value, data_type)
                 write_values.append((wd[0], value))
                 next_request_size = service_segment_size + rsp_tag_size + 2
