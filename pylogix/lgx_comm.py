@@ -13,11 +13,15 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 """
+import errno
 import pylogix
 import socket
 
 from random import randrange
 from struct import pack, unpack_from
+
+from pylogix.utils import is_micropython
+
 
 
 # noinspection PyMethodMayBeStatic
@@ -91,12 +95,27 @@ class Connection(object):
                 pass
             self.Socket = socket.socket()
             self.Socket.settimeout(self.parent.SocketTimeout)
-            self.Socket.connect((self.parent.IPAddress, self.parent.Port))
-        except socket.error as e:
+            addr = socket.getaddrinfo(self.parent.IPAddress, self.parent.Port)[0][-1]
+            self.Socket.connect(addr)
+        # Changed to a more generic exception class as mpy does not have socket.error
+        # Explanation in the docs: https://docs.micropython.org/en/latest/library/socket.html#functions
+        except OSError as e:
             self.SocketConnected = False
             self._sequence_counter = 1
             self.Socket.close()
-            return [False, e]
+            # Handle errors just as before for python
+            if not is_micropython():
+                return [False, e]
+            else:
+                # mpy: For now all exceptions go to 1 Connection failure
+                # there might be a better way to handle this in the future
+                # If the plc IP is wrong, the socket conn error goes to err 115 EINPROGRESS
+                # this only happens when the socket is non block which is the default
+                # If the socket is blocking socket conn error goes to err 103 ECONNABORTED
+                # https://docs.python.org/3/library/exceptions.html
+                # https://docs.python.org/3/library/errno.html this list is far greater than
+                # available mpy errors
+                return [False, 1]
 
         # register the session
         self.Socket.send(self._build_register_session())
@@ -161,7 +180,8 @@ class Connection(object):
                 return status, ret_data
             else:
                 return 1, None
-        except socket.gaierror:
+        # Generalized exception error to catch both python and mpy
+        except OSError:
             self.SocketConnected = False
             return 1, None
         except IOError:
@@ -195,7 +215,7 @@ class Connection(object):
         eip_length = 0x0004
         eip_session_handle = self._session_handle
         eip_status = 0x0000
-        eip_context = pylogix.__version__.ljust(8, " ").encode("utf-8")
+        eip_context = '{:<8}'.format(pylogix.__version__).encode("utf-8")
         eip_options = 0x0000
 
         eip_proto_version = 0x01

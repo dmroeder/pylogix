@@ -6,6 +6,7 @@
 ![PyPI](https://img.shields.io/pypi/v/pylogix?label=pypi%20pylogix)
 ![PyPI](https://img.shields.io/pypi/l/pylogix)
 ![Versions](https://img.shields.io/pypi/pyversions/pylogix)
+![MicroPython](https://img.shields.io/badge/micropython-1.20.0+-red?logo=micropython)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/pylogix)
 
 
@@ -95,6 +96,9 @@ Optionally set a specific maximum size for requests/replies.  If not specified, 
 comm.ConnectionSize = 508
 ```
 
+## Installing MicroPython
+
+Checkout [Documentation](docs/mpy/README.md)
 
 ### Other Features
 

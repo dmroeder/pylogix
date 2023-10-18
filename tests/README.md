@@ -111,6 +111,23 @@ pip install tox
 tox
 ```
 
+## Micropython testing
+
+Install micropython either on your board or local machine. Specific boards is out of scope for this library.
+Linux distros also have micropython on package managers, but might be outdated.
+https://docs.micropython.org/en/latest/develop/gettingstarted.html
+
+Install dependencies, this is tested on the unix/port of micropython:
+```python
+micropython -m mip install unittest
+micropython -m mip install unittest-discover
+```
+
+Run tests:
+```python
+micropython -m unittest tests/PylogixTests.py
+```
+
 ## TODO
 
 - Create a micro800 project, and export tags

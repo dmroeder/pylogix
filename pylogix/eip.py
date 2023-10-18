@@ -25,10 +25,13 @@ from .lgx_comm import Connection
 from .lgx_device import Device
 from .lgx_response import Response
 from .lgx_tag import Tag, UDT
-from datetime import datetime, timedelta
+from .utils import is_micropython
 from random import randrange
 from struct import pack, unpack_from
 
+
+if not is_micropython():
+    from datetime import datetime, timedelta
 
 # noinspection PyMethodMayBeStatic
 class PLC(object):
@@ -229,6 +232,12 @@ class PLC(object):
 
         returns Response class (.TagName, .Value, .Status)
         """
+        if is_micropython():
+            # limited implementation of lwip_socket_setsockopt()
+            # https://github.com/micropython/micropython/issues/2691
+            status = "Discover not available on micropython, due to limited socket module"
+            return Response(None, None, status)
+
         devices = self.conn.discover(parse_procedural_parameter=Device.parse)
         return Response(None, devices, 0)
 
@@ -656,7 +665,7 @@ class PLC(object):
         if status == 0:
             # get the time from the packet
             plc_time = unpack_from('<Q', ret_data, 56)[0]
-            if raw:
+            if raw or is_micropython():
                 value = plc_time
             else:
                 human_time = datetime(1970, 1, 1) + timedelta(microseconds=plc_time)
@@ -835,7 +844,7 @@ class PLC(object):
                         field.Scope1 = scope[1]
                         field.Internal = field.AccessRight == 0
 
-                    field_def = p[slice((i - 1) * 8, i * 8)]
+                    field_def = p[(i - 1) * 8: i * 8]
                     field.Bytes = field_def
                     field.InstanceID = unpack_from('<H', field_def, 6)[0]
                     field.Meta = unpack_from("<H", field_def, 4)[0]
@@ -1156,7 +1165,12 @@ class PLC(object):
                     el = value[i]
                     write_service += pack(self.CIPTypes[data_type][2], el)
             except Exception:
-                write_service += pack(self.CIPTypes[data_type][2], value)
+                # handling special format for micropython for bools
+                # boolean format ? doesn't exist for upy struct module
+                if self.CIPTypes[data_type][2] == '?' and is_micropython():
+                    write_service += pack('B', value)
+                else:
+                    write_service += pack(self.CIPTypes[data_type][2], value)
 
         return write_service
 
@@ -1342,8 +1356,22 @@ class PLC(object):
                     data = data[length:]
                 break
             else:
-                return_value = unpack_from(fmt, data, index)[0]
-                values.append(return_value)
+                # handling special format for micropython for bools
+                # boolean format ? doesn't exist for upy struct module
+                if fmt == '?' and is_micropython():
+                    bool_int_val = unpack_from('B', data, index)[0]
+
+                    if bool_int_val == 255 or bool_int_val == 1:
+                        bool_val = True
+                    elif bool_int_val == 0:
+                        bool_val = False
+                    else:
+                        bool_val = None
+
+                    values.append(bool_val)
+                else:
+                    return_value = unpack_from(fmt, data, index)[0]
+                    values.append(return_value)
 
             self.Offset += data_size
             counter += 1
@@ -1498,8 +1526,22 @@ class PLC(object):
                     response = Response(tag, value, status)
                 else:
                     type_fmt = self.CIPTypes[data_type][2]
-                    value = unpack_from(type_fmt, stripped, offset + 6)[0]
-                    response = Response(tag, value, status)
+                    # handling special format for micropython for bools
+                    # boolean format ? doesn't exist for upy struct module
+                    if type_fmt == '?' and is_micropython():
+                        value = unpack_from('B', stripped, offset + 6)[0]
+
+                        if value == 255 or value == 1:
+                            bool_val = True
+                        elif value == 0:
+                            bool_val = False
+                        else:
+                            bool_val = None
+
+                        response = Response(tag, bool_val, status)
+                    else:
+                        value = unpack_from(type_fmt, stripped, offset + 6)[0]
+                        response = Response(tag, value, status)
             else:
                 response = Response(tag, None, status)
             reply.append(response)
@@ -1602,7 +1644,7 @@ def bit_of_word_state(tag, value):
     ex: (bit 4 of the number 30313 is False)
     """
     bit_pattern = r'\d+$'
-    array_pattern = r'\[([\d]|[,]|[\s])*\]$'
+    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
     try:
         index = re.search(array_pattern, tag).group(0)
         index = index[1:-1]
@@ -1637,7 +1679,7 @@ def parse_tag_name(tag):
     MyTag.Name[42], MyTag.Name, 42
     """
     bit_end_pattern = r'\.\d+$'
-    array_pattern = r'\[([\d]|[,]|[\s])*\]$'
+    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
 
     # get the array index
     try:
@@ -1685,7 +1727,7 @@ def mod_write_masks(tag, values, bpw):
     convert them to values.
     """
     bit_pattern = r'\.\d+$'
-    array_pattern = r'\[([\d]|[,]|[\s])*\]$'
+    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
 
     try:
         # A bit of a word

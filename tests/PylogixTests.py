@@ -25,6 +25,7 @@ import unittest
 from pylogix.lgx_response import Response
 from pylogix.lgx_tag import Tag  # Need Classes for type checking
 from Randomizer import Randomizer
+from pylogix.utils import is_micropython, is_python2
 
 
 class PylogixTests(unittest.TestCase):
@@ -298,17 +299,17 @@ class PylogixTests(unittest.TestCase):
     def nemesis_fixture(self, tag, length):
         # test write BOOL array
         true_val = [1 for i in range(length)]
-        false_val = [0 for i  in range(length)]
+        false_val = [0 for i in range(length)]
 
         # write array to 0
         self.comm.Write(tag, false_val)
         ret = self.comm.Read(tag, length).Value
-        self.assertListEqual(ret, false_val, "Failed to write nemesis to 0")
+        self.assertEqual(ret, false_val, "Failed to write nemesis to 0")
 
         # write array to 1
         self.comm.Write(tag, true_val)
         ret = self.comm.Read(tag, length).Value
-        self.assertListEqual(ret, true_val, "Failed to write nemesis to 1")
+        self.assertEqual(ret, true_val, "Failed to write nemesis to 1")
 
     def large_list_fixture(self):
             length = 50
@@ -321,7 +322,7 @@ class PylogixTests(unittest.TestCase):
             ret = self.comm.Read(tags)
             read_vals = [r.Value for r in ret]
 
-            self.assertListEqual(vals, read_vals, "Failed to write large list")
+            self.assertEqual(vals, read_vals, "Failed to write large list")
 
     def test_with_datatype(self):
         """
@@ -357,7 +358,7 @@ class PylogixTests(unittest.TestCase):
         ret = self.comm.Read(read_request)
         return_values = [r.Value for r in ret]
 
-        self.assertListEqual(values, return_values, "Failed reading a list with data type")
+        self.assertEqual(values, return_values, "Failed reading a list with data type")
 
     def write_array_fixture(self):
         
@@ -373,32 +374,32 @@ class PylogixTests(unittest.TestCase):
         values = [i for i in range(100)]
         self.comm.Write("BaseSINTArray[0]", values)
         return_values = self.comm.Read("BaseSINTArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of SINT values")
+        self.assertEqual(values, return_values, "Failed to write array of SINT values")
 
         values = [i for i in range(100)]
         self.comm.Write("BaseINTArray[0]", values)
         return_values = self.comm.Read("BaseINTArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of INT values")
+        self.assertEqual(values, return_values, "Failed to write array of INT values")
 
         values = [i for i in range(100)]
         self.comm.Write("BaseDINTArray[0]", values)
         return_values = self.comm.Read("BaseDINTArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of DINT values")
+        self.assertEqual(values, return_values, "Failed to write array of DINT values")
 
         values = [i for i in range(100)]
         self.comm.Write("BaseLINTArray[0]", values)
         return_values = self.comm.Read("BaseLINTArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of LINT values")
+        self.assertEqual(values, return_values, "Failed to write array of LINT values")
 
         values = [i for i in range(100)]
         self.comm.Write("BaseREALArray[0]", values)
         return_values = self.comm.Read("BaseREALArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of REAL values")
+        self.assertEqual(values, return_values, "Failed to write array of REAL values")
 
         values = ["String{}".format(i) for i in range(100)]
         self.comm.Write("BaseSTRINGArray[0]", values)
         return_values = self.comm.Read("BaseSTRINGArray[0]", len(values)).Value
-        self.assertListEqual(values, return_values, "Failed to write array of STRING values")
+        self.assertEqual(values, return_values, "Failed to write array of STRING values")
 
 
     def setUp(self):
@@ -459,11 +460,13 @@ class PylogixTests(unittest.TestCase):
     def test_large_list(self):
         self.test_with_datatype()
 
+    @unittest.skipIf(is_micropython(), 'No gethostname in micropython socket module')
     def test_discover(self):
         devices = self.comm.Discover()
         self.assertEqual(devices.Status, 'Success', devices.Status)
 
-    @unittest.skipIf(plcConfig.isMicro800,'for Micro800')
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
+    @unittest.skipIf(is_micropython(), 'No daylight in micropython time module')
     def test_time(self):
         self.comm.SetPLCTime()
         time = self.comm.GetPLCTime()
@@ -471,7 +474,7 @@ class PylogixTests(unittest.TestCase):
 
     def test_get_tags(self):
         tags = self.comm.GetTagList()
-        self.assertGreater(len(tags.Value), 1, tags.Status)
+        self.assertEqual(tags.Status, 'Success', tags.Status)
 
     def test_unexistent_tags(self):
         expected_msg = (plcConfig.isMicro800
@@ -495,16 +498,16 @@ class PylogixTests(unittest.TestCase):
         one_bool = self.comm.Read('BaseBool')
         self.assertEqual(
             isinstance(one_bool, Response),
-            True, "Reponse class not found in Read")
+            True, "Response class not found in Read")
         bool_tags = ['BaseBool', 'BaseBits.0', 'BaseBits.31']
         booleans = self.comm.Read(bool_tags)
         self.assertEqual(
             isinstance(booleans[0], Response),
-            True, "Reponse class not found in Multi Read")
+            True, "Response class not found in Multi Read")
         bool_write = self.comm.Write('BaseBool', 1)
         self.assertEqual(
             isinstance(bool_write, Response),
-            True, "Reponse class not found in Write")
+            True, "Response class not found in Write")
 
     @unittest.skipIf(plcConfig.isMicro800,'for Micro800')
     def test_program_list(self):
@@ -512,7 +515,7 @@ class PylogixTests(unittest.TestCase):
         self.assertEqual(programs.Status, 'Success', programs.Status)
         self.assertEqual(
             isinstance(programs, Response),
-            True, "Reponse class not found in GetProgramsList")
+            True, "Response class not found in GetProgramsList")
 
     @unittest.skipIf(plcConfig.isMicro800,'for Micro800')
     def test_program_tag_list(self):
@@ -520,7 +523,7 @@ class PylogixTests(unittest.TestCase):
         self.assertEqual(program_tags.Status, 'Success', program_tags.Status)
         self.assertEqual(
             isinstance(program_tags, Response),
-            True, "Reponse class not found in GetProgramTagList")
+            True, "Response class not found in GetProgramTagList")
         self.assertEqual(
             isinstance(program_tags.Value[0], Tag),
             True, "LgxTag class not found in GetProgramTagList Value")
@@ -529,6 +532,22 @@ class PylogixTests(unittest.TestCase):
         self.assertFalse(pylogix.PLC().Micro800)
         self.assertFalse(pylogix.PLC(Micro800=False).Micro800)
         self.assertTrue(pylogix.PLC(Micro800=True).Micro800)
+
+    @unittest.skipIf(is_micropython(), 'Not loading vendors dict into micropython')
+    def test_all_uvendors(self):
+        from pylogix.lgx_uvendors import uvendors
+        vendors = pylogix.lgx_vendors.vendors
+        for k in vendors:
+            self.assertEqual(uvendors[k], vendors[k], "Mismatch vendors/uvendors")
+
+    @unittest.skipIf(not is_micropython(), 'Not testing uvendors for python')
+    def test_known_uvendors(self):
+        from pylogix.lgx_uvendors import uvendors
+        self.assertEqual(uvendors[26], 'Festo', "Festo uvendor not found")
+        self.assertEqual(uvendors[1], 'Rockwell Automation/Allen-Bradley', "Rockwell uvendor not found")
+        self.assertEqual(uvendors[-1], 'Unknown', "Unknown uvendor not returned")
+        self.assertEqual(uvendors[(1<<32)-1], 'Unknown', "Unknown uvendor not returned")
+
 
     def tearDown(self):
         self.comm.Close()

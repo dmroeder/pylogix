@@ -16,6 +16,8 @@
 
 import sys
 
+from pylogix.utils import is_python3, is_micropython, is_python2
+
 
 class Response(object):
 
@@ -41,10 +43,10 @@ class Response(object):
         # hack to check if status string for both py2 and py3
         # because of nesting Response.Status to another Response obj constr
         # some Success results are shown as 'Unknown error Success'
-        if sys.version_info.major == 3:
+        if is_python3() or is_micropython():
             if isinstance(status, str):
                 return status
-        if sys.version_info.major == 2:
+        elif is_python2():
             if isinstance(status, basestring):
                 return status
 

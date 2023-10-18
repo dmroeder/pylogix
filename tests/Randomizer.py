@@ -18,7 +18,6 @@
 '''
 
 import random
-import string
 
 
 class Randomizer:
@@ -42,12 +41,13 @@ class Randomizer:
         '''
         Get a random 32 bit integer
         '''
-        return random.randint(-2147483648, 2147483647)
+        return random.randint(-2147483647, 2147483647)
 
     def String(self):
         '''
          Get a random 8 bit integer
         '''
         integer = random.randint(1, 82)
+        letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
         return ''.join(
-            random.choice(string.ascii_letters) for i in range(integer))
+            random.choice(letters) for i in range(integer))
