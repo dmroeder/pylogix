@@ -1611,6 +1611,7 @@ class PLC(object):
         String for Compact/Control Logix
         """
         work = []
+        string = string[:82]
         temp = pack('<I', len(string)).decode(self.StringEncoding)
         for char in temp:
             work.append(ord(char))
