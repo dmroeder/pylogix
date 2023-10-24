@@ -10,19 +10,19 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/pylogix)
 
 
-<span style="color:red"> <font size="4">**WARNING**</font> </span> There appears to be the possibility of a scam going on using the pylogix name. Be careful with anything claming to be pylogix. https://www.notpylogix.com
+<span style="color:red"> <font size="4">**WARNING**:</font> </span> There is a possibility of a scam using the pylogix name. Be careful with anything claiming to be pylogix.  https://www.notpylogix.com
 
 
-pylogix is a communication driver that lets you easily read/write values from tags in Rockwell Automation ControlLogix, CompactLogix and Micro8xx PLC's over Ethernet I/P using Python.  Only PLC's that are programmed with RSLogix5000/Studio5000 or Connected Components Workbench (Micro8xx), models like PLC5, SLC, MicroLogix are *not* supported.  They use a different protocol, which I have no plans to support.  You can also connect to RSEmulate, but it may require additional
-configuration. See the Emulate [document](docs/Emulate.md) for more information.
+Pylogix is a communication driver that lets you easily read/write values from tags in Rockwell Automation ControlLogix, CompactLogix, and Micro8xx PLCs over Ethernet I/P using Python.  Only PLCs that are programmed with RSLogix5000/Studio5000 or Connected Components Workbench (Micro8xx), models like PLC5, SLC, and MicroLogix are *not* supported.  They use a different protocol, which I have no plans to support.  You can also connect to RSEmulate, but it may require additional
+configuration.  See the Emulate [document](docs/Emulate.md) for more information.
 
-There are many devices that support CIP objects that allow for automatic discovery (like RSLinx does), which pylogix can discover, but will likely not be able to interact with in any other meaningful way.  Pylogix is really only intended to talk to the above mentioned PLC's and is only tested against them.  It likely will not communicate with any other brands.
+Many devices support CIP objects that allow for automatic discovery (like RSLinx does), which pylogix can discover but will likely not be able to interact with in any other meaningful way.  Pylogix is only intended to talk to the above-mentioned PLCs and is only tested against them.  It likely will not communicate with any other brands.
 
-For general support or questions, I created a [discord](https://discord.gg/tw8E9EAAnf), feel free to join and ask questions, I'll do my best to help in a timely manner.
+For general support or questions, I created a [discord](https://discord.gg/tw8E9EAAnf).  Feel free to join and ask questions, and I'll do my best to help promptly.
 
 ## Getting Started
 
-There are currently no dependencies, so you can get going quickly without having to install any other prerequiste packages.  Both python2 and python3 are supported.
+There are no dependencies, so you can get going quickly without installing other prerequisite packages.  Both python2 and python3 are supported.
 
 ### Installing
 
@@ -120,7 +120,7 @@ Here's a list of frequent asked questions. [faq](docs/FAQ.md)
 
 This project is licensed under Apache 2.0 License - see the [LICENSE](LICENSE.txt) file for details.
 
-## Acknowledgements
+## Acknowledgments
 
 * Archie of AdvancedHMI for all kinds pointers and suggestions.
 * Thanks to ottowayi for general python and good practice advice.
