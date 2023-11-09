@@ -266,7 +266,7 @@ class Connection(object):
         
         if not ret_data:
             self.SoocketConnected = False
-            return [False, "Forward open failed, dumb"]
+            return [False, "Forward open failed"]
             
         sts = unpack_from('<b', ret_data, 42)[0]
         if not sts:
