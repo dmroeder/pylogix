@@ -179,6 +179,7 @@ class Connection(object):
                     status = unpack_from('<B', ret_data, 42)[0]
                 return status, ret_data
             else:
+                self.SocketConnected = False
                 return 1, None
         # Generalized exception error to catch both python and mpy
         except OSError:
@@ -197,13 +198,16 @@ class Connection(object):
         when using LargeForwardOpen
         """
         data = b''
-        part = self.Socket.recv(4096)
-        payload_len = unpack_from('<H', part, 2)[0]
-        data += part
-
-        while len(data)-24 < payload_len:
+        try:
             part = self.Socket.recv(4096)
+            payload_len = unpack_from('<H', part, 2)[0]
             data += part
+
+            while len(data)-24 < payload_len:
+                part = self.Socket.recv(4096)
+                data += part
+        except (Exception, ):
+            return None
 
         return data
 
@@ -259,6 +263,11 @@ class Connection(object):
             ret_data = self.receive_data()
         except socket.timeout as e:
             return [False, e]
+        
+        if not ret_data:
+            self.SoocketConnected = False
+            return [False, "Forward open failed, dumb"]
+            
         sts = unpack_from('<b', ret_data, 42)[0]
         if not sts:
             self._ot_connection_id = unpack_from('<I', ret_data, 44)[0]
