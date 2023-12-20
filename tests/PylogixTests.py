@@ -548,6 +548,9 @@ class PylogixTests(unittest.TestCase):
         self.assertEqual(uvendors[-1], 'Unknown', "Unknown uvendor not returned")
         self.assertEqual(uvendors[(1<<32)-1], 'Unknown', "Unknown uvendor not returned")
 
+    def test_unknown_attribute_in_plc(self):
+        with self.assertRaises(AttributeError):
+            getattr(self.comm, 'undefined_attribute')
 
     def tearDown(self):
         self.comm.Close()
