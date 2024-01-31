@@ -1041,6 +1041,7 @@ class PLC(object):
             return Response(None, Device(), status)
 
     def _build_ioi(self, tag_name, data_type):
+
         """
         The tag IOI is basically the tag name assembled into
         an array of bytes structured in a way that the PLC will
@@ -1056,42 +1057,38 @@ class PLC(object):
             Oh and multi-dim arrays, program scope tags...
         """
         ioi = b""
-        tag_array = tag_name.split(".")
 
-        # this loop figures out the packet length and builds our packet
-        for i in range(len(tag_array)):
-            if tag_array[i].endswith("]"):
-                tag, base_tag, index = parse_tag_name(tag_array[i])
+        for segment in tag_name.split("."):
+            if segment.endswith("]"):
+                _, base_tag, index = parse_tag_name(segment)
 
-                tag_size = len(base_tag)
-                if data_type == 0xd3 and i == len(tag_array) - 1:
-                    index = int(index / 32)
-                elif data_type is None:
-                    index = 0
+            # bool arrays are special
+                if data_type == 0xd3:
+                    index = int(index/32)
 
-                # Assemble the packet
-                ioi += pack('<BB', 0x91, tag_size)
+                name_length = len(base_tag)
+                ioi += pack('<BB', 0x91, name_length)
                 ioi += base_tag.encode('utf-8')
-                if tag_size % 2:
-                    tag_size += 1
+                if name_length % 2:
+                    name_length += 1
                     ioi += pack('<B', 0x00)
 
-                if i < len(tag_array):
-                    if not isinstance(index, list):
-                        if index < 256:
-                            ioi += pack('<BB', 0x28, index)
-                        if 65536 > index > 255:
-                            ioi += pack('<HH', 0x29, index)
-                        if index > 65535:
-                            ioi += pack('<HI', 0x2A, index)
-                    else:
-                        for j in range(len(index)):
-                            if index[j] < 256:
-                                ioi += pack('<BB', 0x28, index[j])
-                            if 65536 > index[j] > 255:
-                                ioi += pack('<HH', 0x29, index[j])
-                            if index[j] > 65535:
-                                ioi += pack('<HI', 0x2A, index[j])
+                if isinstance(index, list):
+                    for value in index:
+                        if value < 256:
+                            ioi += pack('<BB', 0x28, value)
+                        if 65536 > value > 255:
+                            ioi += pack('<HH', 0x29, value)
+                        if value > 65535:
+                            ioi += pack('<HI', 0x2A, value)
+                else:
+                    if index < 256:
+                        ioi += pack('<BB', 0x28, index)
+                    if 65536 > index > 255:
+                        ioi += pack('<HH', 0x29, index)
+                    if index > 65535:
+                        ioi += pack('<HI', 0x2A, index)
+
             else:
                 """
                 for non-array segment of tag
@@ -1102,12 +1099,12 @@ class PLC(object):
                     the individual bit in the read function.
                 """
                 try:
-                    if int(tag_array[i]) <= 31:
+                    if int(segment) <= 31:
                         pass
                 except Exception:
-                    tag_size = int(len(tag_array[i]))
+                    tag_size = int(len(segment))
                     ioi += pack('<BB', 0x91, tag_size)
-                    ioi += tag_array[i].encode('utf-8')
+                    ioi += segment.encode('utf-8')
                     if tag_size % 2:
                         tag_size += 1
                         ioi += pack('<B', 0x00)
