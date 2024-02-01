@@ -1,5 +1,5 @@
 """
-Write to a custom size string
+Write to a custom size string (not intended for the default STRING)
 
 WHen you create a custom size string, it is essentially
 a UDT.  We cannot write to them in the same way that we
