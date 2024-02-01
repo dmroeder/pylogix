@@ -30,3 +30,4 @@ TAG,MainProgram,pUDTBasicArray,"","Basic[32]","","(Constant := false, ExternalAc
 TAG,MainProgram,pUDTCombined,"","combined","","(Constant := false, ExternalAccess := Read/Write)"
 TAG,MainProgram,pUDTCombinedArray,"","combined[32]","","(Constant := false, ExternalAccess := Read/Write)"
 TAG,MainProgram,pMultiDim,,"DINT[5,5,5]",,"(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
+TAG,MainProgram,pMultiString,"","STRING[2,2,2]","","(Constant := false, ExternalAccess := Read/Write)"

@@ -34,6 +34,7 @@ TAG,,UDTCombinedArray,,combined[32],,"(Constant := false, ExternalAccess := Read
 TAG,,YugeArray,,DINT[60000],,"(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
 TAG,,Nemesis,,DINT[64],,"(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
 TAG,,MultiDim,"","DINT[5,5,5]","","(RADIX := Decimal, Constant := false, ExternalAccess := Read/Write)"
+TAG,,MultiString,"","STRING[2,2,2]","","(Constant := false, ExternalAccess := Read/Write)"
 TAG,,Str0,,STRING,,"(Constant := false, ExternalAccess := Read/Write)"
 TAG,,Str1,,STRING,,"(Constant := false, ExternalAccess := Read/Write)"
 TAG,,Str10,,STRING,,"(Constant := false, ExternalAccess := Read/Write)"
