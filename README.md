@@ -14,7 +14,7 @@
 
 
 Pylogix is a communication driver that lets you easily read/write values from tags in Rockwell Automation ControlLogix, CompactLogix, and Micro8xx PLCs over Ethernet I/P using Python.  Only PLCs that are programmed with RSLogix5000/Studio5000 or Connected Components Workbench (Micro8xx), models like PLC5, SLC, and MicroLogix are *not* supported.  They use a different protocol, which I have no plans to support.  You can also connect to RSEmulate, but it may require additional
-configuration.  See the Emulate [document](https://github.com/dmroeder/pylogix/docs/Emulate.md) for more information.
+configuration.  See the Emulate [document](https://github.com/dmroeder/pylogix/blob/master/docs/Emulate.md) for more information.
 
 Many devices support CIP objects that allow for automatic discovery (like RSLinx does), which pylogix can discover but will likely not be able to interact with in any other meaningful way.  Pylogix is only intended to talk to the above-mentioned PLCs and is only tested against them.  It likely will not communicate with any other brands.
 
@@ -98,16 +98,16 @@ comm.ConnectionSize = 508
 
 ## Installing MicroPython
 
-Checkout [Documentation](https://github.com/dmroeder/pylogix/docs/mpy/README.md)
+Checkout [Documentation](https://github.com/dmroeder/pylogix/blob/master/docs/mpy/README.md)
 
 ### Other Features
 
-Pylogix has features other than simply reading/writing.  See the [documentation](https://github.com/dmroeder/pylogix/docs/Documentation.md) for more info, see the examples directory
+Pylogix has features other than simply reading/writing.  See the [documentation](https://github.com/dmroeder/pylogix/blob/master/docs/Documentation.md) for more info, see the examples directory
 simple use cases for the various methods.
 
 ## FAQ
 
-Here's a list of frequent asked questions. [faq](https://github.com/dmroeder/pylogix/docs/FAQ.md)
+Here's a list of frequent asked questions. [faq](https://github.com/dmroeder/pylogix/blob/master/docs/FAQ.md)
 
 ## Authors
 * **Burt Peterson** - *Initial work*
@@ -118,7 +118,7 @@ Here's a list of frequent asked questions. [faq](https://github.com/dmroeder/pyl
 
 ## License
 
-This project is licensed under Apache 2.0 License - see the [LICENSE](https://github.com/dmroeder/pylogix/LICENSE.txt) file for details.
+This project is licensed under Apache 2.0 License - see the [LICENSE](https://github.com/dmroeder/pylogix/blob/master/LICENSE.txt) file for details.
 
 ## Acknowledgments
 
