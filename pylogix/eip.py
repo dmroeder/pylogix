@@ -983,21 +983,7 @@ class PLC(object):
         if not conn[0]:
             return Response(None, Device(), conn[1])
 
-        cip_service = 0x01
-        cip_size = 0x02
-        cip_class_type = 0x20
-        cip_class = 0x01
-        cip_instance_type = 0x24
-        cip_instance = 0x01
-
-        request = pack('<6B',
-                       cip_service,
-                       cip_size,
-                       cip_class_type,
-                       cip_class,
-                       cip_instance_type,
-                       cip_instance)
-
+        request = self._cip_message(0x01, 0x01, 0x01)
         status, ret_data = self.conn.send(request, False, slot)
         pad = pack('<I', 0x00)
         ret_data = pad + ret_data
@@ -1016,21 +1002,7 @@ class PLC(object):
         if not conn[0]:
             return Response(None, Device(), conn[1])
 
-        cip_service = 0x01
-        cip_size = 0x02
-        cip_class_type = 0x20
-        cip_class = 0x01
-        cip_instance_type = 0x24
-        cip_instance = 0x01
-
-        request = pack('<6B',
-                       cip_service,
-                       cip_size,
-                       cip_class_type,
-                       cip_class,
-                       cip_instance_type,
-                       cip_instance)
-
+        request = self._cip_message(0x01, 0x01, 0x01)
         status, ret_data = self.conn.send(request, False)
         pad = pack('<I', 0x00)
         ret_data = pad + ret_data
