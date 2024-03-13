@@ -1040,6 +1040,37 @@ class PLC(object):
         else:
             return Response(None, Device(), status)
 
+    def _cip_message(self, cip_service, cip_class, cip_instance, cip_attribute=None, data=b''):
+
+        class_bytes = pack("<BB", 0x20, cip_class)
+        service_size = 2
+        attribute_bytes = b''
+
+        # append the instance
+        if cip_instance > 256:
+            instance_bytes = pack("<HH", 0x25, cip_instance)
+            service_size += 1
+        else:
+            instance_bytes = pack("<BB", 0x24, cip_instance)
+
+        # append the attribute if any
+        if cip_attribute:
+            if isinstance(cip_attribute, list):
+                attribute_bytes = pack("<H", len(cip_attribute))
+                for attribute in cip_attribute:
+                    attribute_bytes += pack("<H", attribute)
+            else:
+                service_size += 1
+                attribute_bytes = pack("<BB", 0x30, cip_attribute)
+                attribute_bytes += data
+        elif data:
+            attribute_bytes = data
+
+        service_bytes = pack("<BB", cip_service, service_size)
+        cip_request = service_bytes + class_bytes + instance_bytes + attribute_bytes
+
+        return cip_request
+
     def _build_ioi(self, tag_name, data_type):
 
         """
