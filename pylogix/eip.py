@@ -643,25 +643,7 @@ class PLC(object):
         if not conn[0]:
             return Response(None, None, conn[1])
 
-        cip_service = 0x03
-        cip_size = 0x02
-        cip_class_type = 0x20
-        cip_class = 0x8B
-        cip_instance_type = 0x24
-        cip_instance = 0x01
-        cip_count = 0x01
-        cip_attribute = 0x0B
-
-        request = pack('<BBBBBBH1H',
-                       cip_service,
-                       cip_size,
-                       cip_class_type,
-                       cip_class,
-                       cip_instance_type,
-                       cip_instance,
-                       cip_count,
-                       cip_attribute)
-
+        request = self._cip_message(0x03, 0x8b, 0x01, [0x0b])
         status, ret_data = self.conn.send(request)
 
         if status == 0:
@@ -685,32 +667,14 @@ class PLC(object):
         if not conn[0]:
             return Response(None, None, conn[1])
 
-        cip_service = 0x04
-        cip_size = 0x02
-        cip_class_type = 0x20
-        cip_class = 0x8B
-        cip_instance_type = 0x24
-        cip_instance = 0x01
-        cip_count = 0x02
-        cip_attribute = 0x06
-        t = int(time.time() * 1000000)
-        cip_dst_attribute = 0x0a
-        request = pack('<BBBBBBHHQHB',
-                       cip_service,
-                       cip_size,
-                       cip_class_type,
-                       cip_class,
-                       cip_instance_type,
-                       cip_instance,
-                       cip_count,
-                       cip_attribute,
-                       t,
-                       cip_dst_attribute,
-                       time.daylight)
+        current_time = int(time.time() * 1000000)
+        time_bytes = pack("<Q", current_time)
+        dst = pack("<B", time.daylight)
 
+        request = self._cip_message(0x04, 0x8b, 0x01, [0x06, 0x0a], [time_bytes, dst])
         status, ret_data = self.conn.send(request)
 
-        return Response(None, t, status)
+        return Response(None, current_time, status)
 
     def _get_tag_list(self, all_tags):
         """
@@ -1012,7 +976,7 @@ class PLC(object):
         else:
             return Response(None, Device(), status)
 
-    def _cip_message(self, cip_service, cip_class, cip_instance, cip_attribute=None, data=b''):
+    def _cip_message(self, cip_service, cip_class, cip_instance, cip_attribute=[None], data=[b'']):
 
         class_bytes = pack("<BB", 0x20, cip_class)
         service_size = 2
@@ -1029,8 +993,9 @@ class PLC(object):
         if cip_attribute:
             if isinstance(cip_attribute, list):
                 attribute_bytes = pack("<H", len(cip_attribute))
-                for attribute in cip_attribute:
+                for i, attribute in enumerate(cip_attribute):
                     attribute_bytes += pack("<H", attribute)
+                    attribute_bytes += data[i]
             else:
                 service_size += 1
                 attribute_bytes = pack("<BB", 0x30, cip_attribute)
