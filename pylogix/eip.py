@@ -933,7 +933,7 @@ class PLC(object):
         else:
             return Response(None, Device(), status)
 
-    def _cip_message(self, cip_service, cip_class, cip_instance, cip_attribute=[None], data=[b'']):
+    def _cip_message(self, cip_service, cip_class, cip_instance, cip_attribute=None, data=b''):
 
         class_bytes = pack("<BB", 0x20, cip_class)
         service_size = 2
@@ -952,8 +952,8 @@ class PLC(object):
                 attribute_bytes = pack("<H", len(cip_attribute))
                 for i, attribute in enumerate(cip_attribute):
                     attribute_bytes += pack("<H", attribute)
-                    if data[0]:
-                        attribute_bytes += data[i]
+                    if isinstance(data, list):
+                            attribute_bytes += data[i]
             else:
                 service_size += 1
                 attribute_bytes = pack("<BB", 0x30, cip_attribute)
@@ -1158,20 +1158,8 @@ class PLC(object):
         """
         Service header for making a multiple tag request
         """
-        cip_service = 0X0A
-        cip_size = 0x02
-        cip_class_type = 0x20
-        cip_class = 0x02
-        cip_instance_type = 0x24
-        cip_instance = 0x01
-
-        return pack('<BBBBBB',
-                    cip_service,
-                    cip_size,
-                    cip_class_type,
-                    cip_class,
-                    cip_instance_type,
-                    cip_instance)
+        request = self._cip_message(0x0a, 0x02, 0x01)
+        return request
 
     def _build_tag_list_request(self, program_name):
         """
