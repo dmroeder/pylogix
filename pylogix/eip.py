@@ -260,6 +260,16 @@ class PLC(object):
         """
         return self._get_device_properties()
 
+    def Message(self, cip_service, cip_class, cip_instance, cip_attribute=None, data=b''):
+        """
+        User can send a custom message by providing service/class/instance
+        data should already be packed in bytes
+
+        returns Response class (.TagName, .Value, .Status)
+        """
+
+        return self._message(cip_service, cip_class, cip_instance, cip_attribute, data)
+
     def Close(self):
         """
         Close the connection to the PLC
@@ -932,6 +942,16 @@ class PLC(object):
             return Response(None, Device.parse(ret_data, self.IPAddress), status)
         else:
             return Response(None, Device(), status)
+
+    def _message(self, cip_service, cip_class, cip_instance, cip_attribute, data):
+        conn = self.conn.connect(False)
+        if not conn[0]:
+            return Response(None, None, conn[1])
+
+        request = self._cip_message(cip_service, cip_class, cip_instance, cip_attribute, data)
+        status, ret_data = self.conn.send(request, False)
+
+        return Response(None, ret_data, status)
 
     def _cip_message(self, cip_service, cip_class, cip_instance, cip_attribute=None, data=b''):
 
