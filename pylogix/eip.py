@@ -858,7 +858,7 @@ class PLC(object):
         """
         Get the attributes of a UDT
         """
-        request = self._build_template_attributes(instance)
+        request = self._cip_message(0x03, 0x6c, instance, [0x04, 0x03, 0x02, 0x01])
         status, ret_data = self.conn.send(request)
         return ret_data
 
@@ -871,7 +871,8 @@ class PLC(object):
         part_offset = 0
         remaining = data_len
         while remaining > 0 and not status:
-            request = self._read_template_service(instance, remaining, part_offset)
+            packet_data = pack("<IH", part_offset, remaining)
+            request = self._cip_message(0x4c, 0x6c, instance, None, packet_data)
             status, ret_data = self.conn.send(request)
             if status == 6:
                 status = 0
@@ -884,59 +885,15 @@ class PLC(object):
 
         return data
 
-    def _build_template_attributes(self, instance):
-        """
-        Build the template attribute packet, part of
-        retrieving the UDT names
-        """
-        cip_service = 0x03
-        cip_size = 0x03
-        cip_class_type = 0x20
-        cip_class = 0x6c
-        cip_instance_type = 0x25
-        cip_instance = instance
-        cip_attribute_count = 0x04
-        cip_attribute4 = 0x04
-        cip_attribute3 = 0x03
-        cip_attribute2 = 0x02
-        cip_attribute1 = 0x01
-
-        return pack('<BBBBHHHHHHH',
-                    cip_service,
-                    cip_size,
-                    cip_class_type,
-                    cip_class,
-                    cip_instance_type,
-                    cip_instance,
-                    cip_attribute_count,
-                    cip_attribute4,
-                    cip_attribute3,
-                    cip_attribute2,
-                    cip_attribute1)
-
     def _read_template_service(self, instance, data_len, offset=0):
         """
         Build the template attribute packet, part of
         retrieving the UDT names
         """
-        cip_service = 0x4c
-        cip_size = 0x03
-        cip_class_type = 0x20
-        cip_class = 0x6c
-        cip_instance_type = 0x25
-        cip_instance = instance
-        cip_offset = offset
-        cip_data_length = data_len
+        data = pack("<IH", offset, data_len)
 
-        return pack('<BBBBHHIH',
-                    cip_service,
-                    cip_size,
-                    cip_class_type,
-                    cip_class,
-                    cip_instance_type,
-                    cip_instance,
-                    cip_offset,
-                    cip_data_length)
+        request = self._cip_message(0x4c, 0x6c, instance, None, data)
+        return request
 
     def _get_module_properties(self, slot):
         """
@@ -995,7 +952,8 @@ class PLC(object):
                 attribute_bytes = pack("<H", len(cip_attribute))
                 for i, attribute in enumerate(cip_attribute):
                     attribute_bytes += pack("<H", attribute)
-                    attribute_bytes += data[i]
+                    if data[0]:
+                        attribute_bytes += data[i]
             else:
                 service_size += 1
                 attribute_bytes = pack("<BB", 0x30, cip_attribute)
