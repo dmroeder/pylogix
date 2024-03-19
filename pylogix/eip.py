@@ -709,14 +709,7 @@ class PLC(object):
             for program_name in self.ProgramNames:
 
                 self.Offset = 0
-
-                request = self._build_tag_list_request(program_name)
-                status, ret_data = self.conn.send(request)
-                if status == 0 or status == 6:
-                    tags += self._parse_packet(ret_data, program_name)
-                    self.Offset += 1
-                else:
-                    return Response(None, None, status)
+                status = 6
 
                 while status == 6:
                     self.Offset += 1
@@ -739,14 +732,8 @@ class PLC(object):
             return Response(None, None, conn[1])
 
         self.Offset = 0
+        status = 6
         tags = []
-
-        request = self._build_tag_list_request(program_name)
-        status, ret_data = self.conn.send(request)
-        if status == 0 or status == 6:
-            tags += self._parse_packet(ret_data, program_name)
-        else:
-            return Response(None, None, status)
 
         while status == 6:
             self.Offset += 1
