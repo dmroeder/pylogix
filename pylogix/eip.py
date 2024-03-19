@@ -328,9 +328,7 @@ class PLC(object):
             request = self._add_read_service(ioi, words)
         elif bit_of_word(tag):
             # bits of word
-            split_tag = tag_name.split('.')
-            bit_pos = split_tag[len(split_tag) - 1]
-            bit_pos = int(bit_pos)
+            bit_pos = int(tag_name.split('.')[-1])
 
             words = get_word_count(bit_pos, elements, bit_count)
             request = self._add_read_service(ioi, words)
@@ -1414,9 +1412,7 @@ class PLC(object):
         if data_type == 0xd3:
             bit_pos = index % 32
         else:
-            split_tag = tag.split('.')
-            bit_pos = split_tag[len(split_tag) - 1]
-            bit_pos = int(bit_pos)
+            bit_pos = int(tag.split('.')[-1])
 
         ret = []
         for v in value:
