@@ -552,6 +552,35 @@ pylogix@pylogix-kde:~$ python3 example.py
 </p>
 </details>
 
+# Message
+Send a custom CIP object, similar to the Logix MSG instruction.  Provide a CIP service/class/instance/attribute,
+the Message function will return the raw bytes of the object. It is up to you to know how the data is
+organized.  When providing multiple attributes, they should be in a list.  Data provided to Message should be in
+bytes (use struct.pack).
+
+Please do not open issues asking for help with finding CIP objects, there are just too many out there. Ask in the
+discord server as well.  There are many users, so the pool of knowledge is larger.
+
+<details><summary>Exammple - Get Major/Minor Fault Code</summary>
+<p>
+
+```python
+import pylogix
+from struct import unpack_from
+
+with pylogix.PLC("192.168.1.10") as comm:
+    ret = comm.Message(cip_service=0x01, cip_class=0x73, cip_instance=0x01)
+
+    if ret.Status == "Success":
+        data = ret.Value[44:]
+        major = unpack_from("<H", data, 20)[0]
+        minor = unpack_from("<H", data, 22)[0]
+
+        print(major, minor)
+```
+</p>
+</details>
+
 # Additional information
 
 When reading/writing, pylogix keeps a dict called KnownTags, this is used to store the tag name
