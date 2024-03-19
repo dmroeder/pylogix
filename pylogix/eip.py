@@ -954,9 +954,15 @@ class PLC(object):
         return Response(None, ret_data, status)
 
     def _cip_message(self, cip_service, cip_class, cip_instance, cip_attribute=None, data=b''):
-
-        class_bytes = pack("<BB", 0x20, cip_class)
-        service_size = 2
+        """
+        Build CIP message with service/class/instance
+        """
+        if cip_class > 256:
+            class_bytes =  pack("<HH", 0x21, cip_class)
+            service_size = 3
+        else:
+            class_bytes = pack("<BB", 0x20, cip_class)
+            service_size = 2
         attribute_bytes = b''
 
         # append the instance
