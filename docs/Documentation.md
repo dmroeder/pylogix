@@ -24,6 +24,7 @@ __Methods:__
 - [Discover](#discover)()
 - [GetModuleProperties](#getmoduleproperties)()
 - [GetDeviceProperties](#getdeviceproperties)()
+- [Message](#message)()
 
 There are a few options for creating an instance of PLC(), how you do it is a matter of style I
 suppose.  My preferred method is using contexts, or with statements, but is up to you.
