@@ -5,6 +5,10 @@
             "github:dmroeder/pylogix/upylogix/__init__.mpy"
         ],
         [
+            "pylogix/adapter.mpy",
+            "github:dmroeder/pylogix/upylogix/adapter.mpy"
+        ],
+        [
             "pylogix/eip.mpy",
             "github:dmroeder/pylogix/upylogix/eip.mpy"
         ],
@@ -23,6 +27,10 @@
         [
             "pylogix/lgx_tag.mpy",
             "github:dmroeder/pylogix/upylogix/lgx_tag.mpy"
+        ],
+        [
+            "pylogix/lgx_type.mpy",
+            "github:dmroeder/pylogix/upylogix/lgx_type.mpy"
         ],
         [
             "pylogix/lgx_uvendors.mpy.bin",

@@ -539,12 +539,15 @@ class PylogixTests(unittest.TestCase):
         from pylogix.lgx_uvendors import uvendors
         vendors = pylogix.lgx_vendors.vendors
         for k in vendors:
-            self.assertEqual(uvendors[k], vendors[k], "Mismatch vendors/uvendors")
+            if is_python2():
+                self.assertEqual(uvendors[k].encode('utf-8'), vendors[k].strip(), "Mismatch vendors/uvendors")
+            else:
+                self.assertEqual(uvendors[k], vendors[k].strip(), "Mismatch vendors/uvendors")
 
     @unittest.skipIf(not is_micropython(), 'Not testing uvendors for python')
     def test_known_uvendors(self):
         from pylogix.lgx_uvendors import uvendors
-        self.assertEqual(uvendors[26], 'Festo', "Festo uvendor not found")
+        self.assertEqual(uvendors[26], 'Festo SE & Co KG', "Festo SE & Co KG uvendor not found")
         self.assertEqual(uvendors[1], 'Rockwell Automation/Allen-Bradley', "Rockwell uvendor not found")
         self.assertEqual(uvendors[-1], 'Unknown', "Unknown uvendor not returned")
         self.assertEqual(uvendors[(1<<32)-1], 'Unknown', "Unknown uvendor not returned")
