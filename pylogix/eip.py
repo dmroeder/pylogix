@@ -357,6 +357,18 @@ class PLC(object):
         if not conn[0]:
             return [Response(t, None, conn[1]) for t in tags]
 
+        new_tags = []
+        if isinstance(tags, (list, tuple)):
+            for tag in tags:
+                if len(tag) > 1:
+                    new_tags.append(tag)
+                else:
+                    new_tags.append([tag[0], 1, None])
+        else:
+            new_tags = tags
+
+        tags = new_tags
+
         # get data types of unknown tags
         self._get_unknown_types(tags)
 
@@ -1311,10 +1323,10 @@ class PLC(object):
         for t in tags:
             if isinstance(t, (list, tuple)):
                 tag_name, base_tag, index = parse_tag_name(t[0])
-                if len(t) == 3:
+                if len(t) == 3 and t[2] != None:
                     self.KnownTags[base_tag] = (t[2], 0)
                 else:
-                    unk_tags.append(t[0])
+                    unk_tags.append(t)
             else:
                 tag_name, base_tag, index = parse_tag_name(t)
             if base_tag not in self.KnownTags:
