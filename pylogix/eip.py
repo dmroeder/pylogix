@@ -278,8 +278,7 @@ class PLC(object):
 
     def _batch_read(self, tags):
         """
-        Processes the multiple read request. Split into multiple requests and
-        reassemble responses when needed
+        Read tags using multi-service messaging
         """
         if self.Micro800:
             return Response(tags, None, 8)
@@ -291,16 +290,77 @@ class PLC(object):
         # get data types of unknown tags
         self._get_unknown_types(tags)
 
-        result = []
-        while len(result) < len(tags):
-            if len(result) == len(tags) - 1:
-                # single tag left over, can't use multi msg service
-                tag = tags[len(result):][0]
-                result.append(self._read_tag(tag, 1, None))
-            else:
-                result.extend(self._multi_read(tags[len(result):], False))
+        # generate a list of service requests
+        ret_tags, ret_services = self._generate_read_service_list(tags)
 
-        return result
+        response = []
+        for i, services in enumerate(ret_services):
+            header = self._build_multi_service_header()
+            tag_count = pack("<H", len(ret_tags[i]))
+            # # calculate the offsets
+            current_offset = len(ret_tags[i]) * 2 + 2
+            offsets = pack("<H", current_offset)
+            for j in range(len(services)-1):
+                current_offset += len(services[j])
+                offsets += pack("<H", current_offset)
+
+            segments = b''.join(s for s in services)
+            request = header + tag_count + offsets + segments
+
+            status, ret_data = self.conn.send(request)
+
+            # return error if no data is returned
+            if not ret_data:
+                return [Response(t, None, status) for t in ret_tags[i]]
+
+            response.extend(self._parse_multi_read(ret_tags[i], ret_data))
+
+        return response
+
+    def _generate_read_service_list(self, tags):
+
+        # cip payload is the size of the connection opened
+        # minus mms header
+        payload_size = 6
+        # minus overhead per tag
+        payload_size += 2 + (2*(len(tags)))
+
+        services = []
+        for tag in tags:
+            _, base_tag, _ = parse_tag_name(tag)
+            if base_tag in self.KnownTags:
+                data_type = self.KnownTags[base_tag][0]
+            else:
+                data_type = None
+            ioi = self._build_ioi(tag, data_type)
+            # cip_data_type = self.KnownTags[base_tag][0]
+            element_count = 1
+
+            read_service = self._add_read_service(ioi, element_count)
+            services.append(read_service)
+
+        final_services, final_tags = [], []
+        temp_services, temp_tags = [], []
+
+        # split the services into lists that fit into a packet
+        for i, service in enumerate(services):
+            payload_size += len(service)
+            if payload_size < self.ConnectionSize:
+                temp_services.append(service)
+                temp_tags.append(tags[i])
+            else:
+                final_services.append(temp_services)
+                final_tags.append(temp_tags)
+                temp_services, temp_tags = [], []
+                temp_tags.append(tags[i])
+                temp_services.append(service)
+                payload_size = 6
+        # add the remainder
+        final_services.append(temp_services)
+        final_tags.append(temp_tags)
+
+        # return services
+        return final_tags, final_services
 
     def _read_tag(self, tag_name, elements, data_type):
         """
@@ -389,8 +449,11 @@ class PLC(object):
 
         for tag in tags:
             if isinstance(tag, (list, tuple)):
-                tag = tag[0]
-            tag_name, base_tag, index = parse_tag_name(tag)
+                tag_name, base_tag, index = parse_tag_name(tag[0])
+                count = tag[1]
+            else:
+                tag_name, base_tag, index = parse_tag_name(tag)
+                count = 1
 
             # get the data type if we have accessed the tag before
             if base_tag in self.KnownTags:
@@ -407,7 +470,7 @@ class PLC(object):
             rsp_tag_size = min_tag_size + len(base_tag) + dt_size
 
             ioi = self._build_ioi(tag_name, data_type)
-            read_service = self._add_read_service(ioi, 1)
+            read_service = self._add_read_service(ioi, count)
 
             next_request_size = service_segment_size + rsp_tag_size + 2
 
