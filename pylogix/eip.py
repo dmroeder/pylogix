@@ -413,7 +413,7 @@ class PLC(object):
             if not ret_data:
                 return [[t, None, status] for t in new_tags[i]]
 
-            response.extend(self._parse_multi_read(ret_data, tags))
+            response.extend(self._parse_multi_read(ret_data, new_tags[i]))
 
         return response
 
@@ -424,16 +424,24 @@ class PLC(object):
         sub lists.
         """
         # cip payload is the size of the connection opened
-        # minus mms header
-        payload_size = 6
-        # minus overhead per tag
-        payload_size += 2 + (2 * (len(tags)))
+        # mms header
+        outbound_size = 6
+        inbound_size = 4
+        # plus overhead per tag
+        outbound_size += 2 + (2 * (len(tags)))
+        inbound_size +=  2 + (2 * (len(tags)))
 
-        services = []
+        test = []
         for tag in tags:
             tag_name, base_tag, index = parse_tag_name(tag[0])
+            # all inbound segments will have 6 bytes for response and type
+            inbound_size += 6
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
+                type_size = self.CIPTypes[data_type][0]
+                if data_type == 0xa0:
+                    # additional 2 bytes for strings
+                    inbound_size += 2
                 ioi = self._build_ioi(tag_name, data_type)
                 if data_type == 0xd3:
                     # bool arrays are special
@@ -444,31 +452,35 @@ class PLC(object):
                     element_count = get_word_count(bit_pos, tag[1], bit_count)
                 else:
                     element_count = tag[1]
+                inbound_size += element_count * type_size
             else:
                 data_type = None
                 ioi = self._build_ioi(base_tag, None)
                 element_count = 1
+                # assume string size
+                inbound_size += 90
 
             read_service = self._add_read_service(ioi, element_count)
-            services.append(read_service)
+            outbound_size += len(read_service)
+            test.append([read_service, outbound_size, inbound_size])
 
         final_services = []
         temp_services = []
 
-        # split the services into lists that fit into a packet
-        for service in services:
-            payload_size += len(service)
-            if payload_size < self.ConnectionSize:
+        in_offset = 0
+        out_offset = 0
+        for service, out_size, in_size in test:
+            if out_size-out_offset < self.ConnectionSize and in_size-in_offset < self.ConnectionSize:
                 temp_services.append(service)
             else:
+                out_offset += out_size
+                in_offset += in_size
                 final_services.append(temp_services)
                 temp_services = []
                 temp_services.append(service)
-                payload_size = 6
-        # add the remainder
-        final_services.append(temp_services)
+        if temp_services:
+            final_services.append(temp_services)
 
-        # return services
         return final_services
 
     def _batch_write(self, tags):
