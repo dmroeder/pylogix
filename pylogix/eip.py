@@ -1441,7 +1441,8 @@ class PLC(object):
             segment_service = unpack_from("<H", segment, 0)[0]
             segment_status = unpack_from("<H", segment, 2)[0]
             segment_data_type = unpack_from("<B", segment, 4)[0]
-            self.KnownTags[tags[i][0]] = (segment_data_type, 0)
+            tag_name, base_tag, index  = parse_tag_name(tags[i][0])
+            self.KnownTags[base_tag] = (segment_data_type, 0)
             type_size = self.CIPTypes[segment_data_type][0]
             value_count = int((len(segment)-6)/type_size)
             # STRING's are special
