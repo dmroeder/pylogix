@@ -1425,6 +1425,7 @@ class PLC(object):
         """
         Extract the values from the multi-service message reply
         """
+
         data = data[46:]
         service = unpack_from("<H", data, 0)[0]
         status, ext_status = unpack_from("<BB", data, 2)
@@ -1467,7 +1468,7 @@ class PLC(object):
                 if segment_data_type == 0xd3:
                     type_fmt = self.CIPTypes[segment_data_type][2][1:]
                     value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
-                    value = [bit_value(value[0], index)]
+                    value = [bit_value(value[0], index+i) for i in range(tags[i][1])]
                 else:
                     type_fmt = self.CIPTypes[segment_data_type][2][1:]
                     value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
