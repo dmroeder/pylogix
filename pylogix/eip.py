@@ -427,7 +427,7 @@ class PLC(object):
         # minus mms header
         payload_size = 6
         # minus overhead per tag
-        payload_size += 2 + (2*(len(tags)))
+        payload_size += 2 + (2 * (len(tags)))
 
         services = []
         for tag in tags:
@@ -437,7 +437,7 @@ class PLC(object):
                 ioi = self._build_ioi(tag_name, data_type)
                 if data_type == 0xd3:
                     # bool arrays are special
-                    element_count = int((tag[1]/32)) + 1
+                    element_count = int(((tag[1] - 1) / 32)) + 1
                 else:
                     element_count = tag[1]
             else:
@@ -1420,7 +1420,6 @@ class PLC(object):
                 ret.append(bit_value(v, i))
 
         return ret[bit_pos:bit_pos + count]
-
     def _parse_multi_read(self, data, tags):
         """
         Extract the values from the multi-service message reply
