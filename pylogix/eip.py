@@ -62,7 +62,7 @@ class PLC(object):
         self.CIPTypes = {0x00: (1, "UNKNOWN", '<B'),
                          0xa0: (88, "STRUCT", '<B'),
                          0xc0: (8, "DT", '<Q'),
-                         0xc1: (1, "BOOL", '?'),
+                         0xc1: (1, "BOOL", '<?'),
                          0xc2: (1, "SINT", '<b'),
                          0xc3: (2, "INT", '<h'),
                          0xc4: (4, "DINT", '<i'),
