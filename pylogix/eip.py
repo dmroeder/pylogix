@@ -430,10 +430,10 @@ class PLC(object):
             tag_name, base_tag, _ = parse_tag_name(tag[0])
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
+                ioi = self._build_ioi(tag_name, data_type)
             else:
                 data_type = None
-            ioi = self._build_ioi(tag_name, data_type)
-            # cip_data_type = self.KnownTags[base_tag][0]
+                ioi = self._build_ioi(base_tag, None)
             element_count = tag[1]
 
             read_service = self._add_read_service(ioi, element_count)
@@ -1416,7 +1416,6 @@ class PLC(object):
         """
         Extract the values from the multi-service message reply
         """
-
         data = data[46:]
         service = unpack_from("<H", data, 0)[0]
         status, ext_status = unpack_from("<BB", data, 2)
@@ -1440,24 +1439,32 @@ class PLC(object):
         for i, segment in enumerate(data_segments):
             segment_service = unpack_from("<H", segment, 0)[0]
             segment_status = unpack_from("<H", segment, 2)[0]
-            segment_data_type = unpack_from("<B", segment, 4)[0]
-            tag_name, base_tag, index  = parse_tag_name(tags[i][0])
-            self.KnownTags[base_tag] = (segment_data_type, 0)
-            type_size = self.CIPTypes[segment_data_type][0]
-            value_count = int((len(segment)-6)/type_size)
-            # STRING's are special
-            if segment_data_type == 0xa0:
-                struct_id = unpack_from("<H", segment, 6)[0]
-                if struct_id == self.StringID:
-                    value = []
-                    for i in range(value_count):
-                        value_length = unpack_from("<B", segment, 8+i*type_size)[0]
-                        v = segment[12+i*type_size:12+i*type_size+value_length]
-                        v = v.decode(self.StringEncoding)
-                        value.append(v)
+            if segment_status == 0:
+                segment_data_type = unpack_from("<B", segment, 4)[0]
+                tag_name, base_tag, index  = parse_tag_name(tags[i][0])
+                self.KnownTags[base_tag] = (segment_data_type, 0)
+                type_size = self.CIPTypes[segment_data_type][0]
+                value_count = int((len(segment)-6)/type_size)
+                # STRING's are special
+                if segment_data_type == 0xa0:
+                    struct_id = unpack_from("<H", segment, 6)[0]
+                    if struct_id == self.StringID:
+                        value = []
+                        for i in range(value_count):
+                            value_length = unpack_from("<B", segment, 8+i*type_size)[0]
+                            v = segment[12+i*type_size:12+i*type_size+value_length]
+                            v = v.decode(self.StringEncoding)
+                            value.append(v)
+                if segment_data_type == 0xd3:
+                    type_fmt = self.CIPTypes[segment_data_type][2][1:]
+                    value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
+                    value = [bit_value(value[0], index)]
+                else:
+                    type_fmt = self.CIPTypes[segment_data_type][2][1:]
+                    value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
+
             else:
-                type_fmt = self.CIPTypes[segment_data_type][2][1:]
-                value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
+                value = [None]
 
             # value shouldn't be a list if there is only one
             if len(value) == 1:
