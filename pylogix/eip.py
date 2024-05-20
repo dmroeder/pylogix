@@ -276,22 +276,6 @@ class PLC(object):
         """
         return self.conn.close()
 
-    def _batch_read(self, tags):
-        """
-        Read tags using multi-service messaging
-        """
-        if self.Micro800:
-            return Response(tags, None, 8)
-
-        conn = self.conn.connect()
-        if not conn[0]:
-            return [Response(t, None, conn[1]) for t in tags]
-
-        # get data types of unknown tags
-        self._get_unknown_types(tags)
-
-        return [Response(tag, value, status) for tag, value, status in self._multi_read(tags)]
-
     def _read_tag(self, tag_name, elements, data_type):
         """
         Processes the read request
@@ -361,6 +345,22 @@ class PLC(object):
             value = None
 
         return Response(tag_name, value, status)
+
+    def _batch_read(self, tags):
+        """
+        Read tags using multi-service messaging
+        """
+        if self.Micro800:
+            return Response(tags, None, 8)
+
+        conn = self.conn.connect()
+        if not conn[0]:
+            return [Response(t, None, conn[1]) for t in tags]
+
+        # get data types of unknown tags
+        self._get_unknown_types(tags)
+
+        return [Response(tag, value, status) for tag, value, status in self._multi_read(tags)]
 
     def _multi_read(self, tags):
         """
