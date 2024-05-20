@@ -290,77 +290,7 @@ class PLC(object):
         # get data types of unknown tags
         self._get_unknown_types(tags)
 
-        # generate a list of service requests
-        ret_tags, ret_services = self._generate_read_service_list(tags)
-
-        response = []
-        for i, services in enumerate(ret_services):
-            header = self._build_multi_service_header()
-            tag_count = pack("<H", len(ret_tags[i]))
-            # # calculate the offsets
-            current_offset = len(ret_tags[i]) * 2 + 2
-            offsets = pack("<H", current_offset)
-            for j in range(len(services)-1):
-                current_offset += len(services[j])
-                offsets += pack("<H", current_offset)
-
-            segments = b''.join(s for s in services)
-            request = header + tag_count + offsets + segments
-
-            status, ret_data = self.conn.send(request)
-
-            # return error if no data is returned
-            if not ret_data:
-                return [Response(t, None, status) for t in ret_tags[i]]
-
-            response.extend(self._parse_multi_read(ret_tags[i], ret_data))
-
-        return response
-
-    def _generate_read_service_list(self, tags):
-
-        # cip payload is the size of the connection opened
-        # minus mms header
-        payload_size = 6
-        # minus overhead per tag
-        payload_size += 2 + (2*(len(tags)))
-
-        services = []
-        for tag in tags:
-            _, base_tag, _ = parse_tag_name(tag)
-            if base_tag in self.KnownTags:
-                data_type = self.KnownTags[base_tag][0]
-            else:
-                data_type = None
-            ioi = self._build_ioi(tag, data_type)
-            # cip_data_type = self.KnownTags[base_tag][0]
-            element_count = 1
-
-            read_service = self._add_read_service(ioi, element_count)
-            services.append(read_service)
-
-        final_services, final_tags = [], []
-        temp_services, temp_tags = [], []
-
-        # split the services into lists that fit into a packet
-        for i, service in enumerate(services):
-            payload_size += len(service)
-            if payload_size < self.ConnectionSize:
-                temp_services.append(service)
-                temp_tags.append(tags[i])
-            else:
-                final_services.append(temp_services)
-                final_tags.append(temp_tags)
-                temp_services, temp_tags = [], []
-                temp_tags.append(tags[i])
-                temp_services.append(service)
-                payload_size = 6
-        # add the remainder
-        final_services.append(temp_services)
-        final_tags.append(temp_tags)
-
-        # return services
-        return final_tags, final_services
+        return [Response(tag, value, status) for tag, value, status in self._multi_read(tags)]
 
     def _read_tag(self, tag_name, elements, data_type):
         """
@@ -432,80 +362,86 @@ class PLC(object):
 
         return Response(tag_name, value, status)
 
-    def _multi_read(self, tags, first):
+    def _multi_read(self, tags):
         """
-        Processes the multiple read request, but only the possible number of tags in a single request. The size
-        difference between tags and result must check for a complete read
+        Read tags using multi-service messaging
         """
-        service_segments = []
-        segments = b""
-        tag_count = 0
-        self.Offset = 0
+        # generate a list of service requests
+        ret_services = self._generate_read_service_list(tags)
 
-        header = self._build_multi_service_header()
+        # format tags to match services
+        new_tags = []
+        for i, s in enumerate(ret_services):
+            temp = []
+            for j, v in enumerate(s):
+                temp.append(tags[i+j])
+            new_tags.append(temp)
 
-        min_tag_size = 24
-        service_segment_size = 8
+        response = []
+        for i, services in enumerate(ret_services):
+            header = self._build_multi_service_header()
+            tag_count = pack("<H", len(new_tags[i]))
+            # # calculate the offsets
+            current_offset = len(new_tags[i]) * 2 + 2
+            offsets = pack("<H", current_offset)
+            for j in range(len(services)-1):
+                current_offset += len(services[j])
+                offsets += pack("<H", current_offset)
 
+            segments = b''.join(s for s in services)
+            request = header + tag_count + offsets + segments
+
+            status, ret_data = self.conn.send(request)
+
+            # return error if no data is returned
+            if not ret_data:
+                return [[t, None, status] for t in new_tags[i]]
+                # return [Response(t, None, status) for t in new_tags[i]]
+
+            response.extend(self._parse_multi_read(new_tags[i], ret_data))
+
+        return response
+
+    def _generate_read_service_list(self, tags):
+
+        # cip payload is the size of the connection opened
+        # minus mms header
+        payload_size = 6
+        # minus overhead per tag
+        payload_size += 2 + (2*(len(tags)))
+
+        services = []
         for tag in tags:
-            if isinstance(tag, (list, tuple)):
-                tag_name, base_tag, index = parse_tag_name(tag[0])
-                count = tag[1]
-            else:
-                tag_name, base_tag, index = parse_tag_name(tag)
-                count = 1
-
-            # get the data type if we have accessed the tag before
+            _, base_tag, _ = parse_tag_name(tag)
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
-                dt_size = self.CIPTypes[data_type][0]
-                if data_type == 0xa0:
-                    dt_size -= 8
             else:
-                # go with the worst case size
-                dt_size = self.CIPTypes[160][0]
                 data_type = None
+            ioi = self._build_ioi(tag, data_type)
+            # cip_data_type = self.KnownTags[base_tag][0]
+            element_count = 1
 
-            # estimate the size that the response will occupy
-            rsp_tag_size = min_tag_size + len(base_tag) + dt_size
+            read_service = self._add_read_service(ioi, element_count)
+            services.append(read_service)
 
-            ioi = self._build_ioi(tag_name, data_type)
-            read_service = self._add_read_service(ioi, count)
+        final_services = []
+        temp_services = []
 
-            next_request_size = service_segment_size + rsp_tag_size + 2
-
-            # check if request size does not exceed (ConnectionSize bytes limit)
-            if next_request_size <= self.ConnectionSize and rsp_tag_size <= self.ConnectionSize:
-                service_segment_size = service_segment_size + rsp_tag_size
-                service_segments.append(read_service)
-                tag_count = tag_count + 1
+        # split the services into lists that fit into a packet
+        for service in services:
+            payload_size += len(service)
+            if payload_size < self.ConnectionSize:
+                temp_services.append(service)
             else:
-                break
+                final_services.append(temp_services)
+                temp_services = []
+                temp_services.append(service)
+                payload_size = 6
+        # add the remainder
+        final_services.append(temp_services)
 
-        tags_effective = tags[0:tag_count]
-        segment_count = pack('<H', tag_count)
-
-        temp = len(header)
-        if tag_count > 2:
-            temp += (tag_count - 2) * 2
-        offsets = pack('<H', temp)
-
-        # assemble all the segments
-        for i in range(tag_count):
-            segments += service_segments[i]
-
-        for i in range(tag_count - 1):
-            temp += len(service_segments[i])
-            offsets += pack('<H', temp)
-
-        request = header + segment_count + offsets + segments
-        status, ret_data = self.conn.send(request)
-
-        # return error if no data is returned
-        if not ret_data:
-            return [Response(t, None, status) for t in tags]
-
-        return self._parse_multi_read(tags_effective, ret_data)
+        # return services
+        return final_services
 
     def _batch_write(self, tags):
         """
@@ -1394,7 +1330,7 @@ class PLC(object):
                 tag_name, base_tag, index = parse_tag_name(tag)
                 result.append(self._initial_read(tag, base_tag, data_type))
             else:
-                result.extend(self._multi_read(unk_tags[len(result):], True))
+                result.extend(self._multi_read(unk_tags[len(result):]))
 
     def _initial_read(self, tag, base_tag, data_type):
         """
@@ -1498,17 +1434,17 @@ class PLC(object):
                     type_fmt = self.CIPTypes[data_type][2]
                     val = unpack_from(type_fmt, stripped, offset + 6)[0]
                     bit_state = bit_of_word_state(tag, val)
-                    response = Response(tag, bit_state, status)
+                    response = tag, bit_state, status
                 elif data_type == 0xd3:
                     type_fmt = self.CIPTypes[data_type][2]
                     val = unpack_from(type_fmt, stripped, offset + 6)[0]
                     bit_state = bit_of_word_state(tag, val)
-                    response = Response(tag, bit_state, status)
+                    response = tag, bit_state, status
                 elif data_type == 0xa0:
                     strlen = unpack_from('<B', stripped, offset + 8)[0]
                     s = stripped[offset + 12:offset + 12 + strlen]
                     value = str(s.decode(self.StringEncoding))
-                    response = Response(tag, value, status)
+                    response = tag, value, status
                 else:
                     type_fmt = self.CIPTypes[data_type][2]
                     # handling special format for micropython for bools
@@ -1523,12 +1459,12 @@ class PLC(object):
                         else:
                             bool_val = None
 
-                        response = Response(tag, bool_val, status)
+                        response = tag, bool_val, status
                     else:
                         value = unpack_from(type_fmt, stripped, offset + 6)[0]
-                        response = Response(tag, value, status)
+                        response = tag, value, status
             else:
-                response = Response(tag, None, status)
+                response = tag, None, status
             reply.append(response)
 
         return reply
