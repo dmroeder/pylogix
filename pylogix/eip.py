@@ -431,13 +431,13 @@ class PLC(object):
 
         services = []
         for tag in tags:
-            tag_name, base_tag, _ = parse_tag_name(tag[0])
+            tag_name, base_tag, index = parse_tag_name(tag[0])
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
                 ioi = self._build_ioi(tag_name, data_type)
                 if data_type == 0xd3:
                     # bool arrays are special
-                    element_count = int(((tag[1] - 1) / 32)) + 1
+                    element_count = get_word_count(index, tag[1], 32)
                 else:
                     element_count = tag[1]
             else:
@@ -1420,6 +1420,7 @@ class PLC(object):
                 ret.append(bit_value(v, i))
 
         return ret[bit_pos:bit_pos + count]
+
     def _parse_multi_read(self, data, tags):
         """
         Extract the values from the multi-service message reply
@@ -1464,14 +1465,19 @@ class PLC(object):
                             v = segment[12+i*type_size:12+i*type_size+value_length]
                             v = v.decode(self.StringEncoding)
                             value.append(v)
-                if segment_data_type == 0xd3:
+                elif segment_data_type == 0xd3:
                     type_fmt = self.CIPTypes[segment_data_type][2][1:]
-                    value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
-                    value = [bit_value(value[0], index+i) for i in range(tags[i][1])]
+                    values = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
+                    value = []
+                    # convert dwrods to BOOL list
+                    for v in values:
+                        value.extend(bit_value(v, i) for i in range(32))
+                    # slice to values requested
+                    index = index % 32
+                    value = value[index:index+tags[i][1]]
                 else:
                     type_fmt = self.CIPTypes[segment_data_type][2][1:]
                     value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
-
             else:
                 value = [None]
 
