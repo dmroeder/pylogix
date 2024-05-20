@@ -371,10 +371,12 @@ class PLC(object):
 
         # format tags to match services
         new_tags = []
-        for i, s in enumerate(ret_services):
+        count = 0
+        for s in (ret_services):
             temp = []
-            for j, v in enumerate(s):
-                temp.append(tags[i+j])
+            for v in s:
+                temp.append(tags[count])
+                count += 1
             new_tags.append(temp)
 
         response = []
