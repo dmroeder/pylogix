@@ -438,6 +438,10 @@ class PLC(object):
                 if data_type == 0xd3:
                     # bool arrays are special
                     element_count = get_word_count(index, tag[1], 32)
+                elif bit_of_word(tag_name):
+                    bit_pos = int(tag_name.split('.')[-1])
+                    bit_count = self.CIPTypes[data_type][0] * 8
+                    element_count = get_word_count(bit_pos, tag[1], bit_count)
                 else:
                     element_count = tag[1]
             else:
@@ -1448,7 +1452,7 @@ class PLC(object):
         reply = []
         for i, segment in enumerate(data_segments):
             segment_service = unpack_from("<H", segment, 0)[0]
-            segment_status = unpack_from("<H", segment, 2)[0]
+            segment_status = unpack_from("<B", segment, 2)[0]
             if segment_status == 0:
                 segment_data_type = unpack_from("<B", segment, 4)[0]
                 tag_name, base_tag, index  = parse_tag_name(tags[i][0])
@@ -1465,16 +1469,10 @@ class PLC(object):
                             v = segment[12+i*type_size:12+i*type_size+value_length]
                             v = v.decode(self.StringEncoding)
                             value.append(v)
-                elif segment_data_type == 0xd3:
+                elif segment_data_type == 0xd3 or bit_of_word(tag_name):
                     type_fmt = self.CIPTypes[segment_data_type][2][1:]
                     values = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
-                    value = []
-                    # convert dwrods to BOOL list
-                    for v in values:
-                        value.extend(bit_value(v, i) for i in range(32))
-                    # slice to values requested
-                    index = index % 32
-                    value = value[index:index+tags[i][1]]
+                    value = self._words_to_bits(tag_name, values, tags[i][1])
                 else:
                     type_fmt = self.CIPTypes[segment_data_type][2][1:]
                     value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
