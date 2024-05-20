@@ -418,7 +418,11 @@ class PLC(object):
         return response
 
     def _generate_read_service_list(self, tags):
-
+        """
+        Generate a list of read services for the multi-message service.
+        Once we have a complete list, they'll be split into packet sized
+        sub lists.
+        """
         # cip payload is the size of the connection opened
         # minus mms header
         payload_size = 6
