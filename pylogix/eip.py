@@ -372,7 +372,13 @@ class PLC(object):
         # get data types of unknown tags
         self._get_unknown_types(tags)
 
-        return [Response(tag, value, status) for tag, value, status in self._multi_read(tags)]
+        responses = [Response(tag, value, status) for tag, value, status in self._multi_read(tags)]
+
+        # update the responses with the original tag name
+        for i, tag in enumerate(tags):
+            responses[i].TagName = tag[0]
+
+        return responses
 
     def _multi_read(self, tags):
         """
