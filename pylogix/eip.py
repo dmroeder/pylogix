@@ -59,7 +59,7 @@ class PLC(object):
         self.ProgramNames = []
         self.StringID = 0x0fce
         self.StringEncoding = 'utf-8'
-        self.CIPTypes = {0x00: (0, "UNKNOWN", '?'),
+        self.CIPTypes = {0x00: (1, "UNKNOWN", '<B'),
                          0xa0: (88, "STRUCT", '<B'),
                          0xc0: (8, "DT", '<Q'),
                          0xc1: (1, "BOOL", '?'),
@@ -410,8 +410,8 @@ class PLC(object):
             # return error if no data is returned
             if not ret_data:
                 return [[t, None, status] for t in new_tags[i]]
-                # return [Response(t, None, status) for t in new_tags[i]]
 
+            self._parse_multi_read2(ret_data)
             response.extend(self._parse_multi_read(new_tags[i], ret_data))
 
         return response
@@ -426,14 +426,14 @@ class PLC(object):
 
         services = []
         for tag in tags:
-            _, base_tag, _ = parse_tag_name(tag)
+            tag_name, base_tag, _ = parse_tag_name(tag[0])
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
             else:
                 data_type = None
-            ioi = self._build_ioi(tag, data_type)
+            ioi = self._build_ioi(tag_name, data_type)
             # cip_data_type = self.KnownTags[base_tag][0]
-            element_count = 1
+            element_count = tag[1]
 
             read_service = self._add_read_service(ioi, element_count)
             services.append(read_service)
@@ -1321,6 +1321,7 @@ class PLC(object):
         """
         unk_tags = []
         for t in tags:
+
             if isinstance(t, (list, tuple)):
                 tag_name, base_tag, index = parse_tag_name(t[0])
                 if len(t) == 3 and t[2] != None:
@@ -1329,8 +1330,8 @@ class PLC(object):
                     unk_tags.append(t)
             else:
                 tag_name, base_tag, index = parse_tag_name(t)
-            if base_tag not in self.KnownTags:
-                unk_tags.append(t)
+                if base_tag not in self.KnownTags:
+                    unk_tags.append(t)
 
         # get the unknown tags
         self._multi_read(unk_tags)
@@ -1409,6 +1410,41 @@ class PLC(object):
                 ret.append(bit_value(v, i))
 
         return ret[bit_pos:bit_pos + count]
+
+    def _parse_multi_read2(self, data):
+
+        data = data[46:]
+        service = unpack_from("<H", data, 0)[0]
+        status, ext_status = unpack_from("<BB", data, 2)
+
+        service_count = unpack_from("<H", data, 4)[0]
+        offsets = [unpack_from("<H", data, i*2+6)[0] for i in range(service_count)]
+
+        data = data[2*service_count:]
+
+        # define the start/end offsets so we can extract the values
+        segment_bounds = [offset for offset in offsets]
+        segment_bounds.append(len(data))
+
+        # slice the data into each response segment
+        data_segments = []
+        for i in range(service_count):
+            data_segments.append(data[segment_bounds[i]:segment_bounds[i+1]])
+
+        # parse each segment (service, status, data type, value(s))
+        reply = []
+        for segment in data_segments:
+            segment_service = unpack_from("<H", segment, 0)[0]
+            segment_status = unpack_from("<H", segment, 2)[0]
+            segment_data_type = unpack_from("<B", segment, 4)[0]
+            type_size = self.CIPTypes[segment_data_type][0]
+            type_fmt = self.CIPTypes[segment_data_type][2][1:]
+            value_count = int((len(segment)-6)/type_size)
+            value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
+            response = None, value, segment_status
+            reply.append(response)
+
+        return reply
 
     def _parse_multi_read(self, tags, data):
         """
