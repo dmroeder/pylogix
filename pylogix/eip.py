@@ -1319,18 +1319,7 @@ class PLC(object):
                 unk_tags.append(t)
 
         # get the unknown tags
-        result = []
-        while len(result) < len(unk_tags):
-            if len(result) == len(unk_tags) - 1:
-                tag = unk_tags[len(result):][0]
-                if isinstance(tag, (list, tuple)):
-                    data_type = tag[1]
-                else:
-                    data_type = None
-                tag_name, base_tag, index = parse_tag_name(tag)
-                result.append(self._initial_read(tag, base_tag, data_type))
-            else:
-                result.extend(self._multi_read(unk_tags[len(result):]))
+        self._multi_read(unk_tags)
 
     def _initial_read(self, tag, base_tag, data_type):
         """
