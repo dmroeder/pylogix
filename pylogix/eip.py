@@ -1142,7 +1142,7 @@ class PLC(object):
             except Exception:
                 # handling special format for micropython for bools
                 # boolean format ? doesn't exist for upy struct module
-                if self.CIPTypes[data_type][2] == '?' and is_micropython():
+                if self.CIPTypes[data_type][2] == '<?' and is_micropython():
                     write_service += pack('B', value)
                 else:
                     write_service += pack(self.CIPTypes[data_type][2], value)
@@ -1321,7 +1321,7 @@ class PLC(object):
             else:
                 # handling special format for micropython for bools
                 # boolean format ? doesn't exist for upy struct module
-                if fmt == '?' and is_micropython():
+                if fmt == '<?' and is_micropython():
                     bool_int_val = unpack_from('B', data, index)[0]
 
                     if bool_int_val == 255 or bool_int_val == 1:
