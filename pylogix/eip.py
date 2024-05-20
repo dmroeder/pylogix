@@ -413,11 +413,7 @@ class PLC(object):
             if not ret_data:
                 return [[t, None, status] for t in new_tags[i]]
 
-            response.extend(self._parse_multi_read(ret_data))
-
-        # update the responses with the original tag name
-        for i, tag in enumerate(tags):
-            response[i][0] = tag[0]
+            response.extend(self._parse_multi_read(ret_data, tags))
 
         return response
 
@@ -1416,10 +1412,11 @@ class PLC(object):
 
         return ret[bit_pos:bit_pos + count]
 
-    def _parse_multi_read(self, data):
+    def _parse_multi_read(self, data, tags):
         """
         Extract the values from the multi-service message reply
         """
+
         data = data[46:]
         service = unpack_from("<H", data, 0)[0]
         status, ext_status = unpack_from("<BB", data, 2)
@@ -1440,10 +1437,11 @@ class PLC(object):
 
         # parse each segment (service, status, data type, value(s))
         reply = []
-        for segment in data_segments:
+        for i, segment in enumerate(data_segments):
             segment_service = unpack_from("<H", segment, 0)[0]
             segment_status = unpack_from("<H", segment, 2)[0]
             segment_data_type = unpack_from("<B", segment, 4)[0]
+            self.KnownTags[tags[i][0]] = (segment_data_type, 0)
             type_size = self.CIPTypes[segment_data_type][0]
             value_count = int((len(segment)-6)/type_size)
             # STRING's are special
@@ -1464,7 +1462,7 @@ class PLC(object):
             if len(value) == 1:
                 value = value[0]
 
-            response = [None, value, segment_status]
+            response = [tags[i][0], value, segment_status]
             reply.append(response)
 
         return reply
