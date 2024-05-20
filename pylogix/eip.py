@@ -431,10 +431,15 @@ class PLC(object):
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
                 ioi = self._build_ioi(tag_name, data_type)
+                if data_type == 0xd3:
+                    # bool arrays are special
+                    element_count = int((tag[1]/32)) + 1
+                else:
+                    element_count = tag[1]
             else:
                 data_type = None
                 ioi = self._build_ioi(base_tag, None)
-            element_count = tag[1]
+                element_count = 1
 
             read_service = self._add_read_service(ioi, element_count)
             services.append(read_service)
