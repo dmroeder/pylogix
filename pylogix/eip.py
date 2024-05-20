@@ -1465,9 +1465,19 @@ class PLC(object):
         for i, segment in enumerate(data_segments):
             segment_service = unpack_from("<H", segment, 0)[0]
             segment_status = unpack_from("<B", segment, 2)[0]
+            tag_name, base_tag, index  = parse_tag_name(tags[i][0])
+            element_count = tags[i][1]
+
+            while segment_status == 6:
+                segment_data_type = unpack_from("<B", segment, 4)[0]
+                ioi = self._build_ioi(tag_name, segment_data_type)
+                self.Offset = len(segment) - 8
+                request = self._add_partial_read_service(ioi, element_count)
+                segment_status, ret_data = self.conn.send(request)
+                segment += ret_data[54:]
+
             if segment_status == 0:
                 segment_data_type = unpack_from("<B", segment, 4)[0]
-                tag_name, base_tag, index  = parse_tag_name(tags[i][0])
                 self.KnownTags[base_tag] = (segment_data_type, 0)
                 type_size = self.CIPTypes[segment_data_type][0]
                 value_count = int((len(segment)-6)/type_size)
@@ -1495,7 +1505,7 @@ class PLC(object):
             if len(value) == 1:
                 value = value[0]
 
-            response = [tags[i][0], value, segment_status]
+            response = [tag_name, value, segment_status]
             reply.append(response)
 
         return reply
