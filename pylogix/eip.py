@@ -358,14 +358,14 @@ class PLC(object):
             return [Response(t, None, conn[1]) for t in tags]
 
         new_tags = []
-        if isinstance(tags, (list, tuple)):
-            for tag in tags:
+        for tag in tags:
+            if isinstance(tag, (list, tuple)):
                 if len(tag) > 1:
                     new_tags.append(tag)
                 else:
                     new_tags.append([tag[0], 1, None])
-        else:
-            new_tags = tags
+            else:
+                new_tags.append([tag, 1, None])
 
         tags = new_tags
 
