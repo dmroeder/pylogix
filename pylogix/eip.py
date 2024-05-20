@@ -411,8 +411,7 @@ class PLC(object):
             if not ret_data:
                 return [[t, None, status] for t in new_tags[i]]
 
-            self._parse_multi_read2(ret_data)
-            response.extend(self._parse_multi_read(new_tags[i], ret_data))
+            response.extend(self._parse_multi_read(ret_data))
 
         return response
 
@@ -1411,7 +1410,7 @@ class PLC(object):
 
         return ret[bit_pos:bit_pos + count]
 
-    def _parse_multi_read2(self, data):
+    def _parse_multi_read(self, data):
 
         data = data[46:]
         service = unpack_from("<H", data, 0)[0]
@@ -1420,7 +1419,7 @@ class PLC(object):
         service_count = unpack_from("<H", data, 4)[0]
         offsets = [unpack_from("<H", data, i*2+6)[0] for i in range(service_count)]
 
-        data = data[2*service_count:]
+        data = data[4:]
 
         # define the start/end offsets so we can extract the values
         segment_bounds = [offset for offset in offsets]
@@ -1438,72 +1437,21 @@ class PLC(object):
             segment_status = unpack_from("<H", segment, 2)[0]
             segment_data_type = unpack_from("<B", segment, 4)[0]
             type_size = self.CIPTypes[segment_data_type][0]
-            type_fmt = self.CIPTypes[segment_data_type][2][1:]
             value_count = int((len(segment)-6)/type_size)
-            value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
-            response = None, value, segment_status
-            reply.append(response)
-
-        return reply
-
-    def _parse_multi_read(self, tags, data):
-        """
-        Takes multi read reply data and returns an array of the values
-        """
-        # remove the beginning of the packet because we just don't care about it
-        stripped = data[50:]
-
-        # get the offset values for each of the tags in the packet
-        reply = []
-        for i, tag in enumerate(tags):
-            if isinstance(tag, (list, tuple)):
-                tag = tag[0]
-            loc = 2 + (i * 2)
-            offset = unpack_from('<H', stripped, loc)[0]
-            status = unpack_from('<b', stripped, offset + 2)[0]
-            ext_status = unpack_from('<b', stripped, offset + 3)[0]
-
-            # successful reply, add the value to our list
-            if status == 0 and ext_status == 0:
-                data_type = unpack_from('<B', stripped, offset + 4)[0]
-                tag_name, base_tag, index = parse_tag_name(tag)
-                self.KnownTags[base_tag] = (data_type, 0)
-                # if a bit of word was requested
-                if bit_of_word(tag):
-                    type_fmt = self.CIPTypes[data_type][2]
-                    val = unpack_from(type_fmt, stripped, offset + 6)[0]
-                    bit_state = bit_of_word_state(tag, val)
-                    response = tag, bit_state, status
-                elif data_type == 0xd3:
-                    type_fmt = self.CIPTypes[data_type][2]
-                    val = unpack_from(type_fmt, stripped, offset + 6)[0]
-                    bit_state = bit_of_word_state(tag, val)
-                    response = tag, bit_state, status
-                elif data_type == 0xa0:
-                    strlen = unpack_from('<B', stripped, offset + 8)[0]
-                    s = stripped[offset + 12:offset + 12 + strlen]
-                    value = str(s.decode(self.StringEncoding))
-                    response = tag, value, status
-                else:
-                    type_fmt = self.CIPTypes[data_type][2]
-                    # handling special format for micropython for bools
-                    # boolean format ? doesn't exist for upy struct module
-                    if type_fmt == '?' and is_micropython():
-                        value = unpack_from('B', stripped, offset + 6)[0]
-
-                        if value == 255 or value == 1:
-                            bool_val = True
-                        elif value == 0:
-                            bool_val = False
-                        else:
-                            bool_val = None
-
-                        response = tag, bool_val, status
-                    else:
-                        value = unpack_from(type_fmt, stripped, offset + 6)[0]
-                        response = tag, value, status
+            # STRING's are special
+            if segment_data_type == 0xa0:
+                struct_id = unpack_from("<H", segment, 6)[0]
+                if struct_id == self.StringID:
+                    value = []
+                    for i in range(value_count):
+                        value_length = unpack_from("<B", segment, 8+i*type_size)[0]
+                        v = segment[12+i*type_size:12+i*type_size+value_length]
+                        v = v.decode(self.StringEncoding)
+                        value.append(v)
             else:
-                response = tag, None, status
+                type_fmt = self.CIPTypes[segment_data_type][2][1:]
+                value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
+            response = None, value, segment_status
             reply.append(response)
 
         return reply
