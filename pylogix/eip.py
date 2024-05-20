@@ -1495,6 +1495,13 @@ class PLC(object):
                     type_fmt = self.CIPTypes[segment_data_type][2][1:]
                     values = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
                     value = self._words_to_bits(tag_name, values, tags[i][1])
+                elif segment_data_type == 0xc1 and is_micropython():
+                    type_fmt = "b"
+                    value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)][0]
+                    if value == 1:
+                        value = [True]
+                    else:
+                        value = [False]
                 else:
                     type_fmt = self.CIPTypes[segment_data_type][2][1:]
                     value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
