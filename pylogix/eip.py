@@ -1411,6 +1411,9 @@ class PLC(object):
         return ret[bit_pos:bit_pos + count]
 
     def _parse_multi_read(self, data):
+        """
+        Extract the values from the multi-service message reply
+        """
 
         data = data[46:]
         service = unpack_from("<H", data, 0)[0]
@@ -1451,6 +1454,11 @@ class PLC(object):
             else:
                 type_fmt = self.CIPTypes[segment_data_type][2][1:]
                 value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
+
+            # value shouldn't be a list if there is only one
+            if len(value) == 1:
+                value = value[0]
+
             response = None, value, segment_status
             reply.append(response)
 
