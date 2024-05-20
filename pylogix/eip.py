@@ -374,10 +374,6 @@ class PLC(object):
 
         responses = [Response(tag, value, status) for tag, value, status in self._multi_read(tags)]
 
-        # update the responses with the original tag name
-        for i, tag in enumerate(tags):
-            responses[i].TagName = tag[0]
-
         return responses
 
     def _multi_read(self, tags):
@@ -418,6 +414,10 @@ class PLC(object):
                 return [[t, None, status] for t in new_tags[i]]
 
             response.extend(self._parse_multi_read(ret_data))
+
+        # update the responses with the original tag name
+        for i, tag in enumerate(tags):
+            response[i][0] = tag[0]
 
         return response
 
@@ -1420,7 +1420,6 @@ class PLC(object):
         """
         Extract the values from the multi-service message reply
         """
-
         data = data[46:]
         service = unpack_from("<H", data, 0)[0]
         status, ext_status = unpack_from("<BB", data, 2)
@@ -1465,7 +1464,7 @@ class PLC(object):
             if len(value) == 1:
                 value = value[0]
 
-            response = None, value, segment_status
+            response = [None, value, segment_status]
             reply.append(response)
 
         return reply
