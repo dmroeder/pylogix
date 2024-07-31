@@ -8,6 +8,7 @@
 ![Versions](https://img.shields.io/pypi/pyversions/pylogix)
 ![MicroPython](https://img.shields.io/badge/micropython-1.20.0+-red?logo=micropython)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/pylogix)
+[![Discord](https://img.shields.io/static/v1?label=discord&message=support&color=738adb&logo=discord)](https://discord.gg/tw8E9EAAnf)
 
 
 <span style="color:red"> <font size="4">**WARNING**:</font> </span> There is a possibility of a scam using the pylogix name. Be careful with anything claiming to be pylogix.  https://www.notpylogix.com
