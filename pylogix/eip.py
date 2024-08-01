@@ -357,11 +357,14 @@ class PLC(object):
         if not conn[0]:
             return [Response(t, None, conn[1]) for t in tags]
 
+        # format requests [tag, length, type]
         new_tags = []
         for tag in tags:
             if isinstance(tag, (list, tuple)):
-                if len(tag) > 1:
+                if len(tag) == 3:
                     new_tags.append(tag)
+                elif len(tag) == 2:
+                    new_tags.append([tag[0], tag[1], None])
                 else:
                     new_tags.append([tag[0], 1, None])
             else:
@@ -372,7 +375,22 @@ class PLC(object):
         # get data types of unknown tags
         self._get_unknown_types(tags)
 
-        responses = [Response(tag, value, status) for tag, value, status in self._multi_read(tags)]
+        # send the read requests.  Array request won't use multi message service
+        current_requests = []
+        responses = []
+        for tag in tags:
+            if tag[1] > 1:
+                # array read
+                if current_requests:
+                    responses += [Response(tag, value, status) for tag, value, status in self._multi_read(current_requests)]
+                responses.append(self._read_tag(*tag))
+                current_requests = []
+            else:
+                current_requests.append(tag)
+
+        # send any leftover requests
+        if current_requests:
+            responses += [Response(tag, value, status) for tag, value, status in self._multi_read(current_requests)]
 
         return responses
 
