@@ -291,6 +291,25 @@ class PylogixTests(unittest.TestCase):
         for i in range(len(response)):
             self.assertEqual('Success', response[i].Status)
 
+    def multi_write_fixture(self):
+        tags = [("BaseSINTArray[10]", self.r.Sint()),
+                ("BaseINTArray[10]", self.r.Int()),
+                ("BaseDINTArray[10]", self.r.Dint()),
+                ("BaseSTRINGArray[10]", self.r.String())]
+        expected_values = [v[1] for v in tags]
+        
+        response = self.comm.Write(tags)
+
+        tag_names = [tag[0] for tag in tags]
+        response = self.comm.Read(tag_names)
+
+        values = [r.Value for r in response]
+
+        for i in range(len(values)):
+            self.assertEqual(values[i], expected_values[i],
+                             "Multi-write failed")
+
+        
     def bool_list_fixture(self, length=8):
         bool_list = []
         for i in range(length):
@@ -440,6 +459,10 @@ class PylogixTests(unittest.TestCase):
     def test_multi_read(self):
         tags = ['BaseDINT', 'BaseINT', 'BaseSTRING']
         self.multi_read_fixture(tags)
+
+    @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
+    def test_multi_write(self):
+        self.multi_write_fixture()
 
     @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_bool_list(self):
