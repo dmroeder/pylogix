@@ -518,9 +518,9 @@ class PLC(object):
         new_tags = []
         for t in tags:
             if len(t) == 3:
-                new_tags.append((t[0], t[2]))
+                new_tags.append((t[0], 1, t[2]))
             else:
-                new_tags.append(t[0])
+                new_tags.append((t[0], 1, None))
 
         self._get_unknown_types(new_tags)
 
