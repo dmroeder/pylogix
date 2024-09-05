@@ -37,7 +37,7 @@ if not is_micropython():
 class PLC(object):
     __slots__ = ('IPAddress', 'Port', 'ProcessorSlot', 'SocketTimeout', 'Micro800', 'Route', 'conn', 'Offset', 'UDT',
                  'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes',
-                 'programs', 'routines', 'tags', 'tasks', 'udts', 'types')
+                 'aois', 'programs', 'routines', 'tags', 'tasks', 'types','udts')
 
     def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False, port=44818):
         """
@@ -59,12 +59,13 @@ class PLC(object):
         self.TagList = []
         self.ProgramNames = []
 
+        self.aois = {}
         self.programs = {}
         self.routines = {}
         self.tags = {}
         self.tasks = {}
-        self.udts = {}
         self.types = {}
+        self.udts = {}
 
         self.StringID = 0x0fce
         self.StringEncoding = 'utf-8'
@@ -1595,6 +1596,8 @@ class PLC(object):
                 elif "Program:" in tag_name:
                     self.programs[tag.InstanceID] = tag.TagName
                     self.ProgramNames.append(tag.TagName)
+                elif "UDI:" in tag_name:
+                    self.aois[tag.InstanceID] = tag.TagName
                 elif "Cnx:" in tag_name:
                     pass
                 elif "Map:" in tag_name:
