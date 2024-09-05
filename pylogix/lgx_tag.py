@@ -147,16 +147,11 @@ def unpack_tag(data, program_name):
     Extract the tag information out of the packet
     """
     t = Tag()
+    instance_id = unpack_from("<I", data, 0)[0]
     name_length = unpack_from('<H', data, 4)[0]
     tag_name = data[6:6+name_length].decode("utf-8")
     type_value = unpack_from("<H", data, 6+name_length)[0]
     dim1, dim2, dim3 = unpack_from("III", data, 8+name_length)
-
-    path_size = unpack_from("<b", data, 24+name_length)[0]
-    if path_size == 2:
-        instance_id = unpack_from("<B", data, -1)[0]
-    else:
-        instance_id = unpack_from("<H", data, -2)[0]
 
     if program_name:
         t.TagName = "{}.{}".format(program_name, tag_name)
