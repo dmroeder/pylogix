@@ -24,7 +24,7 @@ import time
 from .lgx_comm import Connection
 from .lgx_device import Device
 from .lgx_response import Response
-from .lgx_tag import Tag, UDT
+from .lgx_tag import unpack_tag, unpack_udt
 from .utils import is_micropython
 from random import randrange
 from struct import pack, unpack_from
@@ -36,7 +36,8 @@ if not is_micropython():
 # noinspection PyMethodMayBeStatic
 class PLC(object):
     __slots__ = ('IPAddress', 'Port', 'ProcessorSlot', 'SocketTimeout', 'Micro800', 'Route', 'conn', 'Offset', 'UDT',
-                 'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes')
+                 'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes',
+                 'programs', 'routines', 'tags', 'tasks', 'udts', 'types')
 
     def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False, port=44818):
         """
@@ -57,6 +58,14 @@ class PLC(object):
         self.KnownTags = {}
         self.TagList = []
         self.ProgramNames = []
+
+        self.programs = {}
+        self.routines = {}
+        self.tags = {}
+        self.tasks = {}
+        self.udts = {}
+        self.types = {}
+
         self.StringID = 0x0fce
         self.StringEncoding = 'utf-8'
         self.CIPTypes = {0x00: (1, "UNKNOWN", '<B'),
@@ -175,7 +184,7 @@ class PLC(object):
         self.TagList = []
         self.ProgramNames = []
         tag_list = self._get_tag_list(allTags)
-        updated_list = self._get_udt(tag_list.Value) if tag_list.Value else None
+        updated_list = self._get_udt(tag_list.Value)
         return Response(None, updated_list, tag_list.Status)
 
     def GetProgramTagList(self, programName):
@@ -757,7 +766,7 @@ class PLC(object):
             request = self._build_tag_list_request(program_name=None)
             status, ret_data = self.conn.send(request)
             if status == 0 or status == 6:
-                tags += self._parse_packet(ret_data, program_name=None)
+                tags += self._segment_tag_packet(ret_data, None)
                 self.Offset += 1
             else:
                 return Response(None, None, status)
@@ -773,7 +782,7 @@ class PLC(object):
                     request = self._build_tag_list_request(program_name)
                     status, ret_data = self.conn.send(request)
                     if status == 0 or status == 6:
-                        tags += self._parse_packet(ret_data, program_name)
+                        tags += self._segment_tag_packet(ret_data, program_name)
                     else:
                         return Response(None, None, status)
 
@@ -797,7 +806,7 @@ class PLC(object):
             request = self._build_tag_list_request(program_name)
             status, ret_data = self.conn.send(request)
             if status == 0 or status == 6:
-                tags += self._parse_packet(ret_data, program_name)
+                tags += self._segment_tag_packet(ret_data, program_name)
             else:
                 return Response(None, None, status)
 
@@ -805,114 +814,96 @@ class PLC(object):
 
     def _get_udt(self, tag_list):
         """
-        Request information about UDT makeup.
-        Returns the tag list with UDT name appended
+        Get the UDT definitions
+        This is a multi-step process.  First get the UDT attributes, like member 
+        count and size.  Then request the makeup of each UDT. The former will tell
+        us how to parse the latter.
         """
         # get only tags that are a struct
         struct_tags = [x for x in tag_list if x.Struct == 1]
         # reduce our struct tag list to only unique instances
         seen = set()
-        tags = []
-        unique = [obj for obj in struct_tags if obj.DataTypeValue not in seen and not seen.add(obj.DataTypeValue)]
+        unique_types = [obj for obj in struct_tags if obj.DataTypeValue not in seen and not seen.add(obj.DataTypeValue)]
 
-        self.UDT = {}
-        self.UDTByName = {}
-        template = {}
-        while len(unique):
-            iter_template = {}
-            for u in unique:
-                if u.DataTypeValue not in self.UDT.keys():
-                    temp = self._get_template_attribute(u.DataTypeValue)
+        while unique_types:
+            udt_attributes = {}
+            # get the attributes of each UDT
+            for udt in unique_types:
+                type_size, name, member_count = self._get_template_attribute(udt)
+                udt_attributes[udt.DataTypeValue] = [type_size, name, member_count]
+                unique_types.remove(udt)
 
-                    block = temp[46:]
-                    if len(block) > 24:
-                        val = unpack_from('<I', block, 10)[0]
-                        words = (val * 4) - 23
-                        size = int(math.ceil(words / 4.0)) * 4
-                        member_count = int(unpack_from('<H', block, 24)[0])
-                        iter_template[u.DataTypeValue] = template[u.DataTypeValue] = [size, '', member_count]
-                    else:
-                        print("Received invalid template attribute for", u.TagName)
+            # get the member definition of each UDT
+            for key, value in udt_attributes.items():
 
-            unique = []
-            for key, value in iter_template.items():
-                t = self._get_template(key, value[0])
-                member_count = value[2]
-                size = member_count * 8
-                p = t[50:]
-                member_bytes = p[size:]
-                split_char = pack('<b', 0x00)
-                members = member_bytes.split(split_char)
-                split_char = pack('<b', 0x3b)
-                definitions = members[0].split(split_char)
-                name = str(definitions[0].decode('utf-8'))
-                template[key][1] = name
+                type_size, name, member_count = value
+                packet = self._get_template(key, type_size)
+                udt = unpack_udt(packet, member_count)
 
-                udt = UDT()
-                udt.Type = key
-                udt.Name = name
-                for i in range(1, member_count + 1):
-                    field = Tag()
-                    field.UDT = udt
-                    field.TagName = str(members[i].decode('utf-8'))
-                    if len(definitions) > 1:
-                        scope = unpack_from('<BB', definitions[1], 1 + (i - 1) * 2)
-                        field.AccessRight = scope[1] & 0x03
-                        field.Scope0 = scope[0]
-                        field.Scope1 = scope[1]
-                        field.Internal = field.AccessRight == 0
+                # check the members of our UDT for an unknown type
+                for member in udt.Members:
+                    if member.Struct:
+                        if member.DataTypeValue not in unique_types:
+                            unique_types.append(member)
 
-                    field_def = p[(i - 1) * 8: i * 8]
-                    field.Bytes = field_def
-                    field.InstanceID = unpack_from('<H', field_def, 6)[0]
-                    field.Meta = unpack_from("<H", field_def, 4)[0]
-                    val = unpack_from("<H", field_def, 2)[0]
-                    field.SymbolType = val & 0xff
-                    field.DataTypeValue = val & 0xfff
+                self.types[key] = udt
+                self.udts[udt.Name] = udt
 
-                    field.Array = (val & 0x6000) >> 13
-                    field.Struct = (val & 0x8000) >> 15
-                    if field.Array:
-                        field.Size = unpack_from('<H', field_def, 0)[0]
-                    else:
-                        field.Size = 0
-
-                    if field.TagName.startswith('__'):
-                        continue
-
-                    if field.TagName in 'FbkOff':
-                        tags.append(field)
-
-                    if field.SymbolType not in self.CIPTypes:
-                        if field.DataTypeValue not in self.UDT:
-                            unique.append(field)
-                    udt.Fields.append(field)
-                    udt.FieldsByName[field.TagName] = field
                 self.UDT[key] = udt
                 self.UDTByName[udt.Name] = udt
 
+                updated_tags = self._update_type_names(tag_list)
+
+        return updated_tags
+
+    def _update_type_names(self, tag_list):
+        """
+        Replaces the data type value with the name of the data type
+        in our tag and UDT dictionaries
+
+        For example, DataType=196 > DataType=DINT
+        """
+        # update the tag list data types with the names, rather than the
+        # data type value
         for tag in tag_list:
-            if tag.DataTypeValue in template:
-                tag.DataType = template[tag.DataTypeValue][1]
+            if tag.DataTypeValue in self.types:
+                tag.DataType = self.types[tag.DataTypeValue].Name
             elif tag.SymbolType in self.CIPTypes:
                 tag.DataType = self.CIPTypes[tag.SymbolType][1]
 
+        # update UDT's data types with names rather than values
         for type_name, udt in self.UDT.items():
-            for field in udt.Fields:
-                if field.DataTypeValue in template:
-                    field.DataType = template[field.DataTypeValue][1]
-                elif field.SymbolType in self.CIPTypes:
-                    field.DataType = self.CIPTypes[field.SymbolType][1]
+            for member in udt.Members:
+                if member.DataTypeValue in self.types:
+                    member.DataType = self.types[member.DataTypeValue].Name
+                elif member.SymbolType in self.CIPTypes:
+                    member.DataType = self.CIPTypes[member.SymbolType][1]
+
+        # update UDT's data types with names rather than values
+        for type_name, udt in self.udts.items():
+            for member in udt.Members:
+                if member.DataTypeValue in self.types:
+                    member.DataType = self.types[member.DataTypeValue].Name
+                elif member.SymbolType in self.CIPTypes:
+                    member.DataType = self.CIPTypes[member.SymbolType][1]
 
         return tag_list
 
-    def _get_template_attribute(self, instance):
+    def _get_template_attribute(self, udt):
         """
         Get the attributes of a UDT
         """
-        request = self._cip_message(0x03, 0x6c, instance, [0x04, 0x03, 0x02, 0x01])
+        request = self._cip_message(0x03, 0x6c, udt.DataTypeValue, [0x04, 0x03, 0x02, 0x01])
         status, ret_data = self.conn.send(request)
-        return ret_data
+
+        packet = ret_data[46:]
+        words = unpack_from("<I", packet, 10)[0]
+        type_size = (words * 4) - 23 # don't like that last part
+        type_size = int(math.ceil(type_size/4.0)) * 4
+
+        member_count = unpack_from("<H", packet, 24)[0]
+
+        return type_size, "", member_count
 
     def _get_template(self, instance, data_len):
         """
@@ -1252,11 +1243,11 @@ class PLC(object):
             path_segment += pack('<HH', 0x25, self.Offset)
 
         path_segment_len = int(len(path_segment) / 2)
-        attribute_count = 0x03
+        attribute_count = 0x05
         symbol_type = 0x02
         byte_count = 0x08
         symbol_name = 0x01
-        attributes = pack('<HHHH', attribute_count, symbol_name, symbol_type, byte_count)
+        attributes = pack('<HHHHHH', attribute_count, symbol_name, symbol_type, byte_count, 0x0c, 0x0d)
         request = pack('<BB', service, path_segment_len)
         request += path_segment + attributes
 
@@ -1564,32 +1555,60 @@ class PLC(object):
 
         return reply
 
-    def _parse_packet(self, data, program_name):
-        # the first tag in a packet starts at byte 50
-        packet_start = 50
+    def _segment_tag_packet(self, data, name):
+        """
+        Generate a list of the packet segments.  Each object in the packet is 24 bytes
+        plus the length of the object name
+
+        Attribute 4  [Attribute Count]      (4 bytes)
+        Attribute 1  [Name]                 (2 bytes for length, plus the length)
+        Attribute 2  [Data Type]            (2 bytes)
+        Attribute 8  [Array Dimensions]     (12 bytes)
+        Attribute 12 [DataTable Instance]   (2 bytes)
+        Attribute 13 [Data Path List]       (varies)
+        """
+
+        overhead = 24
+        loop = True
         tag_list = []
+        data = data[50:]
 
-        while packet_start < len(data):
-            # get the length of the tag name
-            tag_len = unpack_from('<H', data, packet_start + 4)[0]
-            # get a single tag from the packet
-            packet = data[packet_start:packet_start + tag_len + 20]
-            # extract the offset
-            self.Offset = unpack_from('<H', packet, 0)[0]
-            # add the tag to our tag list
-            tag = Tag.parse(packet, program_name)
+        while loop:
 
-            # filter out garbage
-            if Tag.in_filter(tag.TagName):
-                pass
-            else:
-                tag_list.append(tag)
+            try:
+                # figure out the size of the segment
+                self.Offset, name_length = unpack_from("<IH", data, 0)
+                tag_name = data[6:6+name_length].decode("utf-8")
+                path_size = unpack_from("<B", data, 24+name_length)[0]
+                path_size_bytes = path_size * 2 + 1
 
-            if not program_name:
-                if 'Program:' in tag.TagName:
+                segment_length = name_length + overhead + path_size_bytes
+                segment = data[0:segment_length]
+
+                tag = unpack_tag(segment, name)
+
+                # save the data to the appropriate list/dict
+                if "Routine:" in tag_name:
+                    self.routines[tag.InstanceID] = tag.TagName
+                elif "Task:" in tag_name:
+                    self.tasks[tag.InstanceID] = tag.TagName
+                elif "Program:" in tag_name:
+                    self.programs[tag.InstanceID] = tag.TagName
                     self.ProgramNames.append(tag.TagName)
-            # increment ot the next tag in the packet
-            packet_start = packet_start + tag_len + 20
+                elif "Cnx:" in tag_name:
+                    pass
+                elif "Map:" in tag_name:
+                    pass
+                elif tag_name.startswith("__"):
+                    pass
+                else:
+                    self.tags[tag.TagName] = tag
+                    tag_list.append(tag)
+
+                data = data[segment_length:]
+
+            except Exception:
+                loop = False
 
         return tag_list
 

@@ -120,6 +120,7 @@ class UDT(object):
         self.Name = ''
         self.Fields = []
         self.FieldsByName = {}
+        self.Members = []
 
     def __repr__(self):
 
@@ -128,6 +129,7 @@ class UDT(object):
         props += 'Name={} '.format(self.Name)
         props += 'Fields={} '.format(self.Fields)
         props += 'FieldsByName={}'.format(self.FieldsByName)
+        props += 'Members={}'.format(self.Members)
 
         return 'UDT({})'.format(props)
 
@@ -137,4 +139,97 @@ class UDT(object):
                 self.Type,
                 self.Name,
                 self.Fields,
-                self.FieldsByName)
+                self.FieldsByName,
+                self.Members)
+
+def unpack_tag(data, program_name):
+    """
+    Extract the tag information out of the packet
+    """
+    t = Tag()
+    name_length = unpack_from('<H', data, 4)[0]
+    tag_name = data[6:6+name_length].decode("utf-8")
+    type_value = unpack_from("<H", data, 6+name_length)[0]
+    dim1, dim2, dim3 = unpack_from("III", data, 8+name_length)
+
+    path_size = unpack_from("<b", data, 24+name_length)[0]
+    if path_size == 2:
+        instance_id = unpack_from("<B", data, -1)[0]
+    else:
+        instance_id = unpack_from("<H", data, -2)[0]
+
+    if program_name:
+        t.TagName = "{}.{}".format(program_name, tag_name)
+    else:
+        t.TagName = "{}".format(tag_name)
+
+    t.SymbolType = type_value & 0xff
+    t.DataTypeValue = type_value & 0xfff
+    t.Array = (type_value & 0x6000) >> 13
+    t.Struct = (type_value & 0x8000) >> 15
+    t.Size = dim1
+    t.InstanceID = instance_id
+
+    return t
+
+def unpack_udt(packet, member_count):
+    """
+    Extract the UDT information from the byte stream
+    """
+    type_size = member_count * 8
+
+    packet = packet[50:]
+
+    # remove the beginning of the packet, which has data types
+    # the result is just the bytes with the member details
+    member_bytes = packet[type_size:]
+    # a list of the members
+    member_list = member_bytes.split(b"\x00")
+    # split again, [0] will contain the UDT name
+    definitions = member_list[0].split(b"\x3b")
+    name = str(definitions[0].decode('utf-8'))
+    # remove the nonsense
+    member_list = member_list[1:1+member_count]
+
+    # make a list of the member type information
+    type_bytes = []
+    for i in range(member_count):
+        start = i * 8
+        end = i * 8 + 8
+        chunk = packet[start:end]
+        type_bytes.append(chunk)
+
+    udt = UDT()
+    udt.Name = name
+    for i, member in enumerate(member_list):
+        m = Tag()
+
+        m.TagName = str(member.decode('utf-8'))
+
+        if m.TagName.startswith("__") or m.TagName.startswith("ZZZZ"):
+            # skip this iteration
+            continue
+
+        if len(definitions) > 1:
+            number = (i*2) + 1
+            scope = unpack_from('<BB', definitions[1], number)
+            m.AccessRight = scope[1] & 0x03
+            m.Scope0 = scope[0]
+            m.Scope1 = scope[1]
+            m.Internal = m.AccessRight == 0
+
+        udt.Members.append(m)
+        udt.Fields.append(m)
+        udt.FieldsByName[m.TagName] = m
+        type_value = unpack_from("<H", type_bytes[i], 2)[0]
+        m.Meta = unpack_from("<H", type_bytes[i], 4)[0]
+        m.InstanceID = unpack_from("<H", type_bytes[i], 6)[0]
+
+        m.SymbolType = type_value & 0xff
+        m.DataTypeValue = type_value & 0xfff
+
+        m.Array = (type_value & 0x6000) >> 13
+        m.Struct = (type_value & 0x8000) >> 15
+        m.Size = unpack_from("<H", type_bytes[i], 0)[0]
+
+    return udt
