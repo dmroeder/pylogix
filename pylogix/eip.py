@@ -1599,7 +1599,7 @@ class PLC(object):
                     self.ProgramNames.append(tag.TagName)
                 elif "UDI:" in tag_name:
                     self.aois[tag.InstanceID] = tag.TagName
-                elif "Cnx:" in tag_name:
+                elif "Cxn:" in tag_name:
                     pass
                 elif "Map:" in tag_name:
                     self.modules[tag.InstanceID] = tag.TagName
