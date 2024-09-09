@@ -29,6 +29,7 @@ class Tag(object):
         self.Array = 0x00
         self.Struct = 0x00
         self.Size = 0x00
+        self.Dims = [0,0,0]
         self.AccessRight = None
         self.Internal = None
         self.Meta = None
@@ -47,6 +48,7 @@ class Tag(object):
         props += 'Array={}, '.format(self.Array)
         props += 'Struct={}, '.format(self.Struct)
         props += 'Size={} '.format(self.Size)
+        props += 'Dims=[{}, {}, {}],'.format(*self.Dims)
         props += 'AccessRight={} '.format(self.AccessRight)
         props += 'Internal={} '.format(self.Internal)
         props += 'Meta={} '.format(self.Meta)
@@ -58,7 +60,7 @@ class Tag(object):
 
     def __str__(self):
 
-        return '{} {} {} {} {} {} {} {} {} {} {} {} {} {}'.format(
+        return '{} {} {} {} {} {} {} {} {} {} {} {} {} {} {}'.format(
                 self.TagName,
                 self.InstanceID,
                 self.SymbolType,
@@ -67,37 +69,13 @@ class Tag(object):
                 self.Array,
                 self.Struct,
                 self.Size,
+                self.Dims,
                 self.AccessRight,
                 self.Internal,
                 self.Meta,
                 self.Scope0,
                 self.Scope1,
                 self.Bytes)
-
-    @staticmethod
-    def parse(packet, program_name):
-
-        t = Tag()
-        length = unpack_from('<H', packet, 4)[0]
-        name = packet[6:length+6].decode('utf-8')
-        if program_name:
-            t.TagName = str(program_name + '.' + name)
-        else:
-            t.TagName = str(name)
-        t.InstanceID = unpack_from('<H', packet, 0)[0]
-
-        val = unpack_from('<H', packet, length+6)[0]
-
-        t.SymbolType = val & 0xff
-        t.DataTypeValue = val & 0xfff
-        t.Array = (val & 0x6000) >> 13
-        t.Struct = (val & 0x8000) >> 15
-
-        if t.Array:
-            t.Size = unpack_from('<H', packet, length+8)[0]
-        else:
-            t.Size = 0
-        return t
 
 
 class UDT(object):
@@ -139,7 +117,7 @@ def unpack_tag(data, program_name):
     name_length = unpack_from('<H', data, 4)[0]
     tag_name = data[6:6+name_length].decode("utf-8")
     type_value = unpack_from("<H", data, 6+name_length)[0]
-    dim1, dim2, dim3 = unpack_from("III", data, 8+name_length)
+    dims = unpack_from("<HHH", data, 8+name_length)
 
     if program_name:
         t.TagName = "{}.{}".format(program_name, tag_name)
@@ -150,8 +128,9 @@ def unpack_tag(data, program_name):
     t.DataTypeValue = type_value & 0xfff
     t.Array = (type_value & 0x6000) >> 13
     t.Struct = (type_value & 0x8000) >> 15
-    t.Size = dim1
+    t.Size = dims[0]
     t.InstanceID = instance_id
+    t.Dims = dims
 
     return t
 
