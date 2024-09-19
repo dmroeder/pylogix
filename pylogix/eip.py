@@ -1591,18 +1591,18 @@ class PLC(object):
 
                 # save the data to the appropriate list/dict
                 if "Routine:" in tag_name:
-                    self.routines[tag.InstanceID] = tag.TagName
+                    self.routines[tag.InstanceID] = tag.TagName[8:]
                 elif "Task:" in tag_name:
-                    self.tasks[tag.InstanceID] = tag.TagName
+                    self.tasks[tag.InstanceID] = tag.TagName[5:]
                 elif "Program:" in tag_name:
-                    self.programs[tag.InstanceID] = tag.TagName
+                    self.programs[tag.InstanceID] = tag.TagName[8:]
                     self.ProgramNames.append(tag.TagName)
                 elif "UDI:" in tag_name:
-                    self.aois[tag.InstanceID] = tag.TagName
+                    self.aois[tag.InstanceID] = tag.TagName[4:]
                 elif "Cxn:" in tag_name:
                     pass
                 elif "Map:" in tag_name:
-                    self.modules[tag.InstanceID] = tag.TagName
+                    self.modules[tag.InstanceID] = tag.TagName[4:]
                 elif tag_name.startswith("__"):
                     pass
                 else:
