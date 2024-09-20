@@ -599,3 +599,15 @@ When requesting the PLC's tag list, there is also a dict that is saved of the UD
 called UDT.  This will be the Tag type, which contains a lot of properties.  After reading the
 tag list, you can print this dict:
 >print(comm.UDT)
+
+New dictionaries were added to better organize data when reading the tag list.  Much of this
+information was filtered out.  You can now access tasks, routines, modules and AOI's.  The new
+dictionaries are:
+* aois
+* modules
+* programs
+* routines
+* tags
+* tasks
+* types (Data types stored by ID)
+* udts (Data types stored by name)
