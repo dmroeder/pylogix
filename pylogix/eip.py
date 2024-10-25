@@ -185,9 +185,12 @@ class PLC(object):
         self.KnownTags = {}
         self.TagList = []
         self.ProgramNames = []
-        tag_list = self._get_tag_list(allTags)
-        updated_list = self._get_udt(tag_list.Value)
-        return Response(None, updated_list, tag_list.Status)
+        ret = self._get_tag_list(allTags)
+        if ret.Status == "Success":
+            updated_list = self._get_udt(ret.Value)
+        else:
+            updated_list = []
+        return Response(None, updated_list, ret.Status)
 
     def GetProgramTagList(self, programName):
         """
