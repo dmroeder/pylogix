@@ -1014,6 +1014,11 @@ class PLC(object):
         else:
             instance_bytes = pack("<BB", 0x24, cip_instance)
 
+        # reformat data if user provided a string
+        if type(data) == str:
+            data = [ord(c) for c in data]
+            data = pack("<{}B".format(len(data)), *data)
+
         # append the attribute if any
         if cip_attribute:
             if isinstance(cip_attribute, list):

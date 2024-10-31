@@ -421,6 +421,9 @@ class PylogixTests(unittest.TestCase):
         return_values = self.comm.Read("BaseSTRINGArray[0]", len(values)).Value
         self.assertEqual(values, return_values, "Failed to write array of STRING values")
 
+    def message_fixture(self):
+        return_values = self.comm.Message(0x01, 0x73, 0x01)
+        self.assertEqual(return_values.Status, "Success", "Failed to send Message: {}".format(return_values.Status))
 
     def setUp(self):
         self.comm.IPAddress = plcConfig.plc_ip
@@ -475,6 +478,9 @@ class PylogixTests(unittest.TestCase):
 
     def test_array_write(self):
         self.write_array_fixture()
+
+    def test_message(self):
+        self.message_fixture()
 
     @unittest.skipIf(plcConfig.isMicro800, 'for Micro800')
     def test_large_list(self):
