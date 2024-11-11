@@ -461,6 +461,8 @@ Synchronizes  the PLC clock with your computers time.  This is similar to what h
 a controller and click Set Date, Time and Zone from Workstation, in Controller Properties of RSLogix5000 or
 Studio5000 Logix Designer.  Returns the Response class, which is mainly useful for the status.
 
+Optionally, you can override the daylight savings time by setting dst=True or False
+
 <details><summary>Example</summary>
 <p>
 

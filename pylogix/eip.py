@@ -153,13 +153,13 @@ class PLC(object):
         """
         return self._get_plc_time(raw)
 
-    def SetPLCTime(self):
+    def SetPLCTime(self, dst=None):
         """
         Sets the controller clock time
 
         returns Response class (.TagName, .Value, .Status)
         """
-        return self._set_plc_time()
+        return self._set_plc_time(dst)
 
     def GetTagList(self, allTags=True):
         """
@@ -724,7 +724,7 @@ class PLC(object):
 
         return Response(None, value, status)
 
-    def _set_plc_time(self):
+    def _set_plc_time(self, dst):
         """
         Requests the PLC clock time
         """
@@ -734,9 +734,15 @@ class PLC(object):
 
         current_time = int(time.time() * 1000000)
         time_bytes = pack("<Q", current_time)
-        dst = pack("<B", time.daylight)
 
-        request = self._cip_message(0x04, 0x8b, 0x01, [0x06, 0x0a], [time_bytes, dst])
+        # use the clock dst if none was provided
+        if dst is None:
+            dst = time.localtime().tm_isdst
+
+        dst_value = pack("<B", dst)
+
+        request = self._cip_message(0x04, 0x8b, 0x01, [0x06, 0x0a], [time_bytes, dst_value])
+
         status, ret_data = self.conn.send(request)
 
         return Response(None, current_time, status)
