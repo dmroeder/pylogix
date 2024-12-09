@@ -1059,9 +1059,17 @@ class PLC(object):
             if segment.endswith("]"):
                 _, base_tag, index = parse_tag_name(segment)
 
-            # bool arrays are special
+                # bool arrays are special
                 if data_type == 0xd3:
                     index = int(index/32)
+                elif data_type == None:
+                    # assume index 0 with arrays when data type
+                    # is unknown
+                    if isinstance(index, list):
+                        # multi-dim arrays
+                        index = [0 for _ in index]
+                    else:
+                        index = 0
 
                 name_length = len(base_tag)
                 ioi += pack('<BB', 0x91, name_length)
