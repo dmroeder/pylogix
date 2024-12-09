@@ -441,65 +441,57 @@ class PLC(object):
         Once we have a complete list, they'll be split into packet sized
         sub lists.
         """
-        # cip payload is the size of the connection opened
-        # mms header
-        outbound_size = 6
-        inbound_size = 4
-        # plus overhead per tag
-        outbound_size += 2 + (2 * (len(tags)))
-        inbound_size +=  2 + (2 * (len(tags)))
-
-        test = []
+        read_services = []
         for tag in tags:
             tag_name, base_tag, index = parse_tag_name(tag[0])
-            # all inbound segments will have 6 bytes for response and type
-            inbound_size += 6
+
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
-                type_size = self.CIPTypes[data_type][0]
-                if data_type == 0xa0:
-                    # additional 2 bytes for strings
-                    inbound_size += 2
-                ioi = self._build_ioi(tag_name, data_type)
-                if data_type == 0xd3:
-                    # bool arrays are special
-                    element_count = get_word_count(index, tag[1], 32)
-                elif bit_of_word(tag_name):
+            else:
+                data_type = None
+
+            ioi = self._build_ioi(tag_name, data_type)
+
+            if data_type == 0xd3:
+                element_count = get_word_count(index, tag[1], 32)
+            elif bit_of_word(tag_name) and data_type is not None:
                     bit_pos = int(tag_name.split('.')[-1])
                     bit_count = self.CIPTypes[data_type][0] * 8
                     element_count = get_word_count(bit_pos, tag[1], bit_count)
-                else:
-                    element_count = tag[1]
-                inbound_size += element_count * type_size
             else:
-                data_type = None
-                ioi = self._build_ioi(base_tag, None)
-                element_count = 1
-                # assume string size
-                inbound_size += 90
+                element_count = tag[1]
+            service = self._add_read_service(ioi, element_count)
+            read_services.append([service, data_type])
 
-            read_service = self._add_read_service(ioi, element_count)
-            outbound_size += len(read_service)
-            test.append([read_service, outbound_size, inbound_size])
-
-        final_services = []
-        temp_services = []
-
-        in_offset = 0
-        out_offset = 0
-        for service, out_size, in_size in test:
-            if out_size-out_offset < self.ConnectionSize and in_size-in_offset < self.ConnectionSize:
-                temp_services.append(service)
+        # calculate packet sizes
+        send_packet_size = 30
+        receive_packet_size = 28
+        current = []
+        accumulated = []
+        for service, data_type in read_services:
+            send_size = len(service) + 2
+            if data_type == 0xa0:
+                receive_size = 8 + self.CIPTypes[data_type][0] + 2
+            elif data_type is None:
+                receive_size = 8 + self.CIPTypes[0xa0][0] + 2
+                receive_packet_size += 8 + self.CIPTypes[0xa0][0] + 2
             else:
-                out_offset += out_size
-                in_offset += in_size
-                final_services.append(temp_services)
-                temp_services = []
-                temp_services.append(service)
-        if temp_services:
-            final_services.append(temp_services)
+                receive_size = 6 + self.CIPTypes[data_type][0] + 2
 
-        return final_services
+            receive_packet_size += receive_size
+
+            current.append(service)
+            if send_packet_size >= self.ConnectionSize or receive_packet_size >= self.ConnectionSize:
+                # if it doesn't fit, you must acquit (reset, start new)
+                temp = current.pop()
+                accumulated.append(current)
+                current = []
+                current.append(temp)
+                send_packet_size = 30 + send_size
+                receive_packet_size = 28 + receive_size
+        accumulated.append(current)
+
+        return accumulated
 
     def _batch_write(self, tags):
         """
