@@ -469,7 +469,7 @@ class PLC(object):
         current = []
         accumulated = []
         for service, data_type in read_services:
-            send_size = len(service) + 2
+            send_packet_size += len(service) + 2
             if data_type == 0xa0:
                 receive_size = 8 + self.CIPTypes[data_type][0] + 2
             elif data_type is None:
@@ -487,7 +487,7 @@ class PLC(object):
                 accumulated.append(current)
                 current = []
                 current.append(temp)
-                send_packet_size = 30 + send_size
+                send_packet_size = 30 + len(temp)
                 receive_packet_size = 28 + receive_size
         accumulated.append(current)
 
