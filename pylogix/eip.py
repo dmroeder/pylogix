@@ -458,6 +458,8 @@ class PLC(object):
                     bit_pos = int(tag_name.split('.')[-1])
                     bit_count = self.CIPTypes[data_type][0] * 8
                     element_count = get_word_count(bit_pos, tag[1], bit_count)
+            elif data_type == None:
+                element_count = 1
             else:
                 element_count = tag[1]
             service = self._add_read_service(ioi, element_count)
