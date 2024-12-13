@@ -431,7 +431,7 @@ class PLC(object):
             if not ret_data:
                 return [[t, None, status] for t in new_tags[i]]
 
-            response.extend(self._parse_multi_read(ret_data, new_tags[i]))
+            response.extend(self._parse_multi_read_response(ret_data, new_tags[i]))
 
         return response
 
@@ -1414,7 +1414,10 @@ class PLC(object):
         # make sure it was successful
         if status == 0 or status == 6:
             data_type = unpack_from('<B', ret_data, 50)[0]
-            data_len = unpack_from('<H', ret_data, 2)[0]
+            if data_type == 0xa0:
+                data_len = len(ret_data[54:])
+            else:
+                data_len = len(ret_data[52:])
             self.KnownTags[base_tag] = (data_type, data_len)
             return tag, None, 0
         else:
@@ -1468,19 +1471,13 @@ class PLC(object):
 
         return ret[bit_pos:bit_pos + count]
 
-    def _parse_multi_read(self, data, tags):
+    def _parse_multi_read_response(self, data, tags):
         """
         Extract the values from the multi-service message reply
         """
-
-        data = data[46:]
-        service = unpack_from("<H", data, 0)[0]
-        status, ext_status = unpack_from("<BB", data, 2)
-
-        service_count = unpack_from("<H", data, 4)[0]
-        offsets = [unpack_from("<H", data, i*2+6)[0] for i in range(service_count)]
-
-        data = data[4:]
+        data = data[50:]
+        service_count = unpack_from("<H", data, 0)[0]
+        offsets = [unpack_from("<H", data, i*2+2)[0] for i in range(service_count)]
 
         # define the start/end offsets so we can extract the values
         segment_bounds = [offset for offset in offsets]
@@ -1491,59 +1488,46 @@ class PLC(object):
         for i in range(service_count):
             data_segments.append(data[segment_bounds[i]:segment_bounds[i+1]])
 
-        # parse each segment (service, status, data type, value(s))
         reply = []
         for i, segment in enumerate(data_segments):
-            segment_service = unpack_from("<H", segment, 0)[0]
-            segment_status = unpack_from("<B", segment, 2)[0]
-            tag_name, base_tag, index  = parse_tag_name(tags[i][0])
-            element_count = tags[i][1]
 
-            while segment_status == 6:
-                segment_data_type = unpack_from("<B", segment, 4)[0]
-                ioi = self._build_ioi(tag_name, segment_data_type)
-                self.Offset = len(segment) - 8
-                request = self._add_partial_read_service(ioi, element_count)
-                segment_status, ret_data = self.conn.send(request)
-                segment += ret_data[54:]
+            status = unpack_from("<B", segment, 2)[0]
+            data_type = unpack_from("<B", segment, 4)[0]
 
-            if segment_status == 0:
-                segment_data_type = unpack_from("<B", segment, 4)[0]
-                self.KnownTags[base_tag] = (segment_data_type, 0)
-                type_size = self.CIPTypes[segment_data_type][0]
-                value_count = int((len(segment)-6)/type_size)
-                # STRING's are special
-                if segment_data_type == 0xa0:
-                    struct_id = unpack_from("<H", segment, 6)[0]
-                    if struct_id == self.StringID:
-                        value = []
-                        for i in range(value_count):
-                            value_length = unpack_from("<B", segment, 8+i*type_size)[0]
-                            v = segment[12+i*type_size:12+i*type_size+value_length]
-                            v = v.decode(self.StringEncoding)
-                            value.append(v)
-                elif segment_data_type == 0xd3 or bit_of_word(tag_name):
-                    type_fmt = self.CIPTypes[segment_data_type][2][1:]
-                    values = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
-                    value = self._words_to_bits(tag_name, values, tags[i][1])
-                elif segment_data_type == 0xc1 and is_micropython():
-                    type_fmt = "b"
-                    value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)][0]
-                    if value == 1:
-                        value = [True]
-                    else:
-                        value = [False]
-                else:
-                    type_fmt = self.CIPTypes[segment_data_type][2][1:]
-                    value = [unpack_from(type_fmt, segment, 6+i*type_size)[0] for i in range(value_count)]
+            # get the number of byte the value occupies
+            if data_type == 0xa0:
+                data_len = len(segment[8:])
             else:
-                value = [None]
+                data_len = len(segment[6:])
 
-            # value shouldn't be a list if there is only one
-            if len(value) == 1:
-                value = value[0]
+            tag_name, base_tag, index  = parse_tag_name(tags[i][0])
+            self.KnownTags[base_tag] = (data_type, data_len)
 
-            response = [tag_name, value, segment_status]
+            # extract the value from the segment
+            if data_type == 0xa0:
+                struct_id = unpack_from("<H", segment, 6)[0]
+                if struct_id == self.StringID:
+                    name_length = unpack_from("<I", segment, 8)[0]
+                    value = segment[12:12+name_length].decode(self.StringEncoding)
+                else:
+                    value = segment[12:12+data_len]
+            elif data_type == 0xd3 or bit_of_word(tag_name):
+                type_fmt = self.CIPTypes[data_type][2]
+                value = unpack_from(type_fmt, segment, 6)[0]
+                value = self._words_to_bits(tag_name, [value], 1)[0]
+            elif data_type == 0xc1 and is_micropython():
+                type_fmt = "b"
+                type_fmt = self.CIPTypes[data_type][2]
+                value = unpack_from(type_fmt, segment, 6)[0]
+                if value == 1:
+                    value = True
+                else:
+                    value = False
+            else:
+                type_fmt = self.CIPTypes[data_type][2]
+                value = unpack_from(type_fmt, segment, 6)[0]
+
+            response = [tag_name, value, status]
             reply.append(response)
 
         return reply
