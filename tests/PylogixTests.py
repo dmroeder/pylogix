@@ -374,7 +374,7 @@ class PylogixTests(unittest.TestCase):
         self.KnownTags = {}
         self.comm.Write(write_request)
         
-        self.KnownTags = {}
+        self.comm.KnownTags = {}
         ret = self.comm.Read(read_request)
         return_values = [r.Value for r in ret]
 
