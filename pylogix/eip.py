@@ -1391,7 +1391,8 @@ class PLC(object):
                     unk_tags.append(t)
 
         # get the unknown tags
-        self._multi_read(unk_tags)
+        if unk_tags:
+            self._multi_read(unk_tags)
 
     def _initial_read(self, tag, base_tag, data_type):
         """
