@@ -1512,20 +1512,18 @@ class PLC(object):
 
         reply = []
         for i, segment in enumerate(data_segments):
-
             status = unpack_from("<B", segment, 2)[0]
-            data_type = unpack_from("<B", segment, 4)[0]
-
-            # get the number of byte the value occupies
-            if data_type == 0xa0:
-                data_len = len(segment[8:])
-            else:
-                data_len = len(segment[6:])
-
-            tag_name, base_tag, index  = parse_tag_name(tags[i][0])
-            self.KnownTags[base_tag] = (data_type, data_len)
-
             if status == 0:
+                data_type = unpack_from("<B", segment, 4)[0]
+
+                # get the number of byte the value occupies
+                if data_type == 0xa0:
+                    data_len = len(segment[8:])
+                else:
+                    data_len = len(segment[6:])
+
+                tag_name, base_tag, index  = parse_tag_name(tags[i][0])
+                self.KnownTags[base_tag] = (data_type, data_len)
                 # extract the value from the segment
                 if data_type == 0xa0:
                     struct_id = unpack_from("<H", segment, 6)[0]
