@@ -280,9 +280,6 @@ class PLC(object):
         """
         Processes the read request
         """
-        self.Offset = 0
-        words = 1
-
         conn = self.conn.connect()
         if not conn[0]:
             return Response(tag_name, None, conn[1])
@@ -292,49 +289,73 @@ class PLC(object):
         if resp[2] != 0 and resp[2] != 6:
             return Response(tag_name, None, resp[2])
 
+        # iterations will normally be 1, with the exception
+        # of array reads larger than 0xffff elements
+        iterations = math.ceil(elements/0xffff)
+        if iterations < 1:
+            iterations = 1
+
         data_type = self.KnownTags[base_tag][0]
         bit_count = self.CIPTypes[data_type][0] * 8
 
-        ioi = self._build_ioi(tag_name, data_type)
-        if data_type == 0xd3:
-            # bool array
-            words = get_word_count(index, elements, bit_count)
-            request = self._add_read_service(ioi, words)
-        elif bit_of_word(tag):
-            # bits of word
-            bit_pos = int(tag_name.split('.')[-1])
-
-            words = get_word_count(bit_pos, elements, bit_count)
-            request = self._add_read_service(ioi, words)
-        else:
-            # everything else
-            request = self._add_read_service(ioi, elements)
-
-        # if we are handling structs (string), we have to
-        # remove 2 extra bytes from the data
-        if data_type == 0xa0:
-            pad = 4
-        else:
-            pad = 2
-
-        status, ret_data = self.conn.send(request)
-        if not ret_data:
-            return Response(tag_name, None, status)
-        data = ret_data[50:]
-        self.Offset += len(data) - pad
-        req = data
-
-        while status == 6:
+        return_values = []
+        for i in range(iterations):
+            self.Offset = 0
+            words = 1
+            count = elements
             if data_type == 0xd3:
-                request = self._add_partial_read_service(ioi, words)
-            else:
-                request = self._add_partial_read_service(ioi, elements)
-            status, ret_data = self.conn.send(request)
-            data = ret_data[50 + pad:]
-            self.Offset += len(data)
-            req += data
+                # bool array
+                words = get_word_count(index, count, bit_count)
+                ioi = self._build_ioi(tag_name, data_type)
+                request = self._add_read_service(ioi, words)
+            elif bit_of_word(tag):
+                # bits of word
+                bit_pos = int(tag_name.split('.')[-1])
+                ioi = self._build_ioi(tag_name, data_type)
+                words = get_word_count(bit_pos, count, bit_count)
+                request = self._add_read_service(ioi, words)
+            elif iterations > 1:
+                # only for element counts > 65535
+                new_index = i * 0xffff + index
+                new_tag = "{}[{}]".format(base_tag, new_index)
+                if elements > 0xffff:
+                    count = 0xffff
+                else:
+                    count = elements
 
-        return_values = self._parse_reply(tag_name, elements, req)
+                ioi = self._build_ioi(new_tag, data_type)
+                request = self._add_read_service(ioi, count)
+                elements -= 0xffff
+            else:
+                # everything else
+                ioi = self._build_ioi(tag_name, data_type)
+                request = self._add_read_service(ioi, count)
+
+            # if we are handling structs (string), we have to
+            # remove 2 extra bytes from the data
+            if data_type == 0xa0:
+                pad = 4
+            else:
+                pad = 2
+
+            status, ret_data = self.conn.send(request)
+            if not ret_data:
+                return Response(tag_name, None, status)
+            data = ret_data[50:]
+            self.Offset += len(data) - pad
+            req = data
+
+            while status == 6:
+                if data_type == 0xd3:
+                    request = self._add_partial_read_service(ioi, words)
+                else:
+                    request = self._add_partial_read_service(ioi, count)
+                status, ret_data = self.conn.send(request)
+                data = ret_data[50 + pad:]
+                self.Offset += len(data)
+                req += data
+
+            return_values.extend(self._parse_reply(tag_name, count, req))
 
         if return_values:
             if len(return_values) == 1:
