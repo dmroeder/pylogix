@@ -1525,29 +1525,32 @@ class PLC(object):
             tag_name, base_tag, index  = parse_tag_name(tags[i][0])
             self.KnownTags[base_tag] = (data_type, data_len)
 
-            # extract the value from the segment
-            if data_type == 0xa0:
-                struct_id = unpack_from("<H", segment, 6)[0]
-                if struct_id == self.StringID:
-                    name_length = unpack_from("<I", segment, 8)[0]
-                    value = segment[12:12+name_length].decode(self.StringEncoding)
+            if status == 0:
+                # extract the value from the segment
+                if data_type == 0xa0:
+                    struct_id = unpack_from("<H", segment, 6)[0]
+                    if struct_id == self.StringID:
+                        name_length = unpack_from("<I", segment, 8)[0]
+                        value = segment[12:12+name_length].decode(self.StringEncoding)
+                    else:
+                        value = segment[12:12+data_len]
+                elif data_type == 0xd3 or bit_of_word(tag_name):
+                    type_fmt = self.CIPTypes[data_type][2]
+                    value = unpack_from(type_fmt, segment, 6)[0]
+                    value = self._words_to_bits(tag_name, [value], 1)[0]
+                elif data_type == 0xc1 and is_micropython():
+                    type_fmt = "b"
+                    type_fmt = self.CIPTypes[data_type][2]
+                    value = unpack_from(type_fmt, segment, 6)[0]
+                    if value == 1:
+                        value = True
+                    else:
+                        value = False
                 else:
-                    value = segment[12:12+data_len]
-            elif data_type == 0xd3 or bit_of_word(tag_name):
-                type_fmt = self.CIPTypes[data_type][2]
-                value = unpack_from(type_fmt, segment, 6)[0]
-                value = self._words_to_bits(tag_name, [value], 1)[0]
-            elif data_type == 0xc1 and is_micropython():
-                type_fmt = "b"
-                type_fmt = self.CIPTypes[data_type][2]
-                value = unpack_from(type_fmt, segment, 6)[0]
-                if value == 1:
-                    value = True
-                else:
-                    value = False
+                    type_fmt = self.CIPTypes[data_type][2]
+                    value = unpack_from(type_fmt, segment, 6)[0]
             else:
-                type_fmt = self.CIPTypes[data_type][2]
-                value = unpack_from(type_fmt, segment, 6)[0]
+                value = None
 
             response = [tag_name, value, status]
             reply.append(response)
