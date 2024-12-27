@@ -468,8 +468,10 @@ class PLC(object):
 
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
+                byte_size = self.KnownTags[base_tag][1]
             else:
                 data_type = None
+                byte_size = 88
 
             ioi = self._build_ioi(tag_name, data_type)
 
@@ -484,22 +486,23 @@ class PLC(object):
             else:
                 element_count = tag[1]
             service = self._add_read_service(ioi, element_count)
-            read_services.append([service, data_type])
+            read_services.append([service, data_type, byte_size])
 
         # calculate packet sizes
         send_packet_size = 30
         receive_packet_size = 28
         current = []
         accumulated = []
-        for service, data_type in read_services:
+        for service, data_type, byte_size in read_services:
             send_packet_size += len(service) + 2
             if data_type == 0xa0:
-                receive_size = 8 + self.CIPTypes[data_type][0] + 2
+                # but this might not be a string!
+                receive_size = 8 + byte_size + 2
             elif data_type is None:
-                receive_size = 8 + self.CIPTypes[0xa0][0] + 2
+                receive_size = 8 + byte_size + 2
                 receive_packet_size += 8 + self.CIPTypes[0xa0][0] + 2
             else:
-                receive_size = 6 + self.CIPTypes[data_type][0] + 2
+                receive_size = 6 + byte_size + 2
 
             receive_packet_size += receive_size
 
@@ -1413,7 +1416,9 @@ class PLC(object):
 
         # get the unknown tags
         if unk_tags:
-            self._multi_read(unk_tags)
+            for tag in unk_tags:
+                tag_name, base_tag, index = parse_tag_name(tag[0])
+                self._initial_read(tag_name, base_tag, tag[2])
 
     def _initial_read(self, tag, base_tag, data_type):
         """
