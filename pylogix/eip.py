@@ -1518,6 +1518,7 @@ class PLC(object):
         reply = []
         for i, segment in enumerate(data_segments):
             status = unpack_from("<B", segment, 2)[0]
+            tag_name, base_tag, index  = parse_tag_name(tags[i][0])
             if status == 0:
                 data_type = unpack_from("<B", segment, 4)[0]
 
@@ -1527,7 +1528,6 @@ class PLC(object):
                 else:
                     data_len = len(segment[6:])
 
-                tag_name, base_tag, index  = parse_tag_name(tags[i][0])
                 self.KnownTags[base_tag] = (data_type, data_len)
                 # extract the value from the segment
                 if data_type == 0xa0:
