@@ -1543,7 +1543,6 @@ class PLC(object):
                     value = self._words_to_bits(tag_name, [value], 1)[0]
                 elif data_type == 0xc1 and is_micropython():
                     type_fmt = "b"
-                    type_fmt = self.CIPTypes[data_type][2]
                     value = unpack_from(type_fmt, segment, 6)[0]
                     if value == 1:
                         value = True
