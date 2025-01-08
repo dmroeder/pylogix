@@ -557,7 +557,6 @@ class PLC(object):
         """
         Processes the write request
         """
-        self.Offset = 0
         write_data = []
 
         conn = self.conn.connect()
@@ -582,31 +581,54 @@ class PLC(object):
         # save the number of values we are writing
         element_count = len(write_data)
 
-        # convert writeData to packet sized lists
-        write_data = self._convert_write_data(base_tag, data_type, write_data)
+        # iterations will normally be 1, with the exception
+        # of array reads larger than 0xffff elements
+        iterations = math.ceil(element_count/0xffff)
+        if iterations < 1:
+            iterations = 1
 
-        ioi = self._build_ioi(tag_name, data_type)
+        for i in range(iterations):
+            # convert writeData to packet sized lists
+            self.Offset = 0
+            if iterations > 1:
+                # only for element counts > 65535
+                new_index = i * 0xffff + index
+                new_tag = "{}[{}]".format(base_tag, new_index)
+                if element_count > 0xffff:
+                    count = 0xffff
+                else:
+                    count = element_count
 
-        # handle sending write data
-        if len(write_data) > 1:
-            # write requires multiple packets
-            for w in write_data:
-                request = self._add_frag_write_service(element_count, ioi, w, data_type)
-                status, ret_data = self.conn.send(request)
-                self.Offset += len(w) * self.CIPTypes[data_type][0]
-        else:
-            # write fits in one packet
-            if bit_of_word(tag_name) or data_type == 0xd3:
-                byte_count = self.CIPTypes[data_type][0] * 8
-                high, low, tags = mod_write_masks(tag_name, write_data[0], byte_count)
-                for i in range(len(high)):
-                    ioi = self._build_ioi(tags[i], data_type)
-                    request = self._add_mod_write_service(ioi, data_type, high[i], low[i])
-                    status, ret_data = self.conn.send(request)
+                element_count -= 0xffff
+                ioi = self._build_ioi(new_tag, data_type)
+                values = write_data[new_index:new_index+count]
             else:
-                request = self._add_write_service(ioi, write_data[0], data_type)
+                count = element_count
+                ioi = self._build_ioi(tag_name, data_type)
+                values = write_data
 
-                status, ret_data = self.conn.send(request)
+            values = self._convert_write_data(base_tag, data_type, values)
+
+            # handle sending write data
+            if len(values) > 1:
+                # write requires multiple packets
+                for w in values:
+                    request = self._add_frag_write_service(count, ioi, w, data_type)
+                    status, ret_data = self.conn.send(request)
+                    self.Offset += len(w) * self.CIPTypes[data_type][0]
+            else:
+                # write fits in one packet
+                if bit_of_word(tag_name) or data_type == 0xd3:
+                    byte_count = self.CIPTypes[data_type][0] * 8
+                    high, low, tags = mod_write_masks(tag_name, values[0], byte_count)
+                    for i in range(len(high)):
+                        ioi = self._build_ioi(tags[i], data_type)
+                        request = self._add_mod_write_service(ioi, data_type, high[i], low[i])
+                        status, ret_data = self.conn.send(request)
+                else:
+                    request = self._add_write_service(ioi, values[0], data_type)
+
+                    status, ret_data = self.conn.send(request)
 
         if len(value) == 1:
             value = value[0]
