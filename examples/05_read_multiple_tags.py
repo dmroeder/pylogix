@@ -25,4 +25,4 @@ with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
     ret = comm.Read(tag_list)
     for r in ret:
-        print(r.Value)
+        print(r.TagName, r.Value, r.Status)

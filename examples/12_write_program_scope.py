@@ -14,4 +14,5 @@ from pylogix import PLC
 
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
-    comm.Write('Program:MiscHMI.TimeArray[0]', 2019)
+    ret = comm.Write('Program:MiscHMI.TimeArray[0]', 2019)
+    print(ret.Status)

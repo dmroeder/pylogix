@@ -16,7 +16,7 @@ with PLC() as comm:
     while read:
         try:
             ret = comm.Read('LargeArray[0]')
-            print(ret.Value)
+            print(ret.TagName, ret.Value, ret.Status)
             time.sleep(1)
         except KeyboardInterrupt:
             print('exiting')

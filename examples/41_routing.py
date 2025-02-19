@@ -14,5 +14,5 @@ from pylogix import PLC
 
 with PLC('192.168.1.1') as comm:
     comm.Route = [(1, 4), (2, '10.10.10.9')]
-    x = comm.Read('BaseDINT')
-    print(x.Value)
+    ret = comm.Read('BaseDINT')
+    print(ret.TagName, ret.Value, ret.Status)

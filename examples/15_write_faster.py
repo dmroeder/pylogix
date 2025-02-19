@@ -18,4 +18,5 @@ from pylogix import PLC
 
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
-    comm.Write('Zone1Case', 10, datatype=196)
+    ret = comm.Write('Zone1Case', 10, datatype=196)
+    print(ret.Status)

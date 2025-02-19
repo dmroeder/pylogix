@@ -12,4 +12,5 @@ values = [8, 6, 7, 5, 3, 0, 9]
 
 with PLC() as comm:
     comm.IPAddress = '192.168.1.9'
-    comm.Write('LargeArray[10]', values)
+    ret = comm.Write('LargeArray[10]', values)
+    print(ret.Status)
