@@ -5,6 +5,10 @@
             "github:dmroeder/pylogix/upylogix/__init__.mpy"
         ],
         [
+            "pylogix/adapter.mpy",
+            "github:dmroeder/pylogix/upylogix/adapter.mpy"
+        ],
+        [
             "pylogix/eip.mpy",
             "github:dmroeder/pylogix/upylogix/eip.mpy"
         ],
@@ -37,5 +41,5 @@
             "github:dmroeder/pylogix/upylogix/utils.mpy"
         ]
     ],
-    "version": "1.0.6"
+    "version": "1.0.7"
 }
