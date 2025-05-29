@@ -447,7 +447,7 @@ class Connection(object):
 
         cip_instance = 0x01
         cip_priority = 0x0A
-        cip_timeout_ticks = 0x0e
+        cip_timeout_ticks = 0xff
         cip_service_size = service_size
 
         return pack('<BBBBBBBBH',
