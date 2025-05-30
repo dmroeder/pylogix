@@ -173,7 +173,7 @@ class Listener(threading.Thread):
                     cp1 = unpack_from("<b", self.data[-2:], 1)[0]
                     
                     # forward open
-                    f = self._buildForwardOpenPacket()
+                    f = self._build_forward_open_packet()
                     self.conn.send(f)
 
                     rpi = unpack_from('<I', self.data, 74)[0]
@@ -221,7 +221,7 @@ class Listener(threading.Thread):
         """
         eip_command = 0x0065
         eip_length = 0x0004
-        eip_session_handle = self._session_handle
+        eip_session_handle =  0x04010000
         eip_status = 0x0000
         eip_context = '{:<8}'.format(pylogix.__version__).encode("utf-8")
         eip_options = 0x0000
