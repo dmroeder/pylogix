@@ -205,7 +205,7 @@ class Listener(threading.Thread):
                         item.CIPSequenceCount = 0
                         item.join()
                     self.adapter._responders = {}
-                    f = self._build_forward_open_packet()
+                    f = self._build_forward_close_packet()
                     self.conn.send(f)
                 else:
                     print("CIP Service:", cip_service)
