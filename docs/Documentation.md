@@ -124,18 +124,9 @@ __NOTE:__ Routing has always been a feature of ControlLogix, so the value of goi
 port has always been 2. That is, until the 5380 CompactLogix and dual IP mode came along.  You use
 a value of  3 or 4, depending on which port you are going out of.
 
-__ConnectionSize__
-pylogix, as it currently is, will make an attempt to connect at the maximum possible connection
-size, which is 4002 bytes.  If unsuccessful, it will attempt at the next common max size, which
-is 508 bytes.  The user can specify a connection size anywhere in between.  The best practice is
-to leave this value at default.  The main reason for making this configurable is a history
-problem.  pylogix made this configurable originally.  Later, the concept of default to the max
-size, then fall back another size was implemented.  Making it configurable made sure that there
-was no compatibility issues.
-
-There is no known benefit to reducing the connection size.  In fact, you will get the best
-performance by leaving it at the max.  There seems to be no latency issue with always using the
-larger packet size.
+__ConnectionSize__ (deprecated)
+Pylogix automatically chooses the largest connection size supported by the controller.
+There is no reason to override the connection size.
 
 The early controllers and Ethernet modules supported connection sizes of 508 bytes.  At around
 v18, Rockwell implemented connection sizes of 4002 bytes.
@@ -207,8 +198,9 @@ MyDintArray[0] [42, 43, 44, 45, 46, 47, 48, 49, 50, 51] Success
 
 #### Read a list of tags
 The best way to improve performance is to read tags in a list. Reading lists of tags will take
-advantage of the mulit-service request, packing many request into a single packet.  When reading
-lists, a list of the Response class will be returned.
+advantage of the mulit-service request, packing many request into a single packet.  There is no
+limit to the number of tags in the list, pylogix will break them up into as many reads as necessary.
+When reading lists, a list of the Response class will be returned.
 
 <details><summary>Example</summary>
 <p>

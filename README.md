@@ -91,12 +91,6 @@ NOTE: If you are working with a Micro8xx PLC, you must set the Micro800 flag sin
 comm.Micro800 = True
 ```
 
-Optionally set a specific maximum size for requests/replies.  If not specified, defaults to try a Large, then a Small Forward Open (for Implicit, "Connected" sessions).
-
-```
-comm.ConnectionSize = 508
-```
-
 ## Installing MicroPython
 
 Checkout [Documentation](https://github.com/dmroeder/pylogix/blob/master/docs/mpy/README.md)
