@@ -38,7 +38,7 @@ class Connection(object):
         self._context = 0x00
         self._context_index = 0
         self._originator_serial = 42
-        self._ot_connection_id = None
+        self._ot_connection_id = 0
         self._registered = False
         self._serial_number = 0
         self._session_handle = 0x0000
@@ -67,6 +67,32 @@ class Connection(object):
             eip_header = self._build_rr_data_header(len(frame)) + frame
         
         return self._get_bytes(eip_header, connected)
+
+    def listen(self, ip_address, callback):
+        """ Listen for CIP Data Table Write (0x4d) messages
+        from the PLC, decode send the data to the callback
+        to be cecoded
+        """
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((ip_address, 44818))
+        s.listen(1)
+        tcpconn, address = s.accept()
+
+        while True:
+            data = tcpconn.recv(1024)
+            eip_command = unpack_from("<H", data, 0)[0]
+            if eip_command == 0x65:
+                response = self._build_register_session()
+                tcpconn.send(response)
+            elif eip_command == 0x6f:
+                cip_service = unpack_from("<B", data, 40)[0]
+                if cip_service == 0x4d:
+                    # cip data table write
+                    self._context = unpack_from("<Q", data, 12)[0]
+                    response = pack("<HH", 0xcd, 0x00)
+                    eip_header = self._build_rr_data_header(len(response)) + response
+                    tcpconn.send(eip_header)
+                    callback(data)
 
     def close(self):
         """

@@ -36,7 +36,7 @@ if not is_micropython():
 # noinspection PyMethodMayBeStatic
 class PLC(object):
     __slots__ = ('IPAddress', 'Port', 'ProcessorSlot', 'SocketTimeout', 'Micro800', 'Route', 'conn', 'Offset', 'UDT',
-                 'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes')
+                 'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes', "callback")
 
     def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False, port=44818):
         """
@@ -50,7 +50,7 @@ class PLC(object):
         self.Route = None
 
         self.conn = Connection(self)
-
+        self.callback = None
         self.Offset = 0
         self.UDT = {}
         self.UDTByName = {}
@@ -269,6 +269,11 @@ class PLC(object):
         """
 
         return self._message(cip_service, cip_class, cip_instance, cip_attribute, data)
+
+    def ReceiveMessage(self, ip_address, callback):
+
+        self.callback = callback
+        return self._receive_message(ip_address)
 
     def Close(self):
         """
@@ -1088,6 +1093,32 @@ class PLC(object):
         cip_request = service_bytes + class_bytes + instance_bytes + attribute_bytes
 
         return cip_request
+
+    def _receive_message(self, ip_address):
+        """ Listen for incoming CIP Data Table Write messages
+        """
+        return self.conn.listen(ip_address, self._receive_message_response)
+
+    def _receive_message_response(self, data):
+        """ Unpack CIP Data Table Write message,
+        return the Response class to the user provided callback
+        """
+        tag_name_len = unpack_from("<B", data, 43)[0]
+        # round up to the nearest even number
+        tag_name_len = tag_name_len if tag_name_len % 2 == 0 else tag_name_len + 1
+        tag_name = data[44:44+tag_name_len].decode(self.StringEncoding)
+        data = data[44+tag_name_len:]
+        data_type = unpack_from("<B", data, 0)[0]
+        fmt = self.CIPTypes[data_type][2]
+        if data_type == 0xa0:
+            element_count = unpack_from("<H", data, 4)[0]
+            chr_count = unpack_from("<H", data, 6)[0]
+            value = data[8:8+chr_count].decode(self.StringEncoding)
+        else:
+            element_count = unpack_from("<H", data, 2)[0]
+            value = unpack_from(fmt, data, 4)[0]
+
+        self.callback(Response(tag_name, value, 0))
 
     def _build_ioi(self, tag_name, data_type):
 
