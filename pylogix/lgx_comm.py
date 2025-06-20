@@ -76,10 +76,18 @@ class Connection(object):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind((ip_address, 44818))
         s.listen(1)
-        tcpconn, address = s.accept()
+        try:
+            tcpconn, address = s.accept()
+        except:
+            callback(None)
+            return
 
         while True:
-            data = tcpconn.recv(1024)
+            try:
+                data = tcpconn.recv(1024)
+            except KeyboardInterrupt:
+                callback(None)
+                return
             eip_command = unpack_from("<H", data, 0)[0]
             if eip_command == 0x65:
                 response = self._build_register_session()

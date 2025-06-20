@@ -1103,8 +1103,11 @@ class PLC(object):
         """ Unpack CIP Data Table Write message,
         return the Response class to the user provided callback
         """
-        tag_name, value = self._decode_ioi(data)
-        self.callback(Response(tag_name, value, 0))
+        if data:
+            tag_name, value = self._decode_ioi(data)
+            self.callback(Response(tag_name, value, 0))
+        else:
+            self.callback(Response(None, None, 1))
 
     def _build_ioi(self, tag_name, data_type):
 
