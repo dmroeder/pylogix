@@ -1103,21 +1103,7 @@ class PLC(object):
         """ Unpack CIP Data Table Write message,
         return the Response class to the user provided callback
         """
-        tag_name_len = unpack_from("<B", data, 43)[0]
-        # round up to the nearest even number
-        tag_name_len = tag_name_len if tag_name_len % 2 == 0 else tag_name_len + 1
-        tag_name = data[44:44+tag_name_len].decode(self.StringEncoding)
-        data = data[44+tag_name_len:]
-        data_type = unpack_from("<B", data, 0)[0]
-        fmt = self.CIPTypes[data_type][2]
-        if data_type == 0xa0:
-            element_count = unpack_from("<H", data, 4)[0]
-            chr_count = unpack_from("<H", data, 6)[0]
-            value = data[8:8+chr_count].decode(self.StringEncoding)
-        else:
-            element_count = unpack_from("<H", data, 2)[0]
-            value = unpack_from(fmt, data, 4)[0]
-
+        tag_name, value = self._decode_ioi(data)
         self.callback(Response(tag_name, value, 0))
 
     def _build_ioi(self, tag_name, data_type):
@@ -1198,6 +1184,39 @@ class PLC(object):
                         ioi += pack('<B', 0x00)
 
         return ioi
+
+    def _decode_ioi(self, data):
+
+        # get the tag name
+        tag_name_len = unpack_from("<B", data, 43)[0]
+        tag_name_len = tag_name_len if tag_name_len % 2 == 0 else tag_name_len + 1
+        tag_name = data[44:44+tag_name_len].decode(self.StringEncoding)
+        data = data[44+tag_name_len:]
+        if data[0] == 0x28:
+            # array
+            index = unpack_from("<B", data, 1)[0]
+            tag_name = f"{tag_name}[{index}]"
+            data = data[2:]
+
+        # get the data type
+        data_type = unpack_from("<B", data, 0)[0]
+        byte_count, _, fmt = self.CIPTypes[data_type]
+        values = []
+        if data_type == 0xa0:
+            element_count = unpack_from("<H", data, 4)[0]
+            for i in range(element_count):
+                offset = i * byte_count
+                chr_count = unpack_from("<H", data, 6+offset)[0]
+                value = data[8+offset:8+offset+chr_count].decode(self.StringEncoding)
+                values.append(value)
+        else:
+            element_count = unpack_from("<H", data, 2)[0]
+            for i in range(element_count):
+                offset = i * byte_count
+                value = unpack_from(fmt, data, 4+offset)[0]
+                values.append(value)
+
+        return tag_name, values
 
     def _add_read_service(self, ioi, elements):
         """
