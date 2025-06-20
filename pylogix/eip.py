@@ -1192,17 +1192,22 @@ class PLC(object):
         tag_name_len = tag_name_len if tag_name_len % 2 == 0 else tag_name_len + 1
         tag_name = data[44:44+tag_name_len].decode(self.StringEncoding)
         data = data[44+tag_name_len:]
-        if data[0] == 0x28:
-            # array
-            index = unpack_from("<B", data, 1)[0]
-            tag_name = f"{tag_name}[{index}]"
-            data = data[2:]
-        elif data[0] == 0x91:
-            # udt member
-            count = unpack_from("<B", data, 1)[0]
-            member = data[2:2+count].decode(self.StringEncoding)
-            tag_name = f"{tag_name}.{member}"
-            data = data[2+count:]
+        symbol = data[0]
+
+        while symbol == 0x28 or symbol == 0x91:
+            symbol = data[0]
+            if symbol == 0x28:
+                # array
+                index = unpack_from("<B", data, 1)[0]
+                tag_name = f"{tag_name}[{index}]"
+                data = data[2:]
+            elif data[0] == 0x91:
+                # udt member
+                count = unpack_from("<B", data, 1)[0]
+                member = data[2:2+count].decode(self.StringEncoding)
+                tag_name = f"{tag_name}.{member}"
+                data = data[2+count:]
+            symbol = data[0]
 
         # get the data type
         data_type = unpack_from("<B", data, 0)[0]
