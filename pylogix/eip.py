@@ -1197,17 +1197,24 @@ class PLC(object):
             index = unpack_from("<B", data, 1)[0]
             tag_name = f"{tag_name}[{index}]"
             data = data[2:]
+        elif data[0] == 0x91:
+            # udt member
+            count = unpack_from("<B", data, 1)[0]
+            member = data[2:2+count].decode(self.StringEncoding)
+            tag_name = f"{tag_name}.{member}"
+            data = data[2+count:]
 
         # get the data type
         data_type = unpack_from("<B", data, 0)[0]
         byte_count, _, fmt = self.CIPTypes[data_type]
         values = []
+        # extract the values
         if data_type == 0xa0:
             element_count = unpack_from("<H", data, 4)[0]
             for i in range(element_count):
                 offset = i * byte_count
-                chr_count = unpack_from("<H", data, 6+offset)[0]
-                value = data[8+offset:8+offset+chr_count].decode(self.StringEncoding)
+                chr_count = unpack_from("<I", data, 6+offset)[0]
+                value = data[10+offset:10+offset+chr_count].decode(self.StringEncoding)
                 values.append(value)
         else:
             element_count = unpack_from("<H", data, 2)[0]
