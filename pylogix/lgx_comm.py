@@ -275,6 +275,12 @@ class Connection(object):
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
                     self.callback(data, 0)
+                elif cip_service == 0x53:
+                    self._context = unpack_from("<Q", data, 12)[0]
+                    response = pack("<HH", response_value, 0x00)
+                    eip_header = self._build_rr_data_header(len(response)) + response
+                    self.tcpconn.send(eip_header)
+                    self.callback(data, 0)
                 else:
                     self._context = unpack_from("<Q", data, 12)[0]
                     response = pack("<HH", response_value, 0x08)
