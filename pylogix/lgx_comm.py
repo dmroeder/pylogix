@@ -259,6 +259,9 @@ class Connection(object):
             except KeyboardInterrupt:
                 self.callback(None, "Keyboard Interrupt")
                 return
+            except ConnectionResetError:
+                print("Connection reset")
+                self._wait_for_connection()
             except Exception as e:
                 self.callback(None, e)
                 return
