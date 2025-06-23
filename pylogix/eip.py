@@ -1195,7 +1195,7 @@ class PLC(object):
         return ioi
 
     def _decode_ioi(self, data):
-        """ Extract the tag name 
+        """ Extract the tag name and value(s) from the packet
         """
         # get the tag name
         cip_service = data[40]
