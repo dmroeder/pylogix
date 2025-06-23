@@ -1099,15 +1099,15 @@ class PLC(object):
         """
         return self.conn.listen(ip_address, self._receive_message_response)
 
-    def _receive_message_response(self, data):
+    def _receive_message_response(self, data, status):
         """ Unpack CIP Data Table Write message,
         return the Response class to the user provided callback
         """
         if data:
             tag_name, value = self._decode_ioi(data)
-            self.callback(Response(tag_name, value, 0))
+            self.callback(Response(tag_name, value, status))
         else:
-            self.callback(Response(None, None, 1))
+            self.callback(Response(None, None, status))
 
     def _build_ioi(self, tag_name, data_type):
 

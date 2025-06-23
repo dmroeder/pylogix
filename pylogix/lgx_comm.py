@@ -78,16 +78,23 @@ class Connection(object):
         s.listen(1)
         try:
             tcpconn, address = s.accept()
-        except:
-            callback(None)
+        except KeyboardInterrupt:
+            callback(None, "Keyboard Interrupt")
+            return
+        except Exception as e:
+            callback(None, e)
             return
 
         while True:
             try:
                 data = tcpconn.recv(1024)
             except KeyboardInterrupt:
-                callback(None)
+                callback(None, "Keyboard Interrupt")
                 return
+            except Exception as e:
+                callback(None, e)
+                return
+
             eip_command = unpack_from("<H", data, 0)[0]
             if eip_command == 0x65:
                 response = self._build_register_session()
@@ -100,7 +107,7 @@ class Connection(object):
                     response = pack("<HH", 0xcd, 0x00)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     tcpconn.send(eip_header)
-                    callback(data)
+                    callback(data, 0)
 
     def close(self):
         """
