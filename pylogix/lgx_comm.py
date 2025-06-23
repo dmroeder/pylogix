@@ -267,13 +267,20 @@ class Connection(object):
 
             if eip_command == 0x6f:
                 cip_service = unpack_from("<B", data, 40)[0]
+                response_value = cip_service | 0x80
                 if cip_service == 0x4d:
                     # cip data table write
                     self._context = unpack_from("<Q", data, 12)[0]
-                    response = pack("<HH", 0xcd, 0x00)
+                    response = pack("<HH", response_value, 0x00)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
                     self.callback(data, 0)
+                else:
+                    self._context = unpack_from("<Q", data, 12)[0]
+                    response = pack("<HH", response_value, 0x08)
+                    eip_header = self._build_rr_data_header(len(response)) + response
+                    self.tcpconn.send(eip_header)
+                    self.callback(None, 8)
 
     def _build_register_session(self):
         """
