@@ -34,6 +34,11 @@ class Connection(object):
         self.Socket = socket.socket()
         self.SocketConnected = False
 
+        self.msg_socket = socket.socket()
+        self.tcpconn = None
+        self.listen_ip = ""
+        self.callback = None
+
         self._connected = False
         self._context = 0x00
         self._context_index = 0
@@ -73,41 +78,12 @@ class Connection(object):
         from the PLC, decode send the data to the callback
         to be cecoded
         """
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((ip_address, 44818))
-        s.listen(1)
-        try:
-            tcpconn, address = s.accept()
-        except KeyboardInterrupt:
-            callback(None, "Keyboard Interrupt")
-            return
-        except Exception as e:
-            callback(None, e)
-            return
-
-        while True:
-            try:
-                data = tcpconn.recv(1024)
-            except KeyboardInterrupt:
-                callback(None, "Keyboard Interrupt")
-                return
-            except Exception as e:
-                callback(None, e)
-                return
-
-            eip_command = unpack_from("<H", data, 0)[0]
-            if eip_command == 0x65:
-                response = self._build_register_session()
-                tcpconn.send(response)
-            elif eip_command == 0x6f:
-                cip_service = unpack_from("<B", data, 40)[0]
-                if cip_service == 0x4d:
-                    # cip data table write
-                    self._context = unpack_from("<Q", data, 12)[0]
-                    response = pack("<HH", 0xcd, 0x00)
-                    eip_header = self._build_rr_data_header(len(response)) + response
-                    tcpconn.send(eip_header)
-                    callback(data, 0)
+        self.listen_ip = ip_address
+        self.callback = callback
+        self.msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.msg_socket.bind((ip_address, 44818))
+        self.msg_socket.listen(1)
+        self._wait_for_connection()
 
     def close(self):
         """
@@ -251,6 +227,51 @@ class Connection(object):
             return None
 
         return data
+
+    def _wait_for_connection(self):
+        """ Wait for the incoming connection request.  This happens prior
+        to the CIP Data Table Write.
+        """
+        try:
+            self.tcpconn, _ = self.msg_socket.accept()
+            data = self.tcpconn.recv(1024)
+            eip_command = unpack_from("<H", data, 0)[0]
+            if eip_command == 0x65:
+                response = self._build_register_session()
+                self.tcpconn.send(response)
+            self._wait_for_message()
+        except KeyboardInterrupt:
+            self.callback(None, "Keyboard Interrupt")
+            return
+        except Exception as e:
+            self.callback(None, e)
+            return
+
+    def _wait_for_message(self):
+        """ Once a connection is established, wait for the CIP Data Table Write
+        command. When data is received, parsse and return the data to the
+        callback function provided.
+        """
+        while True:
+            try:
+                data = self.tcpconn.recv(1024)
+                eip_command = unpack_from("<H", data, 0)[0]
+            except KeyboardInterrupt:
+                self.callback(None, "Keyboard Interrupt")
+                return
+            except Exception as e:
+                self.callback(None, e)
+                return
+
+            if eip_command == 0x6f:
+                cip_service = unpack_from("<B", data, 40)[0]
+                if cip_service == 0x4d:
+                    # cip data table write
+                    self._context = unpack_from("<Q", data, 12)[0]
+                    response = pack("<HH", 0xcd, 0x00)
+                    eip_header = self._build_rr_data_header(len(response)) + response
+                    self.tcpconn.send(eip_header)
+                    self.callback(data, 0)
 
     def _build_register_session(self):
         """
