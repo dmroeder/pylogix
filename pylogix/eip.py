@@ -1110,6 +1110,8 @@ class PLC(object):
             tag_name, value = self._decode_ioi(data)
             self.msg_values += value
             if len(self.msg_values) >= self.element_count:
+                if len(self.msg_values) == 1:
+                    self.msg_values = self.msg_values[0]
                 self.callback(Response(tag_name, self.msg_values, status))
                 self.msg_values = []
         else:
