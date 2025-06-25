@@ -44,6 +44,7 @@ class Connection(object):
         self._context_index = 0
         self._originator_serial = 42
         self._ot_connection_id = 0
+        self._to_connection_id = 0
         self._registered = False
         self._serial_number = 0
         self._session_handle = 0x0000
@@ -237,7 +238,7 @@ class Connection(object):
             data = self.tcpconn.recv(1024)
             eip_command = unpack_from("<H", data, 0)[0]
             if eip_command == 0x65:
-                response = self._build_register_session()
+                response = self._register_session_reply()
                 self.tcpconn.send(response)
             self._wait_for_message()
         except KeyboardInterrupt:
@@ -281,12 +282,32 @@ class Connection(object):
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
                     self.callback(data, 0)
+                elif cip_service == 0x54:
+                    self._context = unpack_from("<Q", data, 12)[0]
+                    self._to_connection_id = unpack_from("<I", data, 52)[0]
+                    self._serial_number = unpack_from("<H", data, 56)[0]
+                    self._originator_serial = unpack_from("<I", data, 60)[0]
+                    response = pack("<HH", response_value, 0x00)
+                    reply = response + self._forward_open_reply()
+                    eip_header = self._build_rr_data_header(len(reply)) + reply
+                    self.tcpconn.send(eip_header)
                 else:
                     self._context = unpack_from("<Q", data, 12)[0]
                     response = pack("<HH", response_value, 0x08)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
                     self.callback(None, 8)
+            elif eip_command == 0x70:
+                cip_service = unpack_from("<B", data, 46)[0]
+                response_value = cip_service | 0x80
+                if cip_service == 0x4d:
+                    self._context = unpack_from("<Q", data, 12)[0]
+                    self._sequence_counter = unpack_from("H", data, 44)[0]
+                    response = pack("<HH", response_value, 0x00)
+                    eip_header = self._send_unit_data_reply(response)
+                    self.tcpconn.send(eip_header)
+                    self.callback(data[6:], 0)
+
 
     def _build_register_session(self):
         """
@@ -303,6 +324,31 @@ class Connection(object):
         eip_option_flag = 0x00
 
         return pack('<HHII8sIHH',
+                    eip_command,
+                    eip_length,
+                    eip_session_handle,
+                    eip_status,
+                    eip_context,
+                    eip_options,
+                    eip_proto_version,
+                    eip_option_flag)
+
+    def _register_session_reply(self):
+        """
+        Reply to register session
+        """
+        eip_command = 0x0065
+        eip_length = 0x0004
+        self._session_handle = 0x40000008
+        eip_session_handle = self._session_handle
+        eip_status = 0x0000
+        eip_context = 0x00
+        eip_options = 0x0000
+
+        eip_proto_version = 0x01
+        eip_option_flag = 0x00
+
+        return pack('<HHIIQIHH',
                     eip_command,
                     eip_length,
                     eip_session_handle,
@@ -355,6 +401,28 @@ class Connection(object):
 
         self.SocketConnected = True
         return [self.SocketConnected, 'Success']
+
+    def _forward_open_reply(self):
+
+        cip_ot_connection_id = self._to_connection_id + 16
+        cip_to_connection_id = self._to_connection_id
+        cip_serial_number = self._serial_number
+        cip_vendor_id = 0x01
+        cip_originator_serial = self._originator_serial
+        cip_ot_rpi = 0x007270e0
+        cip_to_rpi = 0x007270e0
+        cip_reply_size = 0x00
+        cip_reserved = 0x00
+
+        return pack("<IIHHIIIBB", cip_ot_connection_id,
+                    cip_to_connection_id,
+                    cip_serial_number,
+                    cip_vendor_id,
+                    cip_originator_serial,
+                    cip_ot_rpi,
+                    cip_to_rpi,
+                    cip_reply_size,
+                    cip_reserved)
 
     def _build_forward_open_packet(self):
         """
@@ -565,7 +633,7 @@ class Connection(object):
         eip_item1 = self._ot_connection_id
         eip_item2_id = 0xB1
         eip_item2_length = eip_connected_data_len
-        eip_sequence = self._sequence_counter 
+        eip_sequence = self._sequence_counter
         self._sequence_counter += 1
         self._sequence_counter = self._sequence_counter % 0x10000
 
@@ -587,6 +655,55 @@ class Connection(object):
                       eip_sequence)
 
         return packet + ioi
+
+    def _send_unit_data_reply(self, payload):
+        """
+        The EIP Header contains the tagIOI and the
+        commands to perform the read or write.  This request
+        will be followed by the reply containing the data
+        """
+        if self._context_index == 155:
+            self._context_index = 0
+
+        eip_connected_data_len = len(payload) + 2
+
+        eip_command = 0x70
+        eip_length = 22 + len(payload)
+        eip_session_handle = self._session_handle
+        eip_status = 0x00
+        eip_context = self._context
+
+        eip_options = 0x0000
+        eip_interface_handle = 0x00
+        eip_timeout = 0x00
+        eip_item_count = 0x02
+        eip_item1_id = 0xA1
+        eip_item1_length = 0x04
+        eip_item1 = self._to_connection_id
+        eip_item2_id = 0xB1
+        eip_item2_length = eip_connected_data_len
+        eip_sequence = self._sequence_counter
+        self._sequence_counter += 1
+        self._sequence_counter = self._sequence_counter % 0x10000
+
+        packet = pack('<HHIIQIIHHHHIHHH',
+                      eip_command,
+                      eip_length,
+                      eip_session_handle,
+                      eip_status,
+                      eip_context,
+                      eip_options,
+                      eip_interface_handle,
+                      eip_timeout,
+                      eip_item_count,
+                      eip_item1_id,
+                      eip_item1_length,
+                      eip_item1,
+                      eip_item2_id,
+                      eip_item2_length,
+                      eip_sequence)
+
+        return packet + payload
 
     def _connected_path(self):
         """
