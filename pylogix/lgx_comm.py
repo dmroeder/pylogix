@@ -253,6 +253,7 @@ class Connection(object):
         command. When data is received, parsse and return the data to the
         callback function provided.
         """
+        count = 0
         while True:
             try:
                 data = self.tcpconn.recv(1024)
@@ -302,11 +303,13 @@ class Connection(object):
                 response_value = cip_service | 0x80
                 if cip_service == 0x4d:
                     self._context = unpack_from("<Q", data, 12)[0]
-                    self._sequence_counter = unpack_from("H", data, 44)[0]
+                    current_count = unpack_from("H", data, 44)[0]
                     response = pack("<HH", response_value, 0x00)
                     eip_header = self._send_unit_data_reply(response)
                     self.tcpconn.send(eip_header)
-                    self.callback(data[6:], 0)
+                    if current_count > count:
+                        self.callback(data[6:], 0)
+                        count = current_count
 
 
     def _build_register_session(self):
