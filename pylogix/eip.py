@@ -1213,7 +1213,7 @@ class PLC(object):
             if symbol == 0x28:
                 # array
                 index = unpack_from("<B", data, 1)[0]
-                tag_name = "[{}[{}]".format(tag_name, index)
+                tag_name = "{}[{}]".format(tag_name, index)
                 data = data[2:]
             elif data[0] == 0x91:
                 # udt member
