@@ -48,7 +48,7 @@ class Connection(object):
         self._registered = False
         self._serial_number = 0
         self._session_handle = 0x0000
-        self._sequence_counter = 1
+        self._sequence_counter = 0
         self._vendor_id = 0x1337
 
     def connect(self, connected=True):
@@ -271,19 +271,30 @@ class Connection(object):
                 cip_service = unpack_from("<B", data, 40)[0]
                 response_value = cip_service | 0x80
                 if cip_service == 0x4d:
-                    # cip data table write
+                    # unconnected cip data table write
                     self._context = unpack_from("<Q", data, 12)[0]
                     response = pack("<HH", response_value, 0x00)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
                     self.callback(data, 0)
+                elif cip_service == 0x4e:
+                    # forward close
+                    self._context = unpack_from("<Q", data, 12)[0]
+                    response = pack("<HH", response_value, 0x00)
+                    command = response + self._build_forward_close_reply()
+                    reply = self._build_rr_data_header(len(command)) + command
+                    self.tcpconn.send(reply)
+                    self._sequence_counter = 0
+                    count = 0
                 elif cip_service == 0x53:
+                    # fragmented write
                     self._context = unpack_from("<Q", data, 12)[0]
                     response = pack("<HH", response_value, 0x00)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
                     self.callback(data, 0)
                 elif cip_service == 0x54:
+                    # forward open
                     self._context = unpack_from("<Q", data, 12)[0]
                     self._to_connection_id = unpack_from("<I", data, 52)[0]
                     self._serial_number = unpack_from("<H", data, 56)[0]
@@ -293,6 +304,7 @@ class Connection(object):
                     eip_header = self._build_rr_data_header(len(reply)) + reply
                     self.tcpconn.send(eip_header)
                 else:
+                    # unsupported service
                     self._context = unpack_from("<Q", data, 12)[0]
                     response = pack("<HH", response_value, 0x08)
                     eip_header = self._build_rr_data_header(len(response)) + response
@@ -302,15 +314,15 @@ class Connection(object):
                 cip_service = unpack_from("<B", data, 46)[0]
                 response_value = cip_service | 0x80
                 if cip_service == 0x4d:
+                    # connected cip data table write
                     self._context = unpack_from("<Q", data, 12)[0]
-                    current_count = unpack_from("H", data, 44)[0]
+                    self._sequence_counter = unpack_from("H", data, 44)[0]
                     response = pack("<HH", response_value, 0x00)
                     eip_header = self._send_unit_data_reply(response)
                     self.tcpconn.send(eip_header)
-                    if current_count > count:
+                    if self._sequence_counter > count:
                         self.callback(data[6:], 0)
-                        count = current_count
-
+                        count = self._sequence_counter
 
     def _build_register_session(self):
         """
@@ -547,6 +559,21 @@ class Connection(object):
         connection_path = pack('<BB', path_size, 0x00)
         connection_path += path
         return packet + connection_path
+    
+    def _build_forward_close_reply(self):
+        """ Reply to forward close
+        """
+        cip_serial_number = self._serial_number
+        cip_vendor_id = 0x01
+        cip_originator_serial = self._originator_serial
+        cip_reply_size = 0x00
+        cip_reserved = 0x00
+
+        return pack("<HHIBB", cip_serial_number,
+                    cip_vendor_id,
+                    cip_originator_serial,
+                    cip_reply_size,
+                    cip_reserved)
 
     def _build_rr_data_header(self, frame_len):
         """
@@ -686,8 +713,6 @@ class Connection(object):
         eip_item2_id = 0xB1
         eip_item2_length = eip_connected_data_len
         eip_sequence = self._sequence_counter
-        self._sequence_counter += 1
-        self._sequence_counter = self._sequence_counter % 0x10000
 
         packet = pack('<HHIIQIIHHHHIHHH',
                       eip_command,
