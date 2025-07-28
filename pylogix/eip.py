@@ -276,7 +276,7 @@ class PLC(object):
         """
         return self.conn.close()
 
-    def _read_tag(self, tag_name, elements, data_type):
+    def _read_tag(self, tag_name, elements=1, data_type=None):
         """
         Processes the read request
         """
