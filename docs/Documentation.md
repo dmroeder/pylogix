@@ -25,6 +25,7 @@ __Methods:__
 - [GetModuleProperties](#getmoduleproperties)()
 - [GetDeviceProperties](#getdeviceproperties)()
 - [Message](#message)()
+- [ReceiveMesssage](#receivemessage)()
 
 There are a few options for creating an instance of PLC(), how you do it is a matter of style I
 suppose.  My preferred method is using contexts, or with statements, but is up to you.
@@ -575,6 +576,28 @@ with pylogix.PLC("192.168.1.10") as comm:
 ```
 </p>
 </details>
+
+# ReceiveMessage
+Listen for a CIP Data Table Write message from a PLC, return the values of the tag to a user
+provided callback function.  There are 2 required parameters, IP Address and a return function
+to send the data back to.  The IP address should be your local machine IP, which the PLC MSG
+should be configured to send to. Similar to Read/Write, the base data types are supported.
+
+<details><summary>Exammple - Receive message</summary>
+<p>
+
+```python
+import pylogix
+
+def return_function(return_data):
+    print(return_data)
+
+with pylogix.PLC("192.168.1.10") as comm:
+    ret = comm.ReceiveMessage("192.168.1.42", return_function)
+```
+</p>
+</details>
+
 
 # Additional information
 

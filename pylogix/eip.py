@@ -36,7 +36,8 @@ if not is_micropython():
 # noinspection PyMethodMayBeStatic
 class PLC(object):
     __slots__ = ('IPAddress', 'Port', 'ProcessorSlot', 'SocketTimeout', 'Micro800', 'Route', 'conn', 'Offset', 'UDT',
-                 'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes')
+                 'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes', "callback",
+                 'element_count', 'msg_values')
 
     def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False, port=44818):
         """
@@ -50,7 +51,9 @@ class PLC(object):
         self.Route = None
 
         self.conn = Connection(self)
-
+        self.callback = None
+        self.element_count = 0
+        self.msg_values = []
         self.Offset = 0
         self.UDT = {}
         self.UDTByName = {}
@@ -269,6 +272,11 @@ class PLC(object):
         """
 
         return self._message(cip_service, cip_class, cip_instance, cip_attribute, data)
+
+    def ReceiveMessage(self, ip_address, callback):
+
+        self.callback = callback
+        return self._receive_message(ip_address)
 
     def Close(self):
         """
@@ -1089,6 +1097,26 @@ class PLC(object):
 
         return cip_request
 
+    def _receive_message(self, ip_address):
+        """ Listen for incoming CIP Data Table Write messages
+        """
+        return self.conn.listen(ip_address, self._receive_message_response)
+
+    def _receive_message_response(self, data, status):
+        """ Unpack CIP Data Table Write message,
+        return the Response class to the user provided callback
+        """
+        if data:
+            tag_name, value = self._decode_ioi(data)
+            self.msg_values += value
+            if len(self.msg_values) >= self.element_count:
+                if len(self.msg_values) == 1:
+                    self.msg_values = self.msg_values[0]
+                self.callback(Response(tag_name, self.msg_values, status))
+                self.msg_values = []
+        else:
+            self.callback(Response(None, None, status))
+
     def _build_ioi(self, tag_name, data_type):
 
         """
@@ -1167,6 +1195,74 @@ class PLC(object):
                         ioi += pack('<B', 0x00)
 
         return ioi
+
+    def _decode_ioi(self, data):
+        """ Extract the tag name and value(s) from the packet
+        """
+        # get the tag name
+        cip_service = data[40]
+        tag_name_len = unpack_from("<B", data, 43)[0]
+        tag_name_len = tag_name_len if tag_name_len % 2 == 0 else tag_name_len + 1
+        tag_name = data[44:44+tag_name_len].decode(self.StringEncoding)
+        data = data[44+tag_name_len:]
+        symbol = data[0]
+
+        # decode any additional tag members/array
+        while symbol == 0x28 or symbol == 0x91:
+            symbol = data[0]
+            if symbol == 0x28:
+                # array
+                index = unpack_from("<B", data, 1)[0]
+                if tag_name[-1] == "]":
+                    # multi-dimm
+                    tag_name = tag_name[:-1]
+                    tag_name += ",{}]".format(index)
+                else:
+                    tag_name = "{}[{}]".format(tag_name, index)
+                data = data[2:]
+            elif data[0] == 0x91:
+                # udt member
+                count = unpack_from("<B", data, 1)[0]
+                member = data[2:2+count].decode(self.StringEncoding)
+                tag_name = "{}.{}".format(tag_name, member)
+                data = data[2+count:]
+            symbol = data[0]
+
+        # get the data type
+        data_type = unpack_from("<B", data, 0)[0]
+        byte_count, _, fmt = self.CIPTypes[data_type]
+
+        # extract the values
+        values = []
+        if data_type == 0xa0:
+            data = data[4:]
+            self.element_count = unpack_from("<H", data, 0)[0]
+            data = data[2:]
+
+            if cip_service == 0x53:
+                # multiple packets has an extra 4 bytes for offset
+                # that need to be removed
+                data = data[4:]
+
+            while data:
+                chr_count = unpack_from("<I", data, 0)[0]
+                value = data[4:4+chr_count].decode(self.StringEncoding)
+                values.append(value)
+                data = data[byte_count:]
+        else:
+            self.element_count = unpack_from("<H", data, 2)[0]
+            data = data[4:]
+
+            if cip_service == 0x53:
+                # multiple packets has an extra 4 bytes for offset
+                # that need to be removed
+                data = data[4:]
+            while data:
+                value = unpack_from(fmt, data, 0)[0]
+                values.append(value)
+                data = data[byte_count:]
+
+        return tag_name, values
 
     def _add_read_service(self, ioi, elements):
         """
