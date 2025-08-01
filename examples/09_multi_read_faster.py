@@ -18,8 +18,8 @@ initial read...
 from pylogix import PLC
 
 with PLC() as comm:
-    comm.IPAddress = '192.168.1.9'
-    tags = ['BaseINT', ['BaseDINT', 196], ('BaseBOOL', 193), ['BaseSTRING', 160]]
+    comm.IPAddress = '192.168.1.10'
+    tags = ['BaseINT', ['BaseDINT', 1, 196], ('BaseBOOL', 1, 193), ['BaseSTRING', 1, 160]]
     ret = comm.Read(tags)
     for r in ret:
         print(r.TagName, r.Value, r.Status)
