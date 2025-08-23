@@ -1073,10 +1073,6 @@ class PLC(object):
             data = [ord(c) for c in data]
             data = pack("<{}B".format(len(data)), *data)
 
-        # pad the data to align with 2 bytes
-        if len(data) % 2:
-            data +=  b'\x00'
-
         # append the attribute if any
         if cip_attribute:
             if isinstance(cip_attribute, list):

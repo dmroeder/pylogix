@@ -67,7 +67,10 @@ class Connection(object):
         else:
             if self.parent.Route or slot is not None:
                 path = self._unconnected_path(slot)
-                frame = self._build_unconnected_send(len(request)) + request + path
+                if len(request) %2:
+                    frame = self._build_unconnected_send(len(request)) + request + b'\x00' + path
+                else:
+                    frame = self._build_unconnected_send(len(request)) + request + path
             else:
                 frame = request
             eip_header = self._build_rr_data_header(len(frame)) + frame
