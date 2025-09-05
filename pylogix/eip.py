@@ -1130,15 +1130,20 @@ class PLC(object):
             Oh and multi-dim arrays, program scope tags...
         """
         ioi = b""
+        segments = tag_name.split(".")
 
-        for segment in tag_name.split("."):
+        # boolean arrays are special
+        last_segment = segments[-1]
+        if last_segment.endswith("]") and data_type == 0xd3:
+            _, base_tag, index = parse_tag_name(last_segment)
+            index = int(index/32)
+            segments[-1] = "{}[{}]".format(base_tag, index)
+
+        for segment in segments:
             if segment.endswith("]"):
                 _, base_tag, index = parse_tag_name(segment)
 
-                # bool arrays are special
-                if data_type == 0xd3:
-                    index = int(index/32)
-                elif data_type == None:
+                if data_type == None:
                     # assume index 0 with arrays when data type
                     # is unknown
                     if isinstance(index, list):
