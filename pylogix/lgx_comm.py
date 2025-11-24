@@ -48,7 +48,7 @@ class Connection(object):
         self._registered = False
         self._serial_number = 0
         self._session_handle = 0x0000
-        self._sequence_counter = 0
+        self._sequence_counter = 1
         self._vendor_id = 0x1337
 
     def connect(self, connected=True):
@@ -82,6 +82,7 @@ class Connection(object):
         from the PLC, decode send the data to the callback
         to be cecoded
         """
+        self._sequence_counter = 0
         self.listen_ip = ip_address
         self.callback = callback
         self.msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
