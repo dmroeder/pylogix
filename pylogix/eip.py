@@ -1045,7 +1045,7 @@ class PLC(object):
             return Response(None, None, conn[1])
 
         request = self._cip_message(cip_service, cip_class, cip_instance, cip_attribute, data)
-        status, ret_data = self.conn.send(request, False)
+        status, ret_data = self.conn.send(request, False, self.ProcessorSlot)
 
         return Response(None, ret_data, status)
 
