@@ -77,7 +77,7 @@ class Connection(object):
         
         return self._get_bytes(eip_header, connected)
 
-    def listen(self, ip_address, callback):
+    def listen(self, ip_address, callback, port):
         """ Listen for CIP Data Table Write (0x4d) messages
         from the PLC, decode send the data to the callback
         to be cecoded
@@ -86,7 +86,7 @@ class Connection(object):
         self.listen_ip = ip_address
         self.callback = callback
         self.msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.msg_socket.bind((ip_address, 44818))
+        self.msg_socket.bind((ip_address, port))
         self.msg_socket.listen(1)
         self._wait_for_connection()
 

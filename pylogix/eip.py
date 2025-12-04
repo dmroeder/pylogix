@@ -273,10 +273,10 @@ class PLC(object):
 
         return self._message(cip_service, cip_class, cip_instance, cip_attribute, data)
 
-    def ReceiveMessage(self, ip_address, callback):
+    def ReceiveMessage(self, ip_address, callback, port=44818):
 
         self.callback = callback
-        return self._receive_message(ip_address)
+        return self._receive_message(ip_address, port)
 
     def Close(self):
         """
@@ -1093,10 +1093,10 @@ class PLC(object):
 
         return cip_request
 
-    def _receive_message(self, ip_address):
+    def _receive_message(self, ip_address, port):
         """ Listen for incoming CIP Data Table Write messages
         """
-        return self.conn.listen(ip_address, self._receive_message_response)
+        return self.conn.listen(ip_address, self._receive_message_response, port)
 
     def _receive_message_response(self, data, status):
         """ Unpack CIP Data Table Write message,
