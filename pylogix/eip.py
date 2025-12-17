@@ -1104,12 +1104,16 @@ class PLC(object):
         """
         if data:
             tag_name, value = self._decode_ioi(data)
-            self.msg_values += value
-            if len(self.msg_values) >= self.element_count:
-                if len(self.msg_values) == 1:
-                    self.msg_values = self.msg_values[0]
-                self.callback(Response(tag_name, self.msg_values, status))
+            if isinstance(value, bytes):
+                self.callback(Response(tag_name, value, status))
                 self.msg_values = []
+            else:
+                self.msg_values += value
+                if len(self.msg_values) >= self.element_count:
+                    if len(self.msg_values) == 1:
+                        self.msg_values = self.msg_values[0]
+                    self.callback(Response(tag_name, self.msg_values, status))
+                    self.msg_values = []
         else:
             self.callback(Response(None, None, status))
 
@@ -1233,9 +1237,15 @@ class PLC(object):
         data_type = unpack_from("<B", data, 0)[0]
         byte_count, _, fmt = self.CIPTypes[data_type]
 
+        is_string = False
+        if data_type == 0xa0:
+            tmp = unpack_from("<H", data, 2)[0]
+            if tmp == self.StringID:
+                is_string = True
+
         # extract the values
         values = []
-        if data_type == 0xa0:
+        if data_type == 0xa0 and is_string:
             data = data[4:]
             self.element_count = unpack_from("<H", data, 0)[0]
             data = data[2:]
@@ -1250,6 +1260,9 @@ class PLC(object):
                 value = data[4:4+chr_count].decode(self.StringEncoding)
                 values.append(value)
                 data = data[byte_count:]
+        elif data_type == 0xa0 and not is_string:
+            data = data[4:]
+            values = data
         else:
             self.element_count = unpack_from("<H", data, 2)[0]
             data = data[4:]
