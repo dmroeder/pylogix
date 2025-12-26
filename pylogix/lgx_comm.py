@@ -327,6 +327,15 @@ class Connection(object):
                     if self._sequence_counter > count:
                         self.callback(data[6:], 0)
                         count = self._sequence_counter
+                elif cip_service == 0x53:
+                    self._context = unpack_from("<Q", data, 12)[0]
+                    self._sequence_counter = unpack_from("H", data, 44)[0]
+                    response = pack("<HH", response_value, 0x00)
+                    eip_header = self._send_unit_data_reply(response)
+                    self.tcpconn.send(eip_header)
+                    if self._sequence_counter > count:
+                        self.callback(data[6:], 0)
+                        count = self._sequence_counter
 
     def _build_register_session(self):
         """
