@@ -37,7 +37,7 @@ if not is_micropython():
 class PLC(object):
     __slots__ = ('IPAddress', 'Port', 'ProcessorSlot', 'SocketTimeout', 'Micro800', 'Route', 'conn', 'Offset', 'UDT',
                  'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes', "callback",
-                 'element_count', 'msg_values')
+                 'element_count', 'msg_values', 'msg_bytes')
 
     def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False, port=44818):
         """
@@ -54,6 +54,7 @@ class PLC(object):
         self.callback = None
         self.element_count = 0
         self.msg_values = []
+        self.msg_bytes = b''
         self.Offset = 0
         self.UDT = {}
         self.UDTByName = {}
@@ -1105,8 +1106,10 @@ class PLC(object):
         if data:
             tag_name, value = self._decode_ioi(data)
             if isinstance(value, bytes):
-                self.callback(Response(tag_name, value, status))
-                self.msg_values = []
+                self.msg_bytes += value
+                if len(self.msg_bytes) >= self.element_count:
+                    self.callback(Response(tag_name, self.msg_bytes, status))
+                    self.msg_bytes = b''
             else:
                 self.msg_values += value
                 if len(self.msg_values) >= self.element_count:
@@ -1261,8 +1264,10 @@ class PLC(object):
                 values.append(value)
                 data = data[byte_count:]
         elif data_type == 0xa0 and not is_string:
+            # STRUCT
             data = data[4:]
-            values = data
+            self.element_count = unpack_from("<H", data, 0)[0] * 4
+            values = data[6:]
         else:
             self.element_count = unpack_from("<H", data, 2)[0]
             data = data[4:]
