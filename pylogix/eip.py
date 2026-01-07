@@ -1208,11 +1208,11 @@ class PLC(object):
         """ Extract the tag name and value(s) from the packet
         """
         # get the tag name
-        cip_service = data[40]
-        tag_name_len = unpack_from("<B", data, 43)[0]
+        cip_service = data[0]
+        tag_name_len = unpack_from("<B", data, 3)[0]
         tag_name_len = tag_name_len if tag_name_len % 2 == 0 else tag_name_len + 1
-        tag_name = data[44:44+tag_name_len].decode(self.StringEncoding)
-        data = data[44+tag_name_len:]
+        tag_name = data[4:4+tag_name_len].decode(self.StringEncoding)
+        data = data[4+tag_name_len:]
         symbol = data[0]
 
         # decode any additional tag members/array
@@ -1267,7 +1267,10 @@ class PLC(object):
             # STRUCT
             data = data[4:]
             self.element_count = unpack_from("<H", data, 0)[0] * 4
-            values = data[6:]
+            if cip_service == 0x53:
+                values = data[6:]
+            else:
+                values = data[2:]
         else:
             self.element_count = unpack_from("<H", data, 2)[0]
             data = data[4:]
