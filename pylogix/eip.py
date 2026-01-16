@@ -1106,15 +1106,14 @@ class PLC(object):
         if data:
             tag_name, value = self._decode_ioi(data)
             if isinstance(value, bytes):
-                self.msg_bytes += value
-                if len(self.msg_bytes) >= self.element_count:
-                    self.callback(Response(tag_name, self.msg_bytes, status))
-                    self.msg_bytes = b''
+                self.callback(Response(tag_name, value, status))
             else:
                 self.msg_values += value
                 if len(self.msg_values) >= self.element_count:
                     if len(self.msg_values) == 1:
                         self.msg_values = self.msg_values[0]
+                    if status == 6:
+                        status = 0
                     self.callback(Response(tag_name, self.msg_values, status))
                     self.msg_values = []
         else:

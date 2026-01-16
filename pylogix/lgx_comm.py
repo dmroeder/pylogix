@@ -292,7 +292,7 @@ class Connection(object):
                     response = pack("<HH", response_value, 0x00)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
-                    self.callback(cip_data, 0)
+                    self.callback(cip_data, 6)
                 elif cip_service == 0x54:
                     # forward open
                     self._to_connection_id = unpack_from("<I", data, 52)[0]
@@ -324,7 +324,7 @@ class Connection(object):
                     eip_header = self._send_unit_data_reply(response)
                     self.tcpconn.send(eip_header)
                     if self._sequence_counter > count:
-                        self.callback(cip_data, 0)
+                        self.callback(cip_data, 6)
                         count = self._sequence_counter
 
     def _extract_packet(self, eip_command, packet):
