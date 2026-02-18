@@ -1,7 +1,7 @@
 # pylogix API
 
 Everything with pylogix is done via the PLC module, all the properties and modules will be
-discussed beow.  Whether you are reading, writing, pulling the tag list, etc.  To make things
+discussed below.  Whether you are reading, writing, pulling the tag list, etc.  To make things
 easy for the user, pylogix will automatically make the necessary connection to the PLC when
 you call any of the methods.
 
@@ -199,7 +199,7 @@ MyDintArray[0] [42, 43, 44, 45, 46, 47, 48, 49, 50, 51] Success
 
 #### Read a list of tags
 The best way to improve performance is to read tags in a list. Reading lists of tags will take
-advantage of the mulit-service request, packing many request into a single packet.  There is no
+advantage of the multi-service request, packing many request into a single packet.  There is no
 limit to the number of tags in the list, pylogix will break them up into as many reads as necessary.
 When reading lists, a list of the Response class will be returned.
 
@@ -349,7 +349,7 @@ MyString hello world Success
 
 
 # GetTagList
-Retreives the controllers tag list, including program scoped tags (default).  Returns the Response class,
+Retrieves the controllers tag list, including program scoped tags (default).  Returns the Response class,
 where the Value will be a list of [Tag](https://github.com/dmroeder/pylogix/blob/master/pylogix/lgx_tag.py)
 class.  pylogix also saves this list internally in TagList.  Along with the tag list, pylogix also retrieves
 the UDT definitions, which are stored as a dict in UDT.
@@ -450,7 +450,7 @@ Raw Time: 1618933282970171
 
 
 # SetPLCTime
-Synchronizes  the PLC clock with your computers time.  This is similar to what happens when you ae online with
+Synchronizes  the PLC clock with your computers time.  This is similar to what happens when you are online with
 a controller and click Set Date, Time and Zone from Workstation, in Controller Properties of RSLogix5000 or
 Studio5000 Logix Designer.  Returns the Response class, which is mainly useful for the status.
 
@@ -557,7 +557,7 @@ bytes (use struct.pack).
 Please do not open issues asking for help with finding CIP objects, there are just too many out there. Ask in the
 discord server as well.  There are many users, so the pool of knowledge is larger.
 
-<details><summary>Exammple - Get Major/Minor Fault Code</summary>
+<details><summary>Example - Get Major/Minor Fault Code</summary>
 <p>
 
 ```python
@@ -583,7 +583,7 @@ provided callback function.  There are 2 required parameters, IP Address and a r
 to send the data back to.  The IP address should be your local machine IP, which the PLC MSG
 should be configured to send to. Similar to Read/Write, the base data types are supported.
 
-<details><summary>Exammple - Receive message</summary>
+<details><summary>Example - Receive message</summary>
 <p>
 
 ```python
@@ -606,7 +606,7 @@ and data type for the purpose of not having to request this each time a tag is r
 to.  There are users who read a list of 1000 or more unique tag names, retrieving the data type
 essentially doubles the time that it would take to read the values.  While the performance has
 increased drastically in this case by utilizing the mult-service request to retrieve the data
-type.  Still, there ae users that want maximum performance, so Read/Write allows providing the
+type.  Still, there are users that want maximum performance, so Read/Write allows providing the
 data type up front.  Doing this adds the tag name and data type to the KnownTags dict up front,
 then skips the initial exchange. You can see the atomic data type values by printing the CIPTypes
 dict:
