@@ -669,8 +669,13 @@ class PLC(object):
                 if data_type == 0xa0:
                     dt_size -= 8
             else:
-                dt_size = self.CIPTypes[160][0]
-                data_type = 0
+                if type(wd[1]) == str:
+                    data_type = 0xa0
+                elif type(wd[1]) == float:
+                    data_type = 0xca
+                else:
+                    data_type = 0x00
+                dt_size = self.CIPTypes[data_type][0]
 
             typ = type(wd[1])
             value = typ(wd[1])
