@@ -77,7 +77,7 @@ class Connection(object):
         
         return self._get_bytes(eip_header, connected)
 
-    def listen(self, ip_address, callback):
+    def listen(self, ip_address, callback, port):
         """ Listen for CIP Data Table Write (0x4d) messages
         from the PLC, decode send the data to the callback
         to be cecoded
@@ -86,7 +86,7 @@ class Connection(object):
         self.listen_ip = ip_address
         self.callback = callback
         self.msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.msg_socket.bind((ip_address, 44818))
+        self.msg_socket.bind((ip_address, port))
         self.msg_socket.listen(1)
         self._wait_for_connection()
 
@@ -262,6 +262,9 @@ class Connection(object):
             try:
                 data = self.tcpconn.recv(1024)
                 eip_command = unpack_from("<H", data, 0)[0]
+                self._context = unpack_from("<Q", data, 12)[0]
+                if eip_command == 0x6f or eip_command == 0x70:
+                    cip_service, response_value, cip_data = self._extract_packet(eip_command, data)
             except KeyboardInterrupt:
                 self.callback(None, "Keyboard Interrupt")
                 return
@@ -272,34 +275,26 @@ class Connection(object):
                 return
 
             if eip_command == 0x6f:
-                cip_service = unpack_from("<B", data, 40)[0]
-                response_value = cip_service | 0x80
                 if cip_service == 0x4d:
-                    # unconnected cip data table write
-                    self._context = unpack_from("<Q", data, 12)[0]
-                    response = pack("<HH", response_value, 0x00)
+                    response = pack("<HH", response_value, 0)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
-                    self.callback(data, 0)
+                    self.callback(cip_data, 0)
                 elif cip_service == 0x4e:
                     # forward close
-                    self._context = unpack_from("<Q", data, 12)[0]
-                    response = pack("<HH", response_value, 0x00)
                     command = response + self._build_forward_close_reply()
                     reply = self._build_rr_data_header(len(command)) + command
                     self.tcpconn.send(reply)
                     self._sequence_counter = 0
                     count = 0
                 elif cip_service == 0x53:
-                    # fragmented write
-                    self._context = unpack_from("<Q", data, 12)[0]
+                    # multi packet
                     response = pack("<HH", response_value, 0x00)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
-                    self.callback(data, 0)
+                    self.callback(cip_data, 6)
                 elif cip_service == 0x54:
                     # forward open
-                    self._context = unpack_from("<Q", data, 12)[0]
                     self._to_connection_id = unpack_from("<I", data, 52)[0]
                     self._serial_number = unpack_from("<H", data, 56)[0]
                     self._originator_serial = unpack_from("<I", data, 60)[0]
@@ -309,24 +304,44 @@ class Connection(object):
                     self.tcpconn.send(eip_header)
                 else:
                     # unsupported service
-                    self._context = unpack_from("<Q", data, 12)[0]
                     response = pack("<HH", response_value, 0x08)
                     eip_header = self._build_rr_data_header(len(response)) + response
                     self.tcpconn.send(eip_header)
                     self.callback(None, 8)
             elif eip_command == 0x70:
-                cip_service = unpack_from("<B", data, 46)[0]
-                response_value = cip_service | 0x80
                 if cip_service == 0x4d:
                     # connected cip data table write
-                    self._context = unpack_from("<Q", data, 12)[0]
                     self._sequence_counter = unpack_from("H", data, 44)[0]
                     response = pack("<HH", response_value, 0x00)
                     eip_header = self._send_unit_data_reply(response)
                     self.tcpconn.send(eip_header)
                     if self._sequence_counter > count:
-                        self.callback(data[6:], 0)
+                        self.callback(cip_data, 0)
                         count = self._sequence_counter
+                elif cip_service == 0x53:
+                    self._sequence_counter = unpack_from("H", data, 44)[0]
+                    response = pack("<HH", response_value, 0x00)
+                    eip_header = self._send_unit_data_reply(response)
+                    self.tcpconn.send(eip_header)
+                    if self._sequence_counter > count:
+                        self.callback(cip_data, 6)
+                        count = self._sequence_counter
+
+    def _extract_packet(self, eip_command, packet):
+
+        if eip_command == 0x6f:
+            # unconnected
+            cip_data_size, cip_service = unpack_from("<HB", packet, 38)
+            cip_data = packet[-cip_data_size:]
+        else:
+            # commected
+            cip_data_size, _, cip_service = unpack_from("<HHB", packet, 42)
+            cip_data = packet[-cip_data_size+2:]
+
+        response = cip_service | 0x80
+        return cip_service, response, cip_data
+
+
 
     def _build_register_session(self):
         """

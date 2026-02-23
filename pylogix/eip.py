@@ -37,7 +37,7 @@ if not is_micropython():
 class PLC(object):
     __slots__ = ('IPAddress', 'Port', 'ProcessorSlot', 'SocketTimeout', 'Micro800', 'Route', 'conn', 'Offset', 'UDT',
                  'UDTByName', 'KnownTags', 'TagList', 'ProgramNames', 'StringID', 'StringEncoding', 'CIPTypes', "callback",
-                 'element_count', 'msg_values')
+                 'element_count', 'msg_values', 'msg_bytes')
 
     def __init__(self, ip_address="", slot=0, timeout=5.0, Micro800=False, port=44818):
         """
@@ -54,6 +54,7 @@ class PLC(object):
         self.callback = None
         self.element_count = 0
         self.msg_values = []
+        self.msg_bytes = b''
         self.Offset = 0
         self.UDT = {}
         self.UDTByName = {}
@@ -273,10 +274,10 @@ class PLC(object):
 
         return self._message(cip_service, cip_class, cip_instance, cip_attribute, data)
 
-    def ReceiveMessage(self, ip_address, callback):
+    def ReceiveMessage(self, ip_address, callback, port=44818):
 
         self.callback = callback
-        return self._receive_message(ip_address)
+        return self._receive_message(ip_address, port)
 
     def Close(self):
         """
@@ -1093,10 +1094,10 @@ class PLC(object):
 
         return cip_request
 
-    def _receive_message(self, ip_address):
+    def _receive_message(self, ip_address, port):
         """ Listen for incoming CIP Data Table Write messages
         """
-        return self.conn.listen(ip_address, self._receive_message_response)
+        return self.conn.listen(ip_address, self._receive_message_response, port)
 
     def _receive_message_response(self, data, status):
         """ Unpack CIP Data Table Write message,
@@ -1104,12 +1105,17 @@ class PLC(object):
         """
         if data:
             tag_name, value = self._decode_ioi(data)
-            self.msg_values += value
-            if len(self.msg_values) >= self.element_count:
-                if len(self.msg_values) == 1:
-                    self.msg_values = self.msg_values[0]
-                self.callback(Response(tag_name, self.msg_values, status))
-                self.msg_values = []
+            if isinstance(value, bytes):
+                self.callback(Response(tag_name, value, status))
+            else:
+                self.msg_values += value
+                if len(self.msg_values) >= self.element_count:
+                    if len(self.msg_values) == 1:
+                        self.msg_values = self.msg_values[0]
+                    if status == 6:
+                        status = 0
+                    self.callback(Response(tag_name, self.msg_values, status))
+                    self.msg_values = []
         else:
             self.callback(Response(None, None, status))
 
@@ -1201,11 +1207,11 @@ class PLC(object):
         """ Extract the tag name and value(s) from the packet
         """
         # get the tag name
-        cip_service = data[40]
-        tag_name_len = unpack_from("<B", data, 43)[0]
+        cip_service = data[0]
+        tag_name_len = unpack_from("<B", data, 3)[0]
         tag_name_len = tag_name_len if tag_name_len % 2 == 0 else tag_name_len + 1
-        tag_name = data[44:44+tag_name_len].decode(self.StringEncoding)
-        data = data[44+tag_name_len:]
+        tag_name = data[4:4+tag_name_len].decode(self.StringEncoding)
+        data = data[4+tag_name_len:]
         symbol = data[0]
 
         # decode any additional tag members/array
@@ -1233,9 +1239,15 @@ class PLC(object):
         data_type = unpack_from("<B", data, 0)[0]
         byte_count, _, fmt = self.CIPTypes[data_type]
 
+        is_string = False
+        if data_type == 0xa0:
+            tmp = unpack_from("<H", data, 2)[0]
+            if tmp == self.StringID:
+                is_string = True
+
         # extract the values
         values = []
-        if data_type == 0xa0:
+        if data_type == 0xa0 and is_string:
             data = data[4:]
             self.element_count = unpack_from("<H", data, 0)[0]
             data = data[2:]
@@ -1250,6 +1262,14 @@ class PLC(object):
                 value = data[4:4+chr_count].decode(self.StringEncoding)
                 values.append(value)
                 data = data[byte_count:]
+        elif data_type == 0xa0 and not is_string:
+            # STRUCT
+            data = data[4:]
+            self.element_count = unpack_from("<H", data, 0)[0] * 4
+            if cip_service == 0x53:
+                values = data[6:]
+            else:
+                values = data[2:]
         else:
             self.element_count = unpack_from("<H", data, 2)[0]
             data = data[4:]
