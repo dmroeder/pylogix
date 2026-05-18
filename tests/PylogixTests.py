@@ -371,7 +371,7 @@ class PylogixTests(unittest.TestCase):
         values = [self.r.Sint() for i in range(10)]
         write_request = [("BaseSINTArray[{}]".format(i), values[i], 0xc2) for i in range(10)]
         read_request = [("BaseSINTArray[{}]".format(i), 1, 0xc2) for i in range(10)]
-        self.KnownTags = {}
+        self.comm.KnownTags = {}
         self.comm.Write(write_request)
         
         self.comm.KnownTags = {}
