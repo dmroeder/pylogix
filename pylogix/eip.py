@@ -16,21 +16,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 """
-
 import math
-import re
 import time
 
+from . import utils
 from .lgx_comm import Connection
 from .lgx_device import Device
 from .lgx_response import Response
 from .lgx_tag import Tag, UDT
-from .utils import is_micropython
-from random import randrange
 from struct import pack, unpack_from
 
 
-if not is_micropython():
+if not utils.is_micropython():
     from datetime import datetime, timedelta
 
 # noinspection PyMethodMayBeStatic
@@ -238,7 +235,7 @@ class PLC(object):
 
         returns Response class (.TagName, .Value, .Status)
         """
-        if is_micropython():
+        if utils.is_micropython():
             # limited implementation of lwip_socket_setsockopt()
             # https://github.com/micropython/micropython/issues/2691
             status = "Discover not available on micropython, due to limited socket module"
@@ -293,7 +290,7 @@ class PLC(object):
         if not conn[0]:
             return Response(tag_name, None, conn[1])
 
-        tag, base_tag, index = parse_tag_name(tag_name)
+        tag, base_tag, index = utils.parse_tag_name(tag_name)
         resp = self._initial_read(tag, base_tag, data_type)
         if resp[2] != 0 and resp[2] != 6:
             return Response(tag_name, None, resp[2])
@@ -314,14 +311,14 @@ class PLC(object):
             count = elements
             if data_type == 0xd3:
                 # bool array
-                words = get_word_count(index, count, bit_count)
+                words = utils.get_word_count(index, count, bit_count)
                 ioi = self._build_ioi(tag_name, data_type)
                 request = self._add_read_service(ioi, words)
-            elif bit_of_word(tag):
+            elif utils.bit_of_word(tag):
                 # bits of word
                 bit_pos = int(tag_name.split('.')[-1])
                 ioi = self._build_ioi(tag_name, data_type)
-                words = get_word_count(bit_pos, count, bit_count)
+                words = utils.get_word_count(bit_pos, count, bit_count)
                 request = self._add_read_service(ioi, words)
             elif iterations > 1:
                 # only for element counts > 65535
@@ -473,7 +470,7 @@ class PLC(object):
         """
         read_services = []
         for tag in tags:
-            tag_name, base_tag, index = parse_tag_name(tag[0])
+            tag_name, base_tag, index = utils.parse_tag_name(tag[0])
 
             if base_tag in self.KnownTags:
                 data_type = self.KnownTags[base_tag][0]
@@ -485,11 +482,11 @@ class PLC(object):
             ioi = self._build_ioi(tag_name, data_type)
 
             if data_type == 0xd3:
-                element_count = get_word_count(index, tag[1], 32)
-            elif bit_of_word(tag_name) and data_type is not None:
+                element_count = utils.get_word_count(index, tag[1], 32)
+            elif utils.bit_of_word(tag_name) and data_type is not None:
                     bit_pos = int(tag_name.split('.')[-1])
                     bit_count = self.CIPTypes[data_type][0] * 8
-                    element_count = get_word_count(bit_pos, tag[1], bit_count)
+                    element_count = utils.get_word_count(bit_pos, tag[1], bit_count)
             elif data_type == None:
                 element_count = 1
             else:
@@ -572,7 +569,7 @@ class PLC(object):
         if not conn[0]:
             return Response(tag_name, None, conn[1])
 
-        tag, base_tag, index = parse_tag_name(tag_name)
+        tag, base_tag, index = utils.parse_tag_name(tag_name)
         resp = self._initial_read(tag, base_tag, data_type)
         if resp[2] != 0 and resp[2] != 6:
             return Response(tag_name, None, resp[2])
@@ -627,9 +624,9 @@ class PLC(object):
                     self.Offset += len(w) * self.CIPTypes[data_type][0]
             else:
                 # write fits in one packet
-                if bit_of_word(tag_name) or data_type == 0xd3:
+                if utils.bit_of_word(tag_name) or data_type == 0xd3:
                     byte_count = self.CIPTypes[data_type][0] * 8
-                    high, low, tags = mod_write_masks(tag_name, values[0], byte_count)
+                    high, low, tags = utils.mod_write_masks(tag_name, values[0], byte_count)
                     for i in range(len(high)):
                         ioi = self._build_ioi(tags[i], data_type)
                         request = self._add_mod_write_service(ioi, data_type, high[i], low[i])
@@ -661,7 +658,7 @@ class PLC(object):
         write_values = []
         for wd in write_data:
 
-            tag_name, base_tag, index = parse_tag_name(wd[0])
+            tag_name, base_tag, index = utils.parse_tag_name(wd[0])
 
             if base_tag in self.KnownTags.keys():
                 data_type = self.KnownTags[base_tag][0]
@@ -688,10 +685,10 @@ class PLC(object):
 
             rsp_tag_size = min_tag_size + len(base_tag) + dt_size
 
-            if bit_of_word(tag_name) or data_type == 0xd3:
+            if utils.bit_of_word(tag_name) or data_type == 0xd3:
                 # bool arrays are unique
                 byte_count = self.CIPTypes[data_type][0] * 8
-                high, low, tags = mod_write_masks(tag_name, value, byte_count)
+                high, low, tags = utils.mod_write_masks(tag_name, value, byte_count)
                 temp_segments = []
                 tmp_count = tag_count
                 tmp_write_values = []
@@ -768,7 +765,7 @@ class PLC(object):
         if status == 0:
             # get the time from the packet
             plc_time = unpack_from('<Q', ret_data, 56)[0]
-            if raw or is_micropython():
+            if raw or utils.is_micropython():
                 value = plc_time
             else:
                 human_time = datetime(1970, 1, 1) + timedelta(microseconds=plc_time)
@@ -1149,13 +1146,13 @@ class PLC(object):
         # boolean arrays are special
         last_segment = segments[-1]
         if last_segment.endswith("]") and data_type == 0xd3:
-            _, base_tag, index = parse_tag_name(last_segment)
+            _, base_tag, index = utils.parse_tag_name(last_segment)
             index = int(index/32)
             segments[-1] = "{}[{}]".format(base_tag, index)
 
         for segment in segments:
             if segment.endswith("]"):
-                _, base_tag, index = parse_tag_name(segment)
+                _, base_tag, index = utils.parse_tag_name(segment)
 
                 if data_type == None:
                     # assume index 0 with arrays when data type
@@ -1338,9 +1335,9 @@ class PLC(object):
             if data_type == 0xca or data_type == 0xcb:
                 value = float(value)
             elif data_type == 0xa0:
-                value = self._make_standard_string(value)
+                value = utils.make_standard_string(value, self.StringEncoding)
             elif data_type == 0xda or data_type == 0xd0:
-                value = self._make_special_string(value)
+                value = utils.make_special_string(value, self.StringEncoding)
             try:
                 for i in range(len(value)):
                     el = value[i]
@@ -1348,7 +1345,7 @@ class PLC(object):
             except Exception:
                 # handling special format for micropython for bools
                 # boolean format ? doesn't exist for upy struct module
-                if self.CIPTypes[data_type][2] == '<?' and is_micropython():
+                if self.CIPTypes[data_type][2] == '<?' and utils.is_micropython():
                     write_service += pack('B', value)
                 else:
                     write_service += pack(self.CIPTypes[data_type][2], value)
@@ -1398,9 +1395,9 @@ class PLC(object):
             if data_type == 0xca or data_type == 0xcb:
                 value = float(value)
             elif data_type == 0xa0:
-                value = self._make_standard_string(value)
+                value = utils.make_standard_string(value, self.StringEncoding)
             elif data_type == 0xda or data_type == 0xd0:
-                value = self._make_special_string(value)
+                value = utils.make_special_string(value, self.StringEncoding)
             try:
                 for i in range(len(value)):
                     el = value[i]
@@ -1456,11 +1453,11 @@ class PLC(object):
         In the case of BOOL arrays and bits of
             a word, we do some reformatting
         """
-        tag, base_tag, index = parse_tag_name(tag_name)
+        tag, base_tag, index = utils.parse_tag_name(tag_name)
         data_type = self.KnownTags[base_tag][0]
 
         # if A bit of word was requested
-        if bit_of_word(tag_name):
+        if utils.bit_of_word(tag_name):
             words = self._get_values(tag_name, data)
             values = self._words_to_bits(tag_name, words, count=elements)
         elif data_type == 0xd3:
@@ -1475,7 +1472,7 @@ class PLC(object):
         """
         Extract the values from the reply/replies
         """
-        tag, base_tag, index = parse_tag_name(tag_name)
+        tag, base_tag, index = utils.parse_tag_name(tag_name)
         data_type = self.KnownTags[base_tag][0]
         fmt = self.CIPTypes[data_type][2]
         values = []
@@ -1527,7 +1524,7 @@ class PLC(object):
             else:
                 # handling special format for micropython for bools
                 # boolean format ? doesn't exist for upy struct module
-                if fmt == '<?' and is_micropython():
+                if fmt == '<?' and utils.is_micropython():
                     bool_int_val = unpack_from('B', data, index)[0]
 
                     if bool_int_val == 255 or bool_int_val == 1:
@@ -1555,20 +1552,20 @@ class PLC(object):
         for t in tags:
 
             if isinstance(t, (list, tuple)):
-                tag_name, base_tag, index = parse_tag_name(t[0])
+                tag_name, base_tag, index = utils.parse_tag_name(t[0])
                 if len(t) == 3 and t[2] != None:
                     self.KnownTags[base_tag] = (t[2], 0)
                 else:
                     unk_tags.append(t)
             else:
-                tag_name, base_tag, index = parse_tag_name(t)
+                tag_name, base_tag, index = utils.parse_tag_name(t)
                 if base_tag not in self.KnownTags:
                     unk_tags.append(t)
 
         # get the unknown tags
         if unk_tags:
             for tag in unk_tags:
-                tag_name, base_tag, index = parse_tag_name(tag[0])
+                tag_name, base_tag, index = utils.parse_tag_name(tag[0])
                 self._initial_read(tag_name, base_tag, tag[2])
 
     def _initial_read(self, tag, base_tag, data_type):
@@ -1620,7 +1617,7 @@ class PLC(object):
         # calculate the limit for values in each request
         limit = int(space_for_payload / bytes_per_value)
         # split the list up into multiple smaller lists
-        if bit_of_word(tag) or data_type == 0xd3:
+        if utils.bit_of_word(tag) or data_type == 0xd3:
             # booleans are packed into 4 byte chunks and will write
             # each chunk individually
             chunks = [write_values]
@@ -1633,7 +1630,7 @@ class PLC(object):
         """
         Convert words to a list of true/false
         """
-        tag, base_tag, index = parse_tag_name(tag_name)
+        tag, base_tag, index = utils.parse_tag_name(tag_name)
         data_type = self.KnownTags[base_tag][0]
         bit_count = self.CIPTypes[data_type][0] * 8
 
@@ -1645,7 +1642,7 @@ class PLC(object):
         ret = []
         for v in value:
             for i in range(0, bit_count):
-                ret.append(bit_value(v, i))
+                ret.append(utils.bit_value(v, i))
 
         return ret[bit_pos:bit_pos + count]
 
@@ -1669,7 +1666,7 @@ class PLC(object):
         reply = []
         for i, segment in enumerate(data_segments):
             status = unpack_from("<B", segment, 2)[0]
-            tag_name, base_tag, index  = parse_tag_name(tags[i][0])
+            tag_name, base_tag, index  = utils.parse_tag_name(tags[i][0])
             if status == 0:
                 data_type = unpack_from("<B", segment, 4)[0]
 
@@ -1688,11 +1685,11 @@ class PLC(object):
                         value = segment[12:12+name_length].decode(self.StringEncoding)
                     else:
                         value = segment[12:12+data_len]
-                elif data_type == 0xd3 or bit_of_word(tag_name):
+                elif data_type == 0xd3 or utils.bit_of_word(tag_name):
                     type_fmt = self.CIPTypes[data_type][2]
                     value = unpack_from(type_fmt, segment, 6)[0]
                     value = self._words_to_bits(tag_name, [value], 1)[0]
-                elif data_type == 0xc1 and is_micropython():
+                elif data_type == 0xc1 and utils.is_micropython():
                     type_fmt = "b"
                     value = unpack_from(type_fmt, segment, 6)[0]
                     if value == 1:
@@ -1768,188 +1765,5 @@ class PLC(object):
 
         return tag_list
 
-    def _make_standard_string(self, string):
-        """
-        String for Compact/Control Logix
-        """
-        work = []
-        string = string[:82]
-        temp = pack('<I', len(string)).decode(self.StringEncoding)
-        for char in temp:
-            work.append(ord(char))
-        for char in string:
-            work.append(ord(char))
-        for _ in range(len(string), 84):
-            work.append(0x00)
-        return work
-
-    def _make_special_string(self, string):
-        """
-        String for Micro800 and other platforms
-        """
-        work = []
-        temp = pack('<B', len(string)).decode(self.StringEncoding)
-        for char in temp:
-            work.append(ord(char))
-        for char in string:
-            work.append(ord(char))
-        return work
-
     def _is_not_used(self):
         pass
-
-
-def bit_of_word_state(tag, value):
-    """
-    Find the array/bit element at the end of a tag
-    and return whether that bit is true/false in the
-    value provided
-    ex: (bit 4 of the number 30313 is False)
-    """
-    bit_pattern = r'\d+$'
-    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
-    try:
-        index = re.search(array_pattern, tag).group(0)
-        index = index[1:-1]
-    except Exception:
-        index = re.search(bit_pattern, tag).group(0)
-
-    index = int(index) % 32
-
-    return bit_value(value, index)
-
-
-def get_word_count(start, length, bits):
-    """
-    Get the number of words that the requested
-    bits would occupy.  We have to take into account
-    how many bits are in a word and the fact that the
-    number of requested bits can span multiple words.
-    """
-    new_start = start % bits
-    new_end = new_start + length
-
-    total_words = (new_end - 1) / bits
-    return int(total_words + 1)
-
-
-def parse_tag_name(tag):
-    """
-    Parse the tag name into it's base tag (remove array index and/or
-    bit) and get the array index if it exists
-
-    ex: MyTag.Name[42] returns:
-    MyTag.Name[42], MyTag.Name, 42
-    """
-    bit_end_pattern = r'\.\d+$'
-    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
-
-    # get the array index
-    try:
-        index = re.search(array_pattern, tag).group(0)
-        index = index[1:-1]
-        if ',' in index:
-            index = index.split(',')
-            index = list(map(int, index))
-        else:
-            index = int(index)
-    except Exception:
-        index = 0
-
-    # get the base tag name
-    base_tag = re.sub(bit_end_pattern, '', tag)
-    base_tag = re.sub(array_pattern, '', base_tag)
-
-    return tag, base_tag, index
-
-
-def bin_to_int(bits, bpw):
-    """
-    Convert a list of bits to an integer
-    """
-    sign_limit = 2 ** (bpw - 1) - 1
-    conv = (2 ** bpw)
-
-    value = 0
-    for bit in reversed(bits):
-        value = (value << 1) | bit
-
-    if value > sign_limit:
-        value -= conv
-
-    return value
-
-
-def mod_write_masks(tag, values, bpw):
-    """
-    The whole goal here is to generate lists of values for modified writes
-    (BOOL array or bits of DINT)
-
-    We can only write 32 bits at a time, so we'll take the request from the user
-    make the mask lists, then break them up into 4 byte chunks.  Lastly, we'll
-    convert them to values.
-    """
-    bit_pattern = r'\.\d+$'
-    array_pattern = r'\[\s*(0|[1-9][0-9]*)(\s*,\s*(0|[1-9][0-9]*))*\s*\]$'
-
-    try:
-        # A bit of a word
-        index = int(re.search(bit_pattern, tag).group(0)[1:])
-    except Exception:
-        # boolean arrays
-        index = re.search(array_pattern, tag).group(0)
-        index = int(index[1:-1])
-
-    # figure out how many words our bits will occupy
-    start_bit = index % bpw
-    bit_count = len(values)
-    word_count = ((start_bit % bpw) + bit_count) / bpw
-    word_count = int(math.ceil(word_count))
-
-    # create template high/low mask lists.
-    mask_high = [0 for _ in range(word_count * bpw)]
-    mask_low = [1 for _ in range(word_count * bpw)]
-
-    # map our values onto our masks
-    mask_high[start_bit:start_bit + len(values)] = values
-    mask_low[start_bit:start_bit + len(values)] = values
-
-    # split up our lists into chunks of n bytes
-    segments_high = [mask_high[x:x + bpw] for x in range(0, len(mask_high), bpw)]
-    segments_low = [mask_low[x:x + bpw] for x in range(0, len(mask_low), bpw)]
-
-    # convert our finalized lists of masks to values to be written
-    values_high = [bin_to_int(seg, bpw) for seg in segments_high]
-    values_low = [bin_to_int(seg, bpw) for seg in segments_low]
-
-    tags = [tag]
-    for _ in range(word_count - 1):
-        index += bpw
-        new_index = "[{}]".format(index)
-        new_tag = re.sub(array_pattern, new_index, tag)
-        tags.append(new_tag)
-
-    return values_high, values_low, tags
-
-
-def bit_of_word(tag):
-    """
-    Test if the user is trying to write to a bit of a word
-    ex. Tag.1 returns True (Tag = DINT)
-    """
-    s = tag.split('.')
-    if s[len(s) - 1].isdigit():
-        return True
-    else:
-        return False
-
-
-def bit_value(value, bit_no):
-    """
-    Returns the specific bit of a words value
-    """
-    mask = 1 << bit_no
-    if value & mask:
-        return True
-    else:
-        return False
