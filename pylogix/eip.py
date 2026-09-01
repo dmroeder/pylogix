@@ -1051,7 +1051,10 @@ class PLC(object):
             return Response(None, None, conn[1])
 
         request = self._cip_message(cip_service, cip_class, cip_instance, cip_attribute, data)
-        status, ret_data = self.conn.send(request, False, self.ProcessorSlot)
+        if self.ProcessorSlot != 0:
+            status, ret_data = self.conn.send(request, False, self.ProcessorSlot)
+        else:
+            status, ret_data = self.conn.send(request, False)
 
         return Response(None, ret_data, status)
 
