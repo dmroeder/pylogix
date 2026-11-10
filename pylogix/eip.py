@@ -1684,7 +1684,7 @@ class PLC(object):
                         name_length = unpack_from("<I", segment, 8)[0]
                         value = segment[12:12+name_length].decode(self.StringEncoding)
                     else:
-                        value = segment[12:12+data_len]
+                        value = segment[8:8+data_len]
                 elif data_type == 0xd3 or utils.bit_of_word(tag_name):
                     type_fmt = self.CIPTypes[data_type][2]
                     value = unpack_from(type_fmt, segment, 6)[0]
