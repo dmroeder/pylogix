@@ -979,16 +979,23 @@ class PLC(object):
         status = 0
         part_offset = 0
         remaining = data_len
-        while remaining > 0 and not status:
+        while remaining > 0:
             packet_data = pack("<IH", part_offset, remaining)
             request = self._cip_message(0x4c, 0x6c, instance, None, packet_data)
             status, ret_data = self.conn.send(request)
-            if status == 6:
-                status = 0
+            if status not in (0, 6):
+                break
             if len(data):
                 part = ret_data[50:]
                 ret_data = part
+                if not len(part):
+                    break
             data = data + ret_data
+            # success (0) means the target sent all it has: the definition
+            # can be up to 3 octets shorter than data_len, so do not ask
+            # again from its end; only a partial transfer (6) has more
+            if status == 0:
+                break
             part_offset = len(data) - 50
             remaining = data_len - part_offset
 
