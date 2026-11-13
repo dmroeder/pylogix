@@ -16,7 +16,7 @@ from pylogix import PLC  # noqa: E402
 from pylogix.lgx_tag import Tag  # noqa: E402
 
 
-def _definition(name, members):
+def _definition(name, members, scope=True):
     """Template definition: 8 octets per member, then 'Name;n...' and the
     member names, NUL terminated."""
     out = b''
@@ -24,7 +24,10 @@ def _definition(name, members):
         # array size, type DINT (0xc4), offset
         out += pack('<HHI', 0, 0xc4, i * 4)
     # name, ';n', then per member a scope pair (no NUL octets)
-    out += name.encode() + b';n' + b'\x01\x03' * len(members) + b'\x00'
+    out += name.encode() + b';n'
+    if scope:
+        out += b'\x01\x03' * len(members)
+    out += b'\x00'
     for m in members:
         out += m.encode() + b'\x00'
     return out
@@ -42,12 +45,13 @@ class FakeConn(object):
     beyond the end of the definition: 0 (an empty success) or a CIP error.
     """
 
-    def __init__(self, definition, member_count, end_status, max_fragment=None):
+    def __init__(self, definition, member_count, end_status, max_fragment=None, attr3=True):
         self.total = _words(len(definition)) * 4 - 23
         self.definition = definition + b'\x00' * (self.total - len(definition))
         self.member_count = member_count
         self.end_status = end_status
         self.max_fragment = max_fragment
+        self.attr3 = attr3
         self.reads = []
 
     @staticmethod
@@ -63,10 +67,16 @@ class FakeConn(object):
             words = _words(len(self.definition))
             data = pack('<H', 4)
             data += pack('<HHI', 4, 0, words)
-            data += pack('<HHH', 3, 0, 0)
+            status = 0
+            if self.attr3:
+                data += pack('<HHH', 3, 0, 0)
+            else:
+                # attribute not supported: a status and no value
+                data += pack('<HH', 3, 0x14)
+                status = 0x0a
             data += pack('<HHH', 2, 0, self.member_count)
             data += pack('<HHH', 1, 0, 0x1234)
-            return 0, self._reply(service, 0, data)
+            return status, self._reply(service, status, data)
         if service == 0x4c:
             offset, length = unpack_from('<IH', request, len(request) - 6)
             self.reads.append((offset, length))
@@ -93,9 +103,9 @@ def _struct_tag(type_value):
 
 class ReadTemplateTests(unittest.TestCase):
 
-    def _read(self, end_status, max_fragment=None):
-        definition = _definition('Recipe_t', ['Speed', 'Count'])
-        conn = FakeConn(definition, 2, end_status, max_fragment)
+    def _read(self, end_status, max_fragment=None, attr3=True, scope=True):
+        definition = _definition('Recipe_t', ['Speed', 'Count'], scope)
+        conn = FakeConn(definition, 2, end_status, max_fragment, attr3)
         plc = PLC()
         plc.conn = conn
         tags = [_struct_tag(0x0abc)]
@@ -125,6 +135,18 @@ class ReadTemplateTests(unittest.TestCase):
         plc, tags, conn = self._read(end_status=0x20, max_fragment=8)
         self._check(plc, tags)
         self.assertGreater(len(conn.reads), 1)
+
+    def test_attribute_3_not_supported(self):
+        """A target that answers attribute 3 with 0x14 (no value): the
+        member count (attribute 2) is still read from its own entry."""
+        plc, tags, conn = self._read(end_status=0x20, attr3=False)
+        self._check(plc, tags)
+
+    def test_name_without_scope(self):
+        """A definition whose name is just 'Name;n' (no scope octets)."""
+        plc, tags, conn = self._read(end_status=0x20, scope=False)
+        self._check(plc, tags)
+        self.assertEqual(plc.UDT[0x0abc].Fields[0].AccessRight, None)
 
 
 if __name__ == '__main__':

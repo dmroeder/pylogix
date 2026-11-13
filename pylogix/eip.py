@@ -881,12 +881,12 @@ class PLC(object):
                 if u.DataTypeValue not in self.UDT.keys():
                     temp = self._get_template_attribute(u.DataTypeValue)
 
-                    block = temp[46:]
-                    if len(block) > 24:
-                        val = unpack_from('<I', block, 10)[0]
+                    attrs = self._parse_template_attributes(temp)
+                    if 4 in attrs and 2 in attrs:
+                        val = attrs[4]
                         words = (val * 4) - 23
                         size = int(math.ceil(words / 4.0)) * 4
-                        member_count = int(unpack_from('<H', block, 24)[0])
+                        member_count = int(attrs[2])
                         iter_template[u.DataTypeValue] = template[u.DataTypeValue] = [size, '', member_count]
                     else:
                         print("Received invalid template attribute for", u.TagName)
@@ -912,7 +912,9 @@ class PLC(object):
                     field = Tag()
                     field.UDT = udt
                     field.TagName = str(members[i].decode('utf-8'))
-                    if len(definitions) > 1:
+                    # the scope octets after ';n' are optional: a target
+                    # may send the name as just 'Name;n'
+                    if len(definitions) > 1 and len(definitions[1]) >= 1 + i * 2:
                         scope = unpack_from('<BB', definitions[1], 1 + (i - 1) * 2)
                         field.AccessRight = scope[1] & 0x03
                         field.Scope0 = scope[0]
@@ -970,6 +972,38 @@ class PLC(object):
         request = self._cip_message(0x03, 0x6c, instance, [0x04, 0x03, 0x02, 0x01])
         status, ret_data = self.conn.send(request)
         return ret_data
+
+    @staticmethod
+    def _parse_template_attributes(ret_data):
+        """
+        Parse the Get Attribute List reply of a template (attributes 4, 3,
+        2 and 1) into {attribute: value}. Each entry is the attribute,
+        its status and, only when the status is 0, its value, so an
+        attribute the target does not support (status 0x14) is skipped
+        instead of shifting the ones after it.
+        """
+        sizes = {1: ('<H', 2), 2: ('<H', 2), 3: ('<H', 2), 4: ('<I', 4)}
+        attrs = {}
+        if not ret_data or len(ret_data) < 52:
+            return attrs
+        data = ret_data[50:]
+        count = unpack_from('<H', data, 0)[0]
+        pos = 2
+        for _ in range(count):
+            if pos + 4 > len(data):
+                break
+            attr, status = unpack_from('<HH', data, pos)
+            pos += 4
+            if status:
+                continue
+            if attr not in sizes:
+                break
+            fmt, size = sizes[attr]
+            if pos + size > len(data):
+                break
+            attrs[attr] = unpack_from(fmt, data, pos)[0]
+            pos += size
+        return attrs
 
     def _get_template(self, instance, data_len):
         """
