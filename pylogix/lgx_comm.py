@@ -31,10 +31,10 @@ class Connection(object):
         self.parent = parent
 
         self.ConnectionSize = None  # Default to try Large, then Small Fwd Open.
-        self.Socket = socket.socket()
+        self.Socket = None
         self.SocketConnected = False
 
-        self.msg_socket = socket.socket()
+        self.msg_socket = None
         self.tcpconn = None
         self.listen_ip = ""
         self.callback = None
@@ -183,7 +183,8 @@ class Connection(object):
                 self.Socket.send(unregister_packet)
             self.Socket.close()
         except (Exception,):
-            self.Socket.close()
+            if self.Socket:
+                self.Socket.close()
         finally:
             pass
 
